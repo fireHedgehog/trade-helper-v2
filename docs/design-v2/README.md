@@ -17,6 +17,12 @@ Read in order:
 | 06 | `06-trend-and-timing.md` | The Donchian signal engine, the single-symbol Timing page, the whole-universe Trend board |
 | 07 | `07-credentials-and-shell.md` | The provider registry + secret handling, the app shell / routing / theme |
 
+Planned work is kept separate from the as-built sequence:
+
+| Status | File | Covers |
+| --- | --- | --- |
+| **UNFINISHED / NOT IMPLEMENTED** | `08-strategy-management-UNFINISHED.md` | Planned versioned strategy registry, manual assignments, V1 fallback, full-universe execution, shadow controls, and Strategy Manager page. |
+
 Everything here is **naive-v1 / descriptive / not statistically validated** by
 design (see 00). Keep these docs updated as the app changes; when a section
 goes stale, fix it or delete it — don't let stale design docs accumulate.
