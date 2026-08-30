@@ -1,0 +1,148 @@
+# =============================================================================
+# AI regime — model catalogue for the Macro page dropdown
+# =============================================================================
+# The dropdown on the Macro page is built from this file. Each [[model]] is one
+# option. `GET /api/macro/ai-regime/models?check=1` returns these rows plus a
+# flag for whether your OpenAI key actually exposes each id.
+#
+# `GET /api/macro/ai-regime/models/account` lists every chat model id on the key.
+#
+# EDITING
+#   - `id` must be the exact OpenAI model id.
+#   - `tier`   : "economy" | "standard" | "premium"  (label / sort hint only)
+#   - `family` : dropdown group label ("5.4", "5.6", "4o", …)
+#   - prices are USD per 1M tokens, for the per-run cost estimate next to the
+#     dropdown. 0.0 = unknown → the UI shows "cost est. n/a". Fill these in.
+#   - exactly one enabled row should have `default = true`.
+#   - `enabled = false` hides a row without deleting it.
+# =============================================================================
+
+# ---- 5.4 family (default) ------------------------------------------------
+[[model]]
+id = "gpt-5.4-nano"
+label = "GPT-5.4 nano"
+family = "5.4"
+tier = "economy"
+input_usd_per_1m = 0.0     # EDIT
+output_usd_per_1m = 0.0    # EDIT
+default = false
+enabled = true
+
+[[model]]
+id = "gpt-5.4-mini"
+label = "GPT-5.4 mini"
+family = "5.4"
+tier = "economy"
+input_usd_per_1m = 0.0     # EDIT
+output_usd_per_1m = 0.0    # EDIT
+default = true             # <-- the "default 5.4" you asked for
+enabled = true
+
+[[model]]
+id = "gpt-5.4"
+label = "GPT-5.4"
+family = "5.4"
+tier = "standard"
+input_usd_per_1m = 0.0     # EDIT
+output_usd_per_1m = 0.0    # EDIT
+default = false
+enabled = true
+
+[[model]]
+id = "gpt-5.4-pro"
+label = "GPT-5.4 pro"
+family = "5.4"
+tier = "premium"
+input_usd_per_1m = 0.0     # EDIT
+output_usd_per_1m = 0.0    # EDIT
+default = false
+enabled = true
+
+# ---- 5.6 family (luna / sol / terra — reorder/retier once you know which
+#      is cheap vs premium; names are as OpenAI ships them) ---------------
+[[model]]
+id = "gpt-5.6-luna"
+label = "GPT-5.6 luna"
+family = "5.6"
+tier = "economy"
+input_usd_per_1m = 0.0     # EDIT
+output_usd_per_1m = 0.0    # EDIT
+default = false
+enabled = true
+
+[[model]]
+id = "gpt-5.6-sol"
+label = "GPT-5.6 sol"
+family = "5.6"
+tier = "standard"
+input_usd_per_1m = 0.0     # EDIT
+output_usd_per_1m = 0.0    # EDIT
+default = false
+enabled = true
+
+[[model]]
+id = "gpt-5.6-terra"
+label = "GPT-5.6 terra"
+family = "5.6"
+tier = "premium"
+input_usd_per_1m = 0.0     # EDIT
+output_usd_per_1m = 0.0    # EDIT
+default = false
+enabled = true
+
+# ---- Older, cheap fallbacks (kept enabled, low in the list) -----------
+[[model]]
+id = "gpt-5-mini"
+label = "GPT-5 mini"
+family = "5.x"
+tier = "economy"
+input_usd_per_1m = 0.0     # EDIT
+output_usd_per_1m = 0.0    # EDIT
+default = false
+enabled = true
+
+[[model]]
+id = "gpt-4o-mini"
+label = "GPT-4o mini"
+family = "4o"
+tier = "economy"
+input_usd_per_1m = 0.15
+output_usd_per_1m = 0.60
+default = false
+enabled = true
+
+# =============================================================================
+# Token-budget presets (the small / medium / large selector)
+# =============================================================================
+# Controls how much snapshot detail is sent and how many LLM calls run.
+# See docs/draft-design/10-macro-page-and-ai-regime.md §5-6.
+
+[budget.small]
+label = "Small"
+snapshot_detail = "features_only"
+rate_series_points = 0
+personas = ["risk_on", "risk_off", "inflation", "credit_vol"]
+rebuttal_round = false
+persona_max_tokens = 700
+reconciler_max_tokens = 1100
+est_total_tokens = 11000
+
+[budget.medium]
+label = "Medium"
+snapshot_detail = "features_plus_key_arrays"
+rate_series_points = 30
+personas = ["risk_on", "risk_off", "inflation", "credit_vol", "growth_labor", "rates_curve"]
+rebuttal_round = false
+persona_max_tokens = 900
+reconciler_max_tokens = 1500
+est_total_tokens = 22000
+
+[budget.large]
+label = "Large"
+snapshot_detail = "features_plus_arrays_plus_history"
+rate_series_points = 60
+personas = ["risk_on", "risk_off", "inflation", "credit_vol", "growth_labor", "rates_curve"]
+rebuttal_round = true
+persona_max_tokens = 1200
+reconciler_max_tokens = 2200
+est_total_tokens = 48000

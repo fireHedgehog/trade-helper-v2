@@ -216,3 +216,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---- Trade Helper project ----
+
+# Frontend (Node)
+node_modules/
+frontend/dist/
+frontend/.env.local
+*.tsbuildinfo
+
+# Local runtime database (disposable, rebuilt from schema/ on startup)
+database/*.sqlite3
+database/*.sqlite3-wal
+database/*.sqlite3-shm
+database/*.sqlite3-journal
+
+# OS cruft
+.DS_Store
