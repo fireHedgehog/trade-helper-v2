@@ -105,6 +105,7 @@ export interface RegimeRun {
   calibration_notes: string | null;
   code_weighted_score: number | null;
   reconciler_score: number | null;
+  event_overlay: number | null;
   weights_json: string | null;
   on_votes: number;
   off_votes: number;

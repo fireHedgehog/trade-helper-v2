@@ -22,7 +22,7 @@ frontend/src/
   app/{router,AppShell,theme}.tsx
   shared/{api/client.ts, components/}
   features/<name>/            page.tsx + api.ts + types.ts + components/
-schema/migrations/            NNNN_*.sql  (0001–0012)
+schema/migrations/            NNNN_*.sql  (0001–0013)
 database/                     runtime SQLite file only (git-ignored)
 docs/design-v2/               this set (the as-built reference; superseded whole, not archived)
 ```

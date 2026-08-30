@@ -32,14 +32,15 @@ Pure, disclosed, recomputed live per request (no persisted score).
 ## AI regime gauge — `macro/ai_regime/`
 
 Optional. **Button-only**, cached once per `trading_date` (UNIQUE on
-`ai_regime_runs`). An adversarial voting agent over a **compact
-macro-financial snapshot only** (no equities / crypto / gold — "we only
-analyse what the macro data contains"): per-series feature vector +
-30/60-point arrays for the key rate/credit/vol series.
+`ai_regime_runs`). The structural analysts use a **compact macro-financial
+snapshot only** (no equities / crypto / gold): per-series feature vectors +
+30/60-point arrays for the key rate/credit/vol series. The separate catalyst
+overlay may web-search dated current events and market-pricing confirmation.
 
-- **6 personas + a reconciler.** `risk_on` / `risk_off` one-sided advocates;
+- **7 personas + a reconciler (medium/large).** `risk_on` / `risk_off` one-sided advocates;
   `inflation` / `credit_vol` / `growth_labor` / `rates_curve` neutral domain
-  analysts. Prompt text in `prompts.toml` (`version = 3`).
+  analysts; `macro_catalyst` is a separate web-searched event overlay, not a
+  structural vote. Prompt text in `prompts.toml` (`version = 5`).
 - **Rounds:** (1) independent persona votes; (2) advocates rebut each other
   (large budget only); (3) reconciler → holistic score + confidence.
 - **Domain weights** (`prompts.toml [weights]`): base `credit_vol 0.30 /
@@ -50,13 +51,20 @@ analyse what the macro data contains"): per-series feature vector +
 - **Score blend:** `score_raw = 0.6 · code_weighted_score + 0.4 ·
   reconciler_score`. `code_weighted_score` is deterministic — `Σ weight ·
   conviction · signed_vote` over the neutral analysts (advocates excluded).
+- **Macro catalyst overlay:** medium/large runs make one Responses API web-search
+  call for material events from the last 7 days. It defaults to neutral, is
+  excluded from structural tallies and weights, and is capped at ±5 before a
+  deterministic confidence, already-priced, and 3-day half-life reduction.
+  Mostly-priced or unsourced events contribute zero; unavailable web search
+  degrades to neutral without failing the structural run.
 - **Calibration (code, after the blend):** agreement ceiling,
   both-advocates-confident penalty, stale-input penalty
   (`2·period + typical_lag + 12` day threshold), naive-divergence penalty,
   vote-sanity, verbosity truncation. Stored as `score` / `confidence` vs the
   `_raw` values + `calibration_notes`.
-- **Budgets** (`models.toml`): `small` (4 personas, features-only snapshot,
-  700/1100 tok), `medium` (6, + key arrays, 900/1500), `large` (6, + history,
+- **Budgets** (`models.toml`): `small` (4 structural personas, features-only snapshot,
+  700/1100 tok), `medium` (6 structural + catalyst, + key arrays, 900/1500),
+  `large` (6 structural + catalyst, + history,
   1200/2200 + rebuttal round). Model list from the OpenAI account, seeded
   ids in `model_catalog.py`. Reasoning models retry once at 4× tokens if the
   first response is empty.

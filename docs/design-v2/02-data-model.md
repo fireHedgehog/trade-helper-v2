@@ -1,7 +1,7 @@
 # Data model
 
 All tables live in one SQLite file, defined only in `schema/migrations/`
-(0001–0012). Grouped by instrument / concern family. `*_stats` tables are
+(0001–0013). Grouped by instrument / concern family. `*_stats` tables are
 maintained summaries so list views never scan the fact table.
 
 ## Equities / ETFs
@@ -58,7 +58,7 @@ No persisted "macro regime" — the composite is computed live (doc 04).
 
 | Table | Key | Notes |
 | --- | --- | --- |
-| `ai_regime_runs` | `id`, UNIQUE `trading_date` | One row per day-cached run: `model`, `budget`, `prompt_version`, `score` / `confidence` (calibrated) + `_raw`, vote tallies, `summary`, `naive_score`, `weights_json`, `code_weighted_score`, `reconciler_score`, `calibration_notes`, token/cost. |
+| `ai_regime_runs` | `id`, UNIQUE `trading_date` | One row per day-cached run: `model`, `budget`, `prompt_version`, `score` / `confidence` (calibrated) + `_raw`, structural vote tallies, `summary`, `naive_score`, `weights_json`, `code_weighted_score`, `reconciler_score`, bounded `event_overlay`, `calibration_notes`, token/cost. |
 | `ai_regime_messages` | `(run_id, …)` | full prompt/response audit per persona + reconciler. |
 | `ai_regime_votes` | `(run_id, persona)` | vote / conviction / rationale (draft table; the live path uses `ai_regime_messages`). |
 

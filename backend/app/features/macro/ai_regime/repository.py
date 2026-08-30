@@ -7,7 +7,7 @@ import sqlite3
 _RUN_COLS = (
     "id, created_at, trading_date, model, budget, prompt_version, "
     "score_raw, score, confidence_raw, confidence, calibration_notes, "
-    "code_weighted_score, reconciler_score, weights_json, "
+    "code_weighted_score, reconciler_score, event_overlay, weights_json, "
     "on_votes, off_votes, neutral_votes, summary, naive_score, "
     "input_snapshot_json, prompt_tokens, completion_tokens, cost_estimate_usd, status, error"
 )
@@ -54,14 +54,14 @@ def upsert_run(conn: sqlite3.Connection, run: dict) -> int:
         INSERT INTO ai_regime_runs
             (trading_date, model, budget, prompt_version, score_raw, score,
              confidence_raw, confidence, calibration_notes,
-             code_weighted_score, reconciler_score, weights_json,
+             code_weighted_score, reconciler_score, event_overlay, weights_json,
              on_votes, off_votes, neutral_votes, summary, naive_score,
              input_snapshot_json, prompt_tokens, completion_tokens,
              cost_estimate_usd, status, error)
         VALUES
             (:trading_date, :model, :budget, :prompt_version, :score_raw, :score,
              :confidence_raw, :confidence, :calibration_notes,
-             :code_weighted_score, :reconciler_score, :weights_json,
+             :code_weighted_score, :reconciler_score, :event_overlay, :weights_json,
              :on_votes, :off_votes, :neutral_votes, :summary, :naive_score,
              :input_snapshot_json, :prompt_tokens, :completion_tokens,
              :cost_estimate_usd, :status, :error)
@@ -73,7 +73,8 @@ def upsert_run(conn: sqlite3.Connection, run: dict) -> int:
             confidence_raw=excluded.confidence_raw, confidence=excluded.confidence,
             calibration_notes=excluded.calibration_notes,
             code_weighted_score=excluded.code_weighted_score,
-            reconciler_score=excluded.reconciler_score, weights_json=excluded.weights_json,
+            reconciler_score=excluded.reconciler_score,
+            event_overlay=excluded.event_overlay, weights_json=excluded.weights_json,
             on_votes=excluded.on_votes, off_votes=excluded.off_votes,
             neutral_votes=excluded.neutral_votes, summary=excluded.summary,
             naive_score=excluded.naive_score,

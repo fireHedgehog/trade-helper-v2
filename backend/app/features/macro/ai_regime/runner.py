@@ -11,7 +11,7 @@ from datetime import date, datetime, timezone
 from app.features.macro import composite as naive
 from app.features.macro.ai_regime import calibration, repository as repo
 from app.features.macro.ai_regime import model_catalog as mc
-from app.features.macro.ai_regime.openai_client import OpenAIError, chat, extract_json
+from app.features.macro.ai_regime.openai_client import OpenAIError, chat, extract_json, web_chat
 from app.features.macro.ai_regime.prompts import get_prompts
 from app.features.macro.ai_regime.snapshot import build_snapshot
 
@@ -140,8 +140,33 @@ async def run(
     try:
         # ---- round 1: independent persona votes ----
         for p in personas:
-            user = p.instruction.replace("{snapshot}", snap_json)
-            text, parsed, pt, ct = await _call(prompts.system, user, budget.persona_max_tokens)
+            user = (
+                p.instruction.replace("{snapshot}", snap_json)
+                .replace("{current_date}", trading_date)
+            )
+            if p.key == "macro_catalyst":
+                try:
+                    text, pt, ct = await web_chat(
+                        model_id, prompts.system, user, max_tokens=budget.persona_max_tokens
+                    )
+                    parsed = _safe_json(text)
+                except OpenAIError as exc:
+                    logger.warning("Macro catalyst web search unavailable: %s", exc)
+                    parsed = {
+                        "vote": "NEUTRAL",
+                        "conviction": 0,
+                        "impact": 0,
+                        "pricing_status": "unclear",
+                        "event": "Web search unavailable",
+                        "event_date": None,
+                        "incremental_reason": "No sourced catalyst assessment was available.",
+                        "sources": [],
+                    }
+                    text, pt, ct = json.dumps(parsed), 0, 0
+            else:
+                text, parsed, pt, ct = await _call(
+                    prompts.system, user, budget.persona_max_tokens
+                )
             total_pt += pt
             total_ct += ct
             vote = str(parsed.get("vote", "")).upper()
@@ -193,7 +218,8 @@ async def run(
         raise RegimeRunError(str(exc)) from exc
 
     # ---- tally + weighted code score + calibrate ----
-    final_votes = [str(a.get("vote", "")).upper() for a in answers.values()]
+    structural_answers = {k: v for k, v in answers.items() if k != "macro_catalyst"}
+    final_votes = [str(a.get("vote", "")).upper() for a in structural_answers.values()]
     on = final_votes.count("ON")
     off = final_votes.count("OFF")
     neutral = final_votes.count("NEUTRAL")
@@ -202,9 +228,13 @@ async def run(
     reconciler_score = _num(rec.get("score"))
     blend = prompts.weights.code_blend
     if code_score is not None and reconciler_score is not None:
-        score_raw = blend * code_score + (1 - blend) * reconciler_score
+        structural_score_raw = blend * code_score + (1 - blend) * reconciler_score
     else:
-        score_raw = reconciler_score if reconciler_score is not None else (code_score or 50.0)
+        structural_score_raw = (
+            reconciler_score if reconciler_score is not None else (code_score or 50.0)
+        )
+    event_overlay = _catalyst_overlay(answers.get("macro_catalyst"), trading_date)
+    score_raw = max(0.0, min(100.0, structural_score_raw + event_overlay))
 
     conf_raw = _num(rec.get("confidence")) or 50.0
     naive_score = _naive_score(conn)
@@ -217,6 +247,8 @@ async def run(
         on_votes=on, off_votes=off, neutral_votes=neutral,
         advocate_convictions=adv_conv, stale_series=_stale_series(conn), naive_score=naive_score,
     )
+    if "macro_catalyst" in answers:
+        notes.append(_catalyst_note(answers["macro_catalyst"], event_overlay))
 
     run_row = {
         "trading_date": trading_date,
@@ -234,6 +266,7 @@ async def run(
         "weights_json": json.dumps(weights),
         "code_weighted_score": (round(code_score, 1) if code_score is not None else None),
         "reconciler_score": (round(reconciler_score, 1) if reconciler_score is not None else None),
+        "event_overlay": round(event_overlay, 1),
         "input_snapshot_json": snap_json,
         "prompt_tokens": total_pt, "completion_tokens": total_ct,
         "cost_estimate_usd": _cost(model_id, total_pt, total_ct),
@@ -245,6 +278,39 @@ async def run(
 
 
 _VOTE_VAL = {"ON": 1.0, "NEUTRAL": 0.0, "OFF": -1.0}
+
+_PRICING_FACTOR = {
+    "unpriced": 1.0,
+    "partly_priced": 0.5,
+    "mostly_priced": 0.0,
+    "unclear": 0.25,
+}
+
+
+def _catalyst_overlay(answer: dict | None, trading_date: str) -> float:
+    """Bounded, fast-decaying event adjustment; structural weights stay intact."""
+    if not answer:
+        return 0.0
+    vote = str(answer.get("vote", "")).upper()
+    sign = 1.0 if vote == "ON" else -1.0 if vote == "OFF" else 0.0
+    if sign == 0.0 or not answer.get("sources"):
+        return 0.0
+    impact = max(0.0, min(5.0, _num(answer.get("impact")) or 0.0))
+    conviction = max(0.0, min(100.0, _num(answer.get("conviction")) or 0.0)) / 100.0
+    pricing = _PRICING_FACTOR.get(str(answer.get("pricing_status", "unclear")), 0.25)
+    try:
+        event_date = date.fromisoformat(str(answer.get("event_date")))
+        age_days = max(0, (date.fromisoformat(trading_date) - event_date).days)
+    except ValueError:
+        age_days = 3
+    recency = 0.5 ** (age_days / 3.0)
+    return round(sign * impact * conviction * pricing * recency, 2)
+
+
+def _catalyst_note(answer: dict, overlay: float) -> str:
+    event = str(answer.get("event") or "no qualifying fresh catalyst").strip()[:100]
+    pricing = str(answer.get("pricing_status") or "unclear").replace("_", " ")
+    return f"macro catalyst overlay {overlay:+.1f} ({event}; {pricing}; 3-day half-life)"
 
 
 def _weighted_code_score(answers: dict[str, dict], weights: dict[str, float]) -> float | None:

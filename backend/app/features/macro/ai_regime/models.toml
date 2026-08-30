@@ -131,18 +131,18 @@ est_total_tokens = 11000
 label = "Medium"
 snapshot_detail = "features_plus_key_arrays"
 rate_series_points = 30
-personas = ["risk_on", "risk_off", "inflation", "credit_vol", "growth_labor", "rates_curve"]
+personas = ["risk_on", "risk_off", "inflation", "credit_vol", "growth_labor", "rates_curve", "macro_catalyst"]
 rebuttal_round = false
 persona_max_tokens = 900
 reconciler_max_tokens = 1500
-est_total_tokens = 22000
+est_total_tokens = 26000
 
 [budget.large]
 label = "Large"
 snapshot_detail = "features_plus_arrays_plus_history"
 rate_series_points = 60
-personas = ["risk_on", "risk_off", "inflation", "credit_vol", "growth_labor", "rates_curve"]
+personas = ["risk_on", "risk_off", "inflation", "credit_vol", "growth_labor", "rates_curve", "macro_catalyst"]
 rebuttal_round = true
 persona_max_tokens = 1200
 reconciler_max_tokens = 2200
-est_total_tokens = 48000
+est_total_tokens = 54000

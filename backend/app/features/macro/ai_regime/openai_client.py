@@ -68,6 +68,50 @@ async def chat(
     return text, int(usage.get("prompt_tokens", 0)), int(usage.get("completion_tokens", 0))
 
 
+async def web_chat(
+    model: str,
+    system: str,
+    user: str,
+    *,
+    max_tokens: int,
+    timeout: float = 120.0,
+) -> tuple[str, int, int]:
+    """One Responses API call with web search for the catalyst overlay only."""
+    settings = get_settings()
+    api_key = resolve_provider_secrets("openai")["api_key"]
+    url = f"{settings.openai_api_base}/v1/responses"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    body = {
+        "model": model,
+        "instructions": system,
+        "input": user,
+        "tools": [{"type": "web_search_preview", "search_context_size": "medium"}],
+        "tool_choice": "auto",
+        "include": ["web_search_call.action.sources"],
+        "max_output_tokens": max_tokens,
+        "store": False,
+    }
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post(url, headers=headers, json=body)
+    if resp.status_code != 200:
+        raise OpenAIError(f"web search HTTP {resp.status_code}: {resp.text[:300]}")
+
+    data = resp.json()
+    parts: list[str] = []
+    for item in data.get("output", []):
+        if item.get("type") != "message":
+            continue
+        for content in item.get("content", []):
+            if content.get("type") == "output_text" and content.get("text"):
+                parts.append(content["text"])
+    text = "\n".join(parts)
+    if not text:
+        raise OpenAIError(f"unexpected web-search response shape: {json.dumps(data)[:300]}")
+    usage = data.get("usage") or {}
+    return text, int(usage.get("input_tokens", 0)), int(usage.get("output_tokens", 0))
+
+
 def extract_json(text: str) -> dict:
     """Pull the first JSON object out of a completion (handles ``` fences)."""
     t = text.strip()

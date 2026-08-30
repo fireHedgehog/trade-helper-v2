@@ -63,7 +63,7 @@ class RunRegimeRequest(BaseModel):
 async def run_regime(
     body: RunRegimeRequest, conn: sqlite3.Connection = Depends(db_dependency)
 ):
-    """Blocking — makes 4–9 OpenAI calls (~15–60 s). Cached per trading date;
+    """Blocking — makes 4–10 OpenAI calls (~15–60 s). Cached per trading date;
     `force=true` re-runs and replaces today's."""
     try:
         return await ai_runner.run(

@@ -51,6 +51,12 @@ function PersonaRow({ m }: { m: RegimeMessage }) {
     /* ignore */
   }
   const evidence = Array.isArray(parsed.key_evidence) ? (parsed.key_evidence as string[]) : [];
+  const rationale =
+    typeof parsed.rationale === "string"
+      ? parsed.rationale
+      : typeof parsed.incremental_reason === "string"
+        ? parsed.incremental_reason
+        : null;
   return (
     <Box sx={{ py: 1 }}>
       <Stack direction="row" spacing={1} sx={{ alignItems: "center", flexWrap: "wrap" }}>
@@ -66,9 +72,15 @@ function PersonaRow({ m }: { m: RegimeMessage }) {
           />
         )}
       </Stack>
-      {typeof parsed.rationale === "string" && (
+      {m.persona === "macro_catalyst" && typeof parsed.event === "string" && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+          {parsed.event} · pricing: {String(parsed.pricing_status ?? "unclear")} · gross impact:{" "}
+          {String(parsed.impact ?? 0)} / 5
+        </Typography>
+      )}
+      {rationale && (
         <Typography variant="body2" color="text.secondary">
-          {parsed.rationale}
+          {rationale}
         </Typography>
       )}
       {evidence.length > 0 && (
@@ -203,8 +215,12 @@ export function RegimePanel({ naiveScore }: { naiveScore: number | null }) {
 
           {run && (run.code_weighted_score != null || run.reconciler_score != null) && (
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-              Score = ½ weighted-vote ({run.code_weighted_score ?? "—"}) + ½ reconciler (
-              {run.reconciler_score ?? "—"}) → {run.score_raw}
+              Structural blend: weighted-vote ({run.code_weighted_score ?? "—"}) + reconciler (
+              {run.reconciler_score ?? "—"})
+              {run.prompt_version >= 5
+                ? ` · catalyst overlay ${(run.event_overlay ?? 0) >= 0 ? "+" : ""}${run.event_overlay ?? 0}`
+                : ""}{" "}
+              → {run.score_raw}
               {(() => {
                 if (!run.weights_json) return "";
                 try {

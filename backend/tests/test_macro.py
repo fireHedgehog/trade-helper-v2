@@ -19,6 +19,11 @@ def test_budgets_endpoint(client):
     assert keys == {"small", "medium", "large"}
     large = next(b for b in body if b["key"] == "large")
     assert large["rebuttal_round"] is True
+    medium = next(b for b in body if b["key"] == "medium")
+    small = next(b for b in body if b["key"] == "small")
+    assert "macro_catalyst" in medium["personas"]
+    assert "macro_catalyst" in large["personas"]
+    assert "macro_catalyst" not in small["personas"]
 
 
 def test_overview_empty(client):
@@ -173,3 +178,54 @@ def test_ai_regime_run_without_macro_data_errors(client, monkeypatch):
     r = client.post("/api/macro/ai-regime/run", json={"budget": "small"})
     assert r.status_code == 400
     assert "macro" in r.json()["detail"].lower()
+
+
+def test_medium_run_applies_separate_bounded_catalyst_overlay(client, monkeypatch):
+    from datetime import datetime, timezone
+
+    _seed_macro()
+
+    async def fake_chat(model, system, user, *, max_tokens, temperature, **kw):
+        if "Analyst answers" in user:
+            body = (
+                '{"score":60,"confidence":60,"on_votes":3,"off_votes":2,'
+                '"neutral_votes":1,"summary":"Structural regime with a separate catalyst."}'
+            )
+        else:
+            body = '{"vote":"ON","conviction":60,"key_evidence":["x"],"rationale":"x"}'
+        return body, 100, 40
+
+    async def fake_web_chat(model, system, user, *, max_tokens, **kw):
+        today = datetime.now(timezone.utc).date().isoformat()
+        body = (
+            '{"vote":"OFF","conviction":80,"impact":4,'
+            '"pricing_status":"partly_priced","event":"Hawkish policy surprise",'
+            f'"event_date":"{today}","incremental_reason":"Part remains unpriced",'
+            '"sources":[{"title":"Source","url":"https://example.com"}]}'
+        )
+        return body, 120, 50
+
+    monkeypatch.setattr("app.features.macro.ai_regime.runner.chat", fake_chat)
+    monkeypatch.setattr("app.features.macro.ai_regime.runner.web_chat", fake_web_chat)
+
+    run = client.post("/api/macro/ai-regime/run", json={"budget": "medium"}).json()
+    assert run["event_overlay"] == pytest.approx(-1.6)
+    assert run["on_votes"] + run["off_votes"] + run["neutral_votes"] == 6
+    assert len(run["messages"]) == 8  # 7 personas + reconciler
+    assert any(m["persona"] == "macro_catalyst" for m in run["messages"])
+    assert "macro catalyst overlay -1.6" in run["calibration_notes"]
+
+
+def test_catalyst_overlay_rejects_double_counted_or_unsourced_events():
+    from app.features.macro.ai_regime.runner import _catalyst_overlay
+
+    answer = {
+        "vote": "OFF",
+        "conviction": 100,
+        "impact": 5,
+        "pricing_status": "mostly_priced",
+        "event_date": "2026-08-30",
+        "sources": [{"title": "Source", "url": "https://example.com"}],
+    }
+    assert _catalyst_overlay(answer, "2026-08-30") == 0
+    assert _catalyst_overlay({**answer, "pricing_status": "unpriced", "sources": []}, "2026-08-30") == 0

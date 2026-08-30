@@ -3,14 +3,14 @@
 # =============================================================================
 # Idea, not implementation, from AIA Forecaster (arxiv 2511.07678): several
 # framed queries + one reconciling pass beats a single prompt. Deliberately
-# cheap — a small model, ~6 short calls, only on a button press, cached per day.
+# cheap — a small model, 4-10 short calls, only on a button press, cached per day.
 #
 # HOW IT RUNS
 #   1. The backend builds `snapshot` (see below) from our own DB — no extra fetch.
 #   2. Each [[persona]] gets: system + its instruction + the snapshot.
 #      It must answer with ONE JSON object: {"vote","conviction","rationale"}.
 #   3. [reconciler] gets all persona answers and returns the gauge JSON.
-#   4. Everything is stored in ai_regime_runs / ai_regime_votes.
+#   4. Everything is stored in ai_regime_runs / ai_regime_messages.
 #
 # EDITING
 #   - Plain text. Edit freely; the loader reads this file at run time.
@@ -21,7 +21,7 @@
 #   - Keep instructions short: personas run with a low token cap.
 # =============================================================================
 
-version = 3
+version = 5
 
 [meta]
 # The actual model id comes from the OPENAI_MODEL setting (default gpt-4o-mini).
@@ -50,8 +50,9 @@ financial-conditions and financial-stress indices, the VIX, credit spreads
 (high-yield OAS), money aggregates, and the broad trade-weighted dollar.
 
 Hard rules:
-- Reason ONLY from series present in the snapshot. Do not invent numbers or
-  news.
+- Structural personas reason ONLY from series present in the snapshot. The
+  macro_catalyst persona may also use dated facts returned by its web-search
+  tool, but never model memory or an unsourced current-event claim.
 - Do NOT reason from equity-index returns, sector or single-stock
   performance, "growth stocks", crypto, or any price action that is not in
   the snapshot — you do not have that data and it is out of scope for this
@@ -66,7 +67,7 @@ Hard rules:
 """
 
 # -----------------------------------------------------------------------------
-# Personas  (P1..P5)  — each returns one JSON object
+# Structural personas — each returns one JSON object
 # -----------------------------------------------------------------------------
 [[persona]]
 key = "risk_on"
@@ -76,9 +77,10 @@ Argue the strongest honest case that the regime is currently risk-ON, from
 the macro series only. Look for: easing financial-conditions / financial-stress
 indices, tight and stable high-yield OAS, low and falling VIX, resilient
 growth and labour data, contained inflation and inflation expectations,
-steady-to-falling real rates, a positive (or re-steepening) curve, a stable
-or softening dollar, and stable-to-soft oil. Steelman the bull case — but
-stay tethered to the snapshot and do not mention equities/stocks/crypto.
+steady-to-falling real rates, a constructively re-steepening curve after
+checking which tenor moved, a stable or softening dollar, and stable-to-soft
+oil. Steelman the bull case — but stay tethered to the snapshot and do not
+mention equities/stocks/crypto.
 
 Snapshot:
 {snapshot}
@@ -133,10 +135,12 @@ instruction = """
 Judge the regime from the rate structure only (leave inflation to the
 inflation analyst): the level and 3-month direction of the policy rate, the 2y
 and 10y yields, the 10y-2y and 10y-3m slopes (inversion vs re-steepening), and
-the 30y mortgage rate as the housing-transmission channel. A deeply inverted
-or sharply flattening curve, or rapidly rising long yields, is cautionary; a
-positive, stable or bull-steepening curve with a policy rate that is steady or
-easing is supportive.
+the 30y mortgage rate as the housing-transmission channel. Do not treat a
+positive slope as automatically supportive: attribute it by comparing changes
+in the policy rate, 2y and 10y (easing-led bull steepening, long-end-led bear
+steepening, or mixed). State the likely channel; if the driver is ambiguous,
+prefer NEUTRAL or lower conviction. Rapidly rising long yields remain
+cautionary, and judge mortgage transmission separately.
 
 Snapshot:
 {snapshot}
@@ -180,6 +184,36 @@ Respond with ONLY this JSON, nothing else:
 {"vote": "ON" | "OFF" | "NEUTRAL", "conviction": <integer 0-100>, "key_evidence": ["<fact with a number>", "<fact with a number>"], "rationale": "<=2 sentences citing figures"}
 """
 
+[[persona]]
+key = "macro_catalyst"
+name = "Macro catalyst & pricing analyst"
+instruction = """
+Act as a small, fast-decaying overlay on the structural regime, not another
+equal-weight domain vote. Today is {current_date}. Use web search to identify
+at most two material macro, central-bank, fiscal, trade, geopolitical, or
+cross-border funding/carry catalysts from the last 7 calendar days. Examples
+include a genuine policy surprise or USD/JPY carry stress; routine headlines
+do not qualify.
+
+Judge only the catalyst's INCREMENTAL information relative to what markets
+already price. Cross-check event surprise, market confirmation, and persistence
+against the snapshot's 2y/10y yields, curve, VIX, high-yield OAS, dollar, oil,
+and financial-stress paths. Do not count the same shock again merely because it
+already moved those structural inputs. If it is mostly priced, unconfirmed,
+reversed, stale, or no qualifying event exists, vote NEUTRAL with impact 0.
+
+This overlay is deliberately tiny: impact is gross severity from 0 to 5, where
+1-2 is normal, 3-4 requires a fresh and clearly material surprise, and 5 is
+reserved for a systemic shock. The backend further reduces it for conviction,
+pricing, and age. Cite dated sources; never guess current news.
+
+Snapshot:
+{snapshot}
+
+Respond with ONLY this JSON, nothing else:
+{"vote": "ON" | "OFF" | "NEUTRAL", "conviction": <integer 0-100>, "impact": <number 0-5>, "pricing_status": "unpriced" | "partly_priced" | "mostly_priced" | "unclear", "event": "<short label or none>", "event_date": "YYYY-MM-DD or null", "incremental_reason": "<why this is not double-counted, <=2 sentences>", "sources": [{"title": "<source>", "url": "<https URL>"}]}
+"""
+
 # -----------------------------------------------------------------------------
 # Rebuttal round  (large budget only) — each advocate answers the other side
 # Placeholders: {snapshot}, {own_answer}, {opposing_answer}
@@ -218,13 +252,15 @@ Snapshot:
 Analyst answers (JSON):
 {persona_answers}
 
-Domain weights to apply to the four neutral analysts (the risk_on / risk_off
-advocates are deliberately one-sided — use their arguments, do NOT weight
-their votes):
+Domain weights to apply to the four neutral structural analysts (the risk_on /
+risk_off advocates are deliberately one-sided — use their arguments, do NOT
+weight their votes; macro_catalyst is a separate overlay and has no domain
+weight):
 {weights}
 
 Do this:
-1. Tally the votes (ON / OFF / NEUTRAL) across ALL analysts.
+1. Tally ON / OFF / NEUTRAL across the structural analysts only. Keep the
+   macro_catalyst result separate; it is not a seventh equal vote.
 2. Produce a 0-100 `score` (0 = extreme risk-OFF, 50 = neutral, 100 = extreme
    risk-ON) by weighting each neutral analyst's signed vote (ON = +1, NEUTRAL
    = 0, OFF = −1) by BOTH the domain weight above AND its stated conviction.
@@ -233,10 +269,18 @@ Do this:
 3. Produce a 0-100 `confidence`: high only when the (weighted) analysts agree
    AND cite strong, consistent figures. If the vote split is close or
    convictions are low, keep confidence at or below 55.
-4. Write `summary`: 3-5 sentences of professional market commentary explaining
+4. Return `score` as the structural score only. The backend applies the small,
+   deterministic catalyst overlay after this blend, so do not add it here.
+5. Write `summary`: 3-5 sentences of professional market commentary explaining
    today's read, leading with the highest-weight drivers and citing specific
    numbers (e.g. "Core PCE at 3.3% keeps the inflation analyst risk-off and
    carries the largest weight, but high-yield OAS at the 2nd percentile ...").
+   For curve evidence, use the component moves rather than the slope's sign
+   alone, and cross-check the likely driver against inflation, growth/labour,
+   and credit/volatility.
+   If macro_catalyst is non-neutral, describe it separately as a fresh headwind
+   or tailwind and state how much appears already priced. Never repeat it as a
+   second structural argument.
    No advice, no disclaimer, no hedging filler.
 
 Respond with ONLY this JSON, nothing else:
