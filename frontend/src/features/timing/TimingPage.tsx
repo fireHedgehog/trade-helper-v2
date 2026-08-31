@@ -103,12 +103,11 @@ export function TimingPage() {
   const [symbol, setSymbol] = useState(initialSymbol);
   const [data, setData] = useState<TimingResponse | null>(null);
   const [params, setParams] = useState<SignalParams | null>(null);
-  const [configName, setConfigName] = useState("");
+  const [strategyLabel, setStrategyLabel] = useState("");
   const [engineVersion, setEngineVersion] = useState("");
   const [showParams, setShowParams] = useState(false);
   const [showGuide, setShowGuide] = useState(true);
   const [running, setRunning] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [timeframe, setTimeframe] = useState<Timeframe>("D");
@@ -161,14 +160,15 @@ export function TimingPage() {
     [symResults, symValue],
   );
 
-  // the (single) parameter library
+  // Pre-fill the form from the symbol's assigned strategy. Re-resolve when the
+  // symbol changes so a bond ETF shows its slow-entry parameters.
   useEffect(() => {
-    void timingApi.config().then((c) => {
-      setParams(c.params);
-      setConfigName(c.name);
-      setEngineVersion(c.engine_version);
+    void timingApi.resolved(symbol).then((r) => {
+      setParams(r.strategy.params);
+      setStrategyLabel(r.strategy.name);
+      setEngineVersion(r.engine_version);
     });
-  }, []);
+  }, [symbol]);
 
   const load = useCallback((sym: string) => {
     setError(null);
@@ -190,27 +190,15 @@ export function TimingPage() {
   };
 
   const doRun = async () => {
+    if (!params) return;
     setRunning(true);
     setError(null);
     try {
-      setData(await timingApi.run(symbol));
+      setData(await timingApi.preview(symbol, params));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
     } finally {
       setRunning(false);
-    }
-  };
-
-  const doSave = async () => {
-    if (!params) return;
-    setSaving(true);
-    try {
-      const c = await timingApi.saveConfig(params, configName);
-      setParams(c.params);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : String(e));
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -296,9 +284,11 @@ export function TimingPage() {
         Timing
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
-        The trend rule ({configName || "Donchian 20/10"}) drilled into one symbol: its long / short
-        entries and exits over the full price history, plus rule-only performance metrics. Every Run
-        computes both directions; the Long / Short toggles below only change what is shown.
+        The trend rule ({strategyLabel || "Naive Donchian V1"}) drilled into one symbol: its long /
+        short entries and exits over the full price history, plus rule-only performance metrics. Run
+        recomputes live with the parameters below and is <b>not saved</b> — the Trend board always
+        uses the symbol&apos;s assigned strategy. Every run computes both directions; the Long /
+        Short toggles below only change what is shown.
       </Typography>
 
       <Stack
@@ -434,8 +424,8 @@ export function TimingPage() {
               <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
                 Parameters
                 <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                  — one set, used for every Run; engine {engineVersion}. The long / short view filter
-                  does not touch these.
+                  — pre-filled from {symbol}&apos;s assigned strategy ({strategyLabel || "V1"}); engine{" "}
+                  {engineVersion}. Edits run live only and are never saved.
                 </Typography>
               </Typography>
               <Stack direction="row" useFlexGap sx={{ flexWrap: "wrap", gap: 2 }}>
@@ -511,20 +501,10 @@ export function TimingPage() {
                   </Typography>
                 </Box>
               </Stack>
-              <Stack direction="row" spacing={2} sx={{ mt: 2, alignItems: "center" }}>
-                <TextField
-                  label="Preset name"
-                  size="small"
-                  value={configName}
-                  onChange={(e) => setConfigName(e.target.value)}
-                />
-                <Button variant="outlined" onClick={doSave} disabled={saving}>
-                  {saving ? "Saving…" : "Save parameters"}
-                </Button>
-                <Typography variant="caption" color="text.secondary">
-                  Save writes the active preset; Run always uses the saved preset.
-                </Typography>
-              </Stack>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>
+                These parameters run live in this page only — nothing is saved. To change what the
+                Trend board uses for a symbol, assign it a strategy on the <b>Strategies</b> page.
+              </Typography>
             </>
           )}
         </Paper>

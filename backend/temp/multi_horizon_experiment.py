@@ -108,6 +108,13 @@ def parse_args() -> argparse.Namespace:
         default=756,
         help="Recent observations embedded for each watchlist timeline.",
     )
+    parser.add_argument(
+        "--cost-mult",
+        type=float,
+        default=1.0,
+        help="Multiply modeled cost_bps and slippage_atr (use 2 for the stage 5 check). "
+        "Outputs get a _cost<mult> suffix so the normal-cost snapshot is preserved.",
+    )
     return parser.parse_args()
 
 
@@ -773,6 +780,11 @@ def main() -> None:
     started = time.perf_counter()
     with read_only_connection(args.database) as conn:
         config_name, base_params = active_config(conn)
+        if args.cost_mult != 1.0:
+            base_params = base_params.model_copy(update={
+                "cost_bps": min(50.0, base_params.cost_bps * args.cost_mult),
+                "slippage_atr": min(1.0, base_params.slippage_atr * args.cost_mult),
+            })
         latest_run = latest_universe_run(conn)
         targets = universe_targets(conn)
         symbol_rows: list[dict[str, Any]] = []
@@ -815,12 +827,13 @@ def main() -> None:
     lags = lag_summaries(speed_events)
     elapsed = time.perf_counter() - started
 
+    sfx = "" if args.cost_mult == 1.0 else f"_cost{args.cost_mult:g}"
     outputs = {
-        "symbols": args.output_dir / "multi_horizon_symbol_results.csv",
-        "periods": args.output_dir / "multi_horizon_period_results.csv",
-        "events": args.output_dir / "multi_horizon_speed_events.csv",
-        "summary": args.output_dir / "multi_horizon_summary.json",
-        "report": args.output_dir / "multi_horizon_report.html",
+        "symbols": args.output_dir / f"multi_horizon_symbol_results{sfx}.csv",
+        "periods": args.output_dir / f"multi_horizon_period_results{sfx}.csv",
+        "events": args.output_dir / f"multi_horizon_speed_events{sfx}.csv",
+        "summary": args.output_dir / f"multi_horizon_summary{sfx}.json",
+        "report": args.output_dir / f"multi_horizon_report{sfx}.html",
     }
     write_csv(outputs["symbols"], symbol_rows)
     write_csv(outputs["periods"], period_results)
@@ -829,6 +842,7 @@ def main() -> None:
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "database": str(args.database.resolve()),
         "config_name": config_name,
+        "cost_mult": args.cost_mult,
         "shared_params": base_params.model_dump(),
         "variants": [variant.__dict__ for variant in VARIANTS],
         "directions": list(DIRECTIONS),

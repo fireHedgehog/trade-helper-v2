@@ -1,13 +1,19 @@
 import { api } from "@/shared/api/client";
 import { dataApi } from "@/features/data-management/api";
 
-import type { ConfigResponse, SignalParams, TimingResponse } from "./types";
+import type { ResolvedStrategy, SignalParams, TimingResponse } from "./types";
 
 export const timingApi = {
-  config: () => api.get<ConfigResponse>("/signals/config"),
-  saveConfig: (params: SignalParams, name?: string) =>
-    api.put<ConfigResponse>("/signals/config", { name, params }),
-  run: (symbol: string) => api.post<TimingResponse>("/signals/run", { symbol }),
+  // The strategy a symbol resolves to — pre-fills the parameter form.
+  resolved: (symbol: string) =>
+    api.get<ResolvedStrategy>(
+      `/signals/strategies/resolve/${encodeURIComponent(symbol)}`,
+    ),
+  // Live run with the supplied parameters. Persists NOTHING — the Trend run
+  // owns the stored signals; Timing is a scratchpad.
+  preview: (symbol: string, params: SignalParams) =>
+    api.post<TimingResponse>("/signals/preview", { symbol, params }),
+  // The last stored run for the symbol (the board's universe run, or a `/run`).
   timing: (symbol: string) =>
     api.get<TimingResponse>(`/signals/timing/${encodeURIComponent(symbol)}`),
 };

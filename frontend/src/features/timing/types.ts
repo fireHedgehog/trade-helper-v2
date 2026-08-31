@@ -20,11 +20,22 @@ export interface SignalParams {
 
 export type Direction = "long" | "short";
 
-export interface ConfigResponse {
+export interface StrategySummary {
+  id: number;
+  key: string;
   name: string;
   params: SignalParams;
+  is_default: boolean;
+  note: string | null;
+  assigned_count: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ResolvedStrategy {
+  symbol: string;
+  strategy: StrategySummary;
   engine_version: string;
-  updated_at: string;
 }
 
 export interface DailyPoint {
@@ -106,7 +117,8 @@ export interface TimingResponse {
   computed_at?: string;
   engine_version?: string;
   params?: SignalParams;
-  run_scope?: "single" | "universe";
+  preview?: boolean; // true when returned by /preview (nothing was persisted)
+  run_scope?: "single" | "universe" | "preview";
   chart_cached?: boolean; // false after a Trend (universe) run — press Run for overlays/equity
   stale?: boolean;
   newest_price_date?: string | null;

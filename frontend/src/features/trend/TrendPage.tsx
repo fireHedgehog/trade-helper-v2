@@ -20,7 +20,7 @@ import Button from "@mui/material/Button";
 import { FetchPanel } from "@/features/data-management/components/FetchPanel";
 
 import { trendApi } from "./api";
-import type { BoardRow, BoardResponse, WatchSection } from "./types";
+import type { BoardResponse, BoardRow, BoardStrategy, WatchSection } from "./types";
 
 const NA = "—";
 const green = "#1f9d55";
@@ -35,6 +35,7 @@ const daysSince = (iso: string | null) =>
 export function TrendPage() {
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [showFlat, setShowFlat] = useState(false);
+  const [showAlloc, setShowAlloc] = useState(false);
 
   const loadBoard = useCallback(() => {
     void trendApi.board().then(setBoard);
@@ -80,9 +81,15 @@ export function TrendPage() {
       )}
 
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Typography variant="subtitle2" gutterBottom>
-          Watchlist
-        </Typography>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1 }}>
+          <Typography variant="subtitle2">Watchlist</Typography>
+          <Button size="small" onClick={() => setShowAlloc((s) => !s)}>
+            {showAlloc ? "Hide position allocation ▾" : "Position allocation (advisory) ▸"}
+          </Button>
+        </Stack>
+        <Collapse in={showAlloc}>
+          <AllocationNote strategies={board?.strategies ?? []} />
+        </Collapse>
         <WatchlistTable sections={board?.watchlist ?? []} />
       </Paper>
 
@@ -218,6 +225,64 @@ function BoardTable({
           })}
         </TableBody>
       </Table>
+    </Box>
+  );
+}
+
+function AllocationNote({ strategies }: { strategies: BoardStrategy[] }) {
+  return (
+    <Box
+      sx={{
+        mb: 2,
+        p: 1.5,
+        border: "1px solid",
+        borderColor: "divider",
+        borderRadius: 1,
+        bgcolor: "action.hover",
+        maxWidth: 900,
+        fontSize: 13,
+        color: "text.secondary",
+      }}
+    >
+      <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 0.5 }}>
+        HOW YOU&apos;D ROUGHLY ALLOCATE — advisory only, nothing here holds a real position
+      </Typography>
+      <Box component="ul" sx={{ mt: 0.5, mb: 0, pl: 3 }}>
+        <li>
+          Every symbol is always in one of three states: <b>long position</b>, <b>short position</b>,
+          or <b>no position</b>. Trade the entries and exits shown above; size them, don&apos;t just
+          equal-weight.
+        </li>
+        <li>
+          <b>Size by volatility</b>: smaller position in a jumpy name, larger in a calm one, so each
+          risks about the same. Aim for a whole-book volatility near <b>~12% a year</b>; cap any one
+          name around <b>10%</b> of the account.
+        </li>
+        <li>
+          <b>Spread across sleeves</b>, don&apos;t let equities dominate: roughly equities 50 / bonds
+          20 / commodities 15 / crypto 5 / other 10 of the risk budget.
+        </li>
+        <li>
+          <b>Direction</b>: default <b>long only</b>. The research says the short side earns its keep
+          only for <b>bond ETFs</b> and <b>BTC/USD</b> (it pays in their bear legs at little Sharpe
+          cost). The board still shows every short setup so you can watch them.
+        </li>
+        <li>
+          Re-check sizing about <b>weekly</b>, not every day. These are reference numbers from the
+          frozen research, not a live optimiser — see the handoff doc.
+        </li>
+      </Box>
+      {strategies.length > 0 && (
+        <Box sx={{ mt: 1 }}>
+          {strategies.map((s) => (
+            <div key={s.id}>
+              <b>{s.name}</b> — {s.assigned_count} symbol
+              {s.assigned_count === 1 ? "" : "s"}
+              {s.is_default ? " (default)" : ""}
+            </div>
+          ))}
+        </Box>
+      )}
     </Box>
   );
 }

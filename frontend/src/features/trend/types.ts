@@ -13,14 +13,23 @@ export interface WatchSection {
   rows: BoardRow[];
 }
 
+export interface BoardStrategy {
+  id: number;
+  key: string;
+  name: string;
+  is_default: boolean;
+  note: string | null;
+  assigned_count: number;
+}
+
 export interface BoardResponse {
   status: "ok" | "not_computed";
   computed_at?: string;
   engine_version?: string;
-  params?: Record<string, unknown>;
   counts?: { long: number; short: number; flat: number };
   long: BoardRow[];
   short: BoardRow[];
   flat: BoardRow[];
   watchlist: WatchSection[];
+  strategies?: BoardStrategy[];
 }

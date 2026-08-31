@@ -32,6 +32,101 @@ def save_config(conn: sqlite3.Connection, params: dict, name: str | None) -> Non
     )
 
 
+# ---- strategy registry (migration 0014) ----
+
+def _strategy_row(r: sqlite3.Row) -> dict:
+    d = dict(r)
+    d["params"] = json.loads(d.pop("params_json"))
+    d["is_default"] = bool(d["is_default"])
+    return d
+
+
+def list_strategies(conn: sqlite3.Connection) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT s.*,
+               (SELECT COUNT(*) FROM assets a        WHERE a.strategy_id = s.id)
+             + (SELECT COUNT(*) FROM crypto_assets c WHERE c.strategy_id = s.id) AS assigned_count
+          FROM signal_strategies s
+         ORDER BY s.is_default DESC, s.id
+        """
+    ).fetchall()
+    return [_strategy_row(r) for r in rows]
+
+
+def get_strategy(conn: sqlite3.Connection, strategy_id: int) -> dict | None:
+    r = conn.execute("SELECT * FROM signal_strategies WHERE id = ?", (strategy_id,)).fetchone()
+    return _strategy_row(r) if r else None
+
+
+def default_strategy(conn: sqlite3.Connection) -> dict:
+    r = conn.execute(
+        "SELECT * FROM signal_strategies WHERE is_default = 1 ORDER BY id LIMIT 1"
+    ).fetchone() or conn.execute("SELECT * FROM signal_strategies ORDER BY id LIMIT 1").fetchone()
+    if r is None:
+        raise RuntimeError("no signal_strategies rows (migration 0014 seeds two)")
+    return _strategy_row(r)
+
+
+def strategy_symbols(conn: sqlite3.Connection, strategy_id: int) -> list[str]:
+    crypto = [row["symbol"] for row in conn.execute(
+        "SELECT symbol FROM crypto_assets WHERE strategy_id = ? ORDER BY symbol", (strategy_id,))]
+    equity = [row["symbol"] for row in conn.execute(
+        "SELECT symbol FROM assets WHERE strategy_id = ? ORDER BY symbol", (strategy_id,))]
+    return [*crypto, *equity]
+
+
+def assign_strategy(conn: sqlite3.Connection, strategy_id: int, symbols: list[str]) -> int:
+    if not symbols:
+        return 0
+    ph = ",".join("?" for _ in symbols)
+    conn.execute("BEGIN")
+    try:
+        n = conn.execute(
+            f"UPDATE assets SET strategy_id = ? WHERE symbol IN ({ph})",
+            (strategy_id, *symbols),
+        ).rowcount
+        n += conn.execute(
+            f"UPDATE crypto_assets SET strategy_id = ? WHERE symbol IN ({ph})",
+            (strategy_id, *symbols),
+        ).rowcount
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    return n
+
+
+def resolve_one(conn: sqlite3.Connection, symbol: str) -> dict:
+    """The strategy a single symbol currently resolves to (falls back to default)."""
+    row = conn.execute(
+        "SELECT strategy_id FROM assets WHERE symbol = ? "
+        "UNION ALL SELECT strategy_id FROM crypto_assets WHERE symbol = ?",
+        (symbol, symbol),
+    ).fetchone()
+    sid = row["strategy_id"] if row and row["strategy_id"] is not None else None
+    return (get_strategy(conn, sid) if sid else None) or default_strategy(conn)
+
+
+def resolve_symbol_params(conn: sqlite3.Connection) -> dict[str, dict]:
+    """symbol -> {strategy_id, strategy_key, params} for every asset + crypto row.
+    A row with no strategy_id (e.g. a freshly synced asset) falls back to the
+    default strategy."""
+    strategies = {s["id"]: s for s in list_strategies(conn)}
+    default = strategies.get(next((sid for sid, s in strategies.items() if s["is_default"]), None)) \
+        or default_strategy(conn)
+    out: dict[str, dict] = {}
+    for row in conn.execute(
+        "SELECT symbol, strategy_id FROM assets WHERE active = 1 "
+        "UNION ALL SELECT symbol, strategy_id FROM crypto_assets WHERE active = 1"
+    ):
+        s = strategies.get(row["strategy_id"]) or default
+        out[row["symbol"]] = {
+            "strategy_id": s["id"], "strategy_key": s["key"], "params": s["params"],
+        }
+    return out
+
+
 # ---- runs ----
 
 def create_run(conn: sqlite3.Connection, scope: str, symbol: str | None,
@@ -132,22 +227,25 @@ def insert_events(conn: sqlite3.Connection, run_id: int, symbol: str, trades: li
 
 
 def upsert_symbol_stats(conn: sqlite3.Connection, run_id: int, symbol: str, params_json: str,
-                        state: dict, metrics: dict, profile: str | None = None) -> None:
+                        state: dict, metrics: dict, profile: str | None = None,
+                        strategy_id: int | None = None) -> None:
     conn.execute(
         """
         INSERT INTO signal_symbol_stats (run_id, symbol, params_json, state, state_since,
             entry_price, last_close, last_date, unrealized_pct, current_stop, metrics_json,
-            updated_at, profile)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            updated_at, profile, strategy_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(run_id, symbol) DO UPDATE SET
             params_json=excluded.params_json, state=excluded.state, state_since=excluded.state_since,
             entry_price=excluded.entry_price, last_close=excluded.last_close, last_date=excluded.last_date,
             unrealized_pct=excluded.unrealized_pct, current_stop=excluded.current_stop,
-            metrics_json=excluded.metrics_json, updated_at=excluded.updated_at, profile=excluded.profile
+            metrics_json=excluded.metrics_json, updated_at=excluded.updated_at, profile=excluded.profile,
+            strategy_id=excluded.strategy_id
         """,
         (run_id, symbol, params_json, state["state"], state["state_since"],
          state["entry_price"], state["last_close"], state["last_date"],
-         state["unrealized_pct"], state["current_stop"], json.dumps(metrics), _now(), profile),
+         state["unrealized_pct"], state["current_stop"], json.dumps(metrics), _now(), profile,
+         strategy_id),
     )
 
 

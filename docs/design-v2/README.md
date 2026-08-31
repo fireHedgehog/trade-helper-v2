@@ -16,12 +16,7 @@ Read in order:
 | 05 | `05-multisectional.md` | The cross-sectional ranking + leadership overlay + caching + the page |
 | 06 | `06-trend-and-timing.md` | The Donchian signal engine, the single-symbol Timing page, the whole-universe Trend board |
 | 07 | `07-credentials-and-shell.md` | The provider registry + secret handling, the app shell / routing / theme |
-
-Planned work is kept separate from the as-built sequence:
-
-| Status | File | Covers |
-| --- | --- | --- |
-| **UNFINISHED / NOT IMPLEMENTED** | `08-strategy-management-UNFINISHED.md` | Planned versioned strategy registry, manual assignments, V1 fallback, full-universe execution, shadow controls, and Strategy Manager page. |
+| 08 | `08-strategy-management.md` | The (minimal) strategy registry + per-symbol assignment, the `/preview` route, the Strategies page, the Trend allocation note. The doc also carries the fuller unbuilt design. |
 
 Everything here is **naive-v1 / descriptive / not statistically validated** by
 design (see 00). Keep these docs updated as the app changes; when a section

@@ -30,13 +30,17 @@ OHLC for `*/USD` crypto (`data.load_ohlc`).
   only, never to stop levels. Gapped-through stops fill at the worse of open
   vs stop.
 
-**Params** (`SignalParams`, one active `signal_config` preset):
-`entry_len 20, exit_len 10, atr_len 20, atr_stop_mult 2.0, trail_mode
-chandelier, chandelier_k 3.0, atr_trail_k 3.0, fill_at open_next, cost_bps
-5.0, slippage_atr 0.05, use_ma_regime false, ma_regime 200, stop_and_reverse
-false, warmup_buffer 10, allow_long true, allow_short true`. The engine still
-honours `allow_long/allow_short` but every Run forces both on (long/short is a
-display filter, see below).
+**Params** (`SignalParams`). Since migration `0014` the parameters are resolved
+**per symbol** from the `signal_strategies` registry (`08-strategy-management.md`)
+via `assets.strategy_id` / `crypto_assets.strategy_id`, not from the old single
+`signal_config` preset. The frozen default `naive-donchian-v1` is
+`entry_len 20, exit_len 20, atr_len 20, atr_stop_mult 2.0, trail_mode
+chandelier, chandelier_k 3.0, fill_at open_next, cost_bps 5.0, slippage_atr
+0.05, allow_long true, allow_short false`; Bond ETFs run
+`naive-donchian-v1-slow-entry` (identical but `entry_len 100`). The engine still
+honours `allow_long/allow_short` but every Run — single or universe — forces
+both on, so the board always shows every short setup (long/short is a display
+filter, see below).
 
 ## Metrics (`metrics.py`) — single-symbol, rule-only, costs included, not validated
 
@@ -54,11 +58,14 @@ long/short view recompute.
 
 ## Timing page — `/timing/:symbol?` (single symbol)
 
-`POST /api/signals/run {symbol}` runs the engine (~0.2 s), wipes + rewrites
-that symbol's `signal_events` + `signal_symbol_stats` + `signal_chart`,
-returns the payload. `GET /api/signals/timing/{symbol}` is a pure cache read
-(`stale` when newer `price_bars` exist; `status:"not_computed"` before the
-first Run; `chart_cached:false` after a universe run — see below).
+**Run is a live scratchpad — it persists nothing.** `POST /api/signals/preview
+{symbol, params}` runs the engine (~0.2 s) with the parameters currently in the
+form and returns the full payload; no DB write. `GET /api/signals/timing/
+{symbol}` still returns the symbol's last *stored* run (the board's universe
+run, or a legacy `/run`) — `stale` when newer `price_bars` exist,
+`status:"not_computed"` before any stored run, `chart_cached:false` after a
+universe run. `POST /api/signals/run {symbol}` (persisting, strategy-resolved)
+is kept for the board / deep links but the Timing page no longer calls it.
 
 `TimingPage.tsx`:
 - **Symbol picker** — async-search `Autocomplete` over `/api/data/assets`
@@ -67,8 +74,11 @@ first Run; `chart_cached:false` after a universe run — see below).
   `/timing/:symbol` preselects.
 - **Model** dropdown (donchian only for now) + **Run**.
 - **Parameters & guide** (collapsed by default) — a plain-language "what this
-  strategy is" block, an expandable entry/exit rationale, `helperText` on
-  every field, Save → `PUT /api/signals/config`.
+  strategy is" block, an expandable entry/exit rationale, `helperText` on every
+  field. The form **pre-fills from the symbol's resolved strategy** (via
+  `GET /api/signals/strategies/resolve/{symbol}`) and re-resolves on symbol
+  change. **No Save** — edits are live-only; to change what the board uses,
+  assign a strategy on the Strategies page.
 - **`TimingChart.tsx`** — `lightweight-charts` v5 **multi-pane**, price pane
   deliberately tall (total height 1040, stretch `[13,1.3,1.9,1.5,1.5]`):
   candles + Donchian channel + toggleable SMA/EMA (5/20/50/200) + Chandelier
@@ -92,25 +102,33 @@ first Run; `chart_cached:false` after a universe run — see below).
 `POST /api/signals/run-universe` → `worker.submit("signal_universe")` → a
 background job (`signals.service.run_universe`, run via `asyncio.to_thread` —
 the loop is pure CPU / GIL-bound, so threads wouldn't parallelise it, and the
-progress bar must stay live). It loops `assets.active` ∪ `crypto_assets` ∪
-the flat `signals/watchlist.py::TREND_WATCHLIST`, chunk 25, per-symbol wipe +
-write `signal_events` + `signal_symbol_stats` **only** (no `signal_chart` —
-the board doesn't need it). One `signal_runs` row `scope='universe'` is the
-domain record. Verified: ~678 targets, ~54 s (SQLite fsync-bound, not
-compute), ≈ 203 long / 118 short / 354 flat.
+progress bar must stay live). It resolves `symbol → params` once from the
+`signal_strategies` registry, then loops `assets.active` ∪ `crypto_assets` ∪
+the flat `signals/watchlist.py::TREND_WATCHLIST`, chunk 25, running each symbol
+with its own strategy's parameters (direction forced two-sided), per-symbol
+wipe + write `signal_events` + `signal_symbol_stats` (with `strategy_id`)
+**only** (no `signal_chart` — the board doesn't need it). One `signal_runs`
+row `scope='universe'` is the domain record. Verified: ~678 targets, ~54 s
+(SQLite fsync-bound, not compute), ≈ 203 long / 118 short / 354 flat.
 
 `GET /api/signals/board` → `{long, short, flat}` (each sorted by `state_since`
 desc — freshest entries on top) + `watchlist` — a **sectioned** list
 (`TREND_WATCHLIST_SECTIONS`): Indices (`QQQ SPY DIA IWM`) · Semis/Software
 (`SOXX IGV`) · Sector SPDRs (11 XL*) · Mega-cap 7 (MAG7) · Cross-asset
-(`GLD USO BTC/USD`). Or `status:"not_computed"`.
+(`GLD USO BTC/USD`) — plus `strategies` (the registry with live assigned
+counts). Or `status:"not_computed"`.
 
 `TrendPage.tsx`: Model select · the reused
 `<FetchPanel kind="signal_universe">` (button + progress + cancel) · the
 **watchlist table** — one table with an Excel-style divider row (`colSpan`,
 tinted, short, uppercase) per section, each name showing state · entry ·
 unrealized % red/green · stop, or "–" when flat · **Holding long / Holding
-short / Flat** tables. Symbol →
+short / Flat** tables. The Watchlist header has a collapsible **"Position
+allocation (advisory)"** panel — static reference text (inverse-vol sizing,
+~12% vol target, ~10% position cap, sleeve budgets 50/20/15/5/10, long-only
+default with bonds + BTC as the short exceptions, weekly re-check) plus the
+live per-strategy symbol counts. No portfolio engine — text only, from the
+frozen research in `docs/temp/NAIVE_DONCHIAN_V1_RESEARCH_HANDOFF.md`. Symbol →
 `/timing/:symbol` — where, because `latest_run_for_symbol` joins via
 `signal_symbol_stats`, the universe run's trades / metrics / state are shown,
 with an info banner: "press Run for the Donchian overlay, equity curve, and

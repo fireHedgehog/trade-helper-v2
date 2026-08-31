@@ -60,12 +60,96 @@ def _board_state(bars: list[dict], trades: list[dict], overlays: dict) -> dict:
             "unrealized_pct": None, "current_stop": None}
 
 
+def _full_result(bars: list[dict], params: SignalParams) -> dict:
+    """Run the engine and assemble the whole Timing payload. Pure — no DB."""
+    result = engine.run(bars, params)
+    m = metrics.summarise(result.trades, result.daily, bars)
+    state = _board_state(bars, result.trades, result.overlays)
+    strat_eq = engine.compound([d["strat_ret"] for d in result.daily])
+    equity = {
+        "dates": [d["date"] for d in result.daily],
+        "strat_equity": strat_eq,
+        "bh_equity": engine.compound(engine.buy_hold_daily(bars)),
+        "drawdown": engine.drawdown_curve(strat_eq),
+    }
+    levels = keylevels.key_levels(bars)
+    if state["current_stop"] is not None:
+        levels.append({"price": state["current_stop"], "label": "current stop", "kind": "stop"})
+    # `daily` (per-bar exposure + cost-included return) lets the Timing page
+    # recompute metrics / equity for a long-only or short-only view.
+    payload = {"overlays": result.overlays, "equity": equity, "key_levels": levels,
+               "daily": result.daily}
+    return {"result": result, "metrics": m, "state": state, "payload": payload}
+
+
+def preview(conn: sqlite3.Connection, symbol: str, params: SignalParams) -> dict:
+    """Run one symbol with the supplied parameters and return the full Timing
+    payload. Writes NOTHING — the Trend run owns the persisted signals; Timing
+    is a live scratchpad."""
+    symbol = ohlc.normalize_symbol(symbol)
+    params = params.model_copy(update={"allow_long": True, "allow_short": True})
+    bars = ohlc.load_ohlc(conn, symbol)
+    if len(bars) < MIN_BARS:
+        raise ValueError(f"{symbol}: only {len(bars)} bars — need >= {MIN_BARS} to run")
+    fr = _full_result(bars, params)
+    events = fr["result"].trades
+    return {
+        "status": "ok",
+        "symbol": symbol,
+        "computed_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "preview": True,
+        "engine_version": ENGINE_VERSION,
+        "params": params.model_dump(),
+        "stale": False,
+        "newest_price_date": ohlc.latest_price_date(conn, symbol),
+        "run_through_date": bars[-1]["date"],
+        "bars": [{"time": b["date"], "open": b["o"], "high": b["h"], "low": b["l"],
+                  "close": b["c"], "volume": b["v"]} for b in bars],
+        "chart_cached": True,
+        "run_scope": "preview",
+        "overlays": fr["payload"]["overlays"],
+        "key_levels": fr["payload"]["key_levels"],
+        "equity": fr["payload"]["equity"],
+        "daily": fr["payload"]["daily"],
+        "markers": _markers(events),
+        "trades": events,
+        "state": {k: fr["state"][k] for k in
+                  ("state", "state_since", "entry_price", "last_close", "unrealized_pct", "current_stop")},
+        "metrics": fr["metrics"],
+    }
+
+
+def list_strategies(conn: sqlite3.Connection) -> dict:
+    return {"strategies": repo.list_strategies(conn), "engine_version": ENGINE_VERSION}
+
+
+def strategy_detail(conn: sqlite3.Connection, strategy_id: int) -> dict:
+    s = repo.get_strategy(conn, strategy_id)
+    if s is None:
+        raise ValueError(f"no strategy {strategy_id}")
+    return {**s, "symbols": repo.strategy_symbols(conn, strategy_id)}
+
+
+def assign_strategy(conn: sqlite3.Connection, strategy_id: int, symbols: list[str]) -> dict:
+    if repo.get_strategy(conn, strategy_id) is None:
+        raise ValueError(f"no strategy {strategy_id}")
+    norm = [ohlc.normalize_symbol(s) for s in symbols]
+    changed = repo.assign_strategy(conn, strategy_id, norm)
+    return {"assigned": changed, "symbols": repo.strategy_symbols(conn, strategy_id)}
+
+
+def resolved_strategy(conn: sqlite3.Connection, symbol: str) -> dict:
+    symbol = ohlc.normalize_symbol(symbol)
+    return {"symbol": symbol, "strategy": repo.resolve_one(conn, symbol),
+            "engine_version": ENGINE_VERSION}
+
+
 def run_for_symbol(conn: sqlite3.Connection, symbol: str) -> dict:
     symbol = ohlc.normalize_symbol(symbol)
     # Always compute the full two-sided trade set. Long / short is a view
     # filter on the Timing page, not an engine input.
-    cfg = repo.get_config(conn)
-    params = SignalParams(**cfg["params"]).model_copy(
+    resolved = repo.resolve_one(conn, symbol)
+    params = SignalParams(**resolved["params"]).model_copy(
         update={"allow_long": True, "allow_short": True}
     )
     params_json = json.dumps(params.model_dump())
@@ -76,33 +160,15 @@ def run_for_symbol(conn: sqlite3.Connection, symbol: str) -> dict:
 
     run_id = repo.create_run(conn, "single", symbol, params_json, ENGINE_VERSION)
     try:
-        result = engine.run(bars, params)
-        m = metrics.summarise(result.trades, result.daily, bars)
-        state = _board_state(bars, result.trades, result.overlays)
-
-        strat_rets = [d["strat_ret"] for d in result.daily]
-        strat_eq = engine.compound(strat_rets)
-        bh_eq = engine.compound(engine.buy_hold_daily(bars))
-        equity = {
-            "dates": [d["date"] for d in result.daily],
-            "strat_equity": strat_eq,
-            "bh_equity": bh_eq,
-            "drawdown": engine.drawdown_curve(strat_eq),
-        }
-        levels = keylevels.key_levels(bars)
-        if state["current_stop"] is not None:
-            levels.append({"price": state["current_stop"], "label": "current stop",
-                           "kind": "stop"})
-        # `daily` (per-bar exposure + cost-included return) lets the Timing
-        # page recompute metrics / equity for a long-only or short-only view.
-        payload = {"overlays": result.overlays, "equity": equity, "key_levels": levels,
-                   "daily": result.daily}
+        fr = _full_result(bars, params)
+        result, m, state = fr["result"], fr["metrics"], fr["state"]
 
         conn.execute("BEGIN")
         repo.wipe_symbol(conn, symbol)
         repo.insert_events(conn, run_id, symbol, result.trades)
-        repo.upsert_symbol_stats(conn, run_id, symbol, params_json, state, m)
-        repo.insert_chart(conn, run_id, symbol, payload)
+        repo.upsert_symbol_stats(conn, run_id, symbol, params_json, state, m,
+                                 strategy_id=resolved["id"])
+        repo.insert_chart(conn, run_id, symbol, fr["payload"])
         repo.finish_run(conn, run_id, "succeeded", 1, len(result.trades))
         conn.execute("COMMIT")
     except Exception as exc:  # noqa: BLE001
@@ -199,14 +265,31 @@ def _universe_targets(conn: sqlite3.Connection) -> list[str]:
 def run_universe(conn: sqlite3.Connection, run_id: int, mode: str = "incremental") -> None:
     """`run_id` is the fetch_runs row driving the progress bar. A companion
     `signal_runs` row is the domain record the board reads."""
-    params = SignalParams(**repo.get_config(conn)["params"]).model_copy(
-        update={"allow_long": True, "allow_short": True}
-    )
-    params_json = json.dumps(params.model_dump())
+    # Resolve one strategy -> params per symbol from the registry (migration
+    # 0014). Direction is forced two-sided regardless of the strategy so the
+    # board always shows every short setup.
+    resolved = repo.resolve_symbol_params(conn)
+    default = repo.default_strategy(conn)
     targets = _universe_targets(conn)
     fetch_runs.set_planned(conn, run_id, len(targets))
 
-    sig_run_id = repo.create_run(conn, "universe", None, params_json, ENGINE_VERSION)
+    sig_run_id = repo.create_run(
+        conn, "universe", None,
+        json.dumps({"resolver": "signal_strategies per-symbol"}), ENGINE_VERSION,
+    )
+    param_cache: dict[str, tuple[SignalParams, str]] = {}
+
+    def resolve(symbol: str) -> tuple[int, SignalParams, str]:
+        res = resolved.get(symbol) or {"strategy_id": default["id"], "params": default["params"]}
+        key = res["strategy_key"] if "strategy_key" in res else str(res["strategy_id"])
+        if key not in param_cache:
+            p = SignalParams(**res["params"]).model_copy(
+                update={"allow_long": True, "allow_short": True}
+            )
+            param_cache[key] = (p, json.dumps(p.model_dump()))
+        p, pj = param_cache[key]
+        return res["strategy_id"], p, pj
+
     total_events = 0
     done = 0
     try:
@@ -221,13 +304,15 @@ def run_universe(conn: sqlite3.Connection, run_id: int, mode: str = "incremental
                                              duration_ms=int((time.monotonic() - t0) * 1000))
                     done += 1
                     continue
+                strategy_id, params, params_json = resolve(symbol)
                 result = engine.run(bars, params)
                 m = metrics.summarise(result.trades, result.daily, bars)
                 state = _board_state(bars, result.trades, result.overlays)
                 conn.execute("BEGIN")
                 repo.wipe_symbol(conn, symbol)
                 repo.insert_events(conn, sig_run_id, symbol, result.trades)
-                repo.upsert_symbol_stats(conn, sig_run_id, symbol, params_json, state, m)
+                repo.upsert_symbol_stats(conn, sig_run_id, symbol, params_json, state, m,
+                                         strategy_id=strategy_id)
                 conn.execute("COMMIT")
                 total_events += len(result.trades)
                 done += 1
@@ -274,8 +359,9 @@ def get_board(conn: sqlite3.Connection) -> dict:
         }
         for title, syms in TREND_WATCHLIST_SECTIONS
     ]
+    strategies = repo.list_strategies(conn)
     if run is None:
-        return {"status": "not_computed", "watchlist": watchlist,
+        return {"status": "not_computed", "watchlist": watchlist, "strategies": strategies,
                 "long": [], "short": [], "flat": []}
 
     rows = [_board_entry(r) for r in repo.board_rows(conn, run["run_id"])]
@@ -288,10 +374,10 @@ def get_board(conn: sqlite3.Connection) -> dict:
         "status": "ok",
         "computed_at": run["finished_at"],
         "engine_version": run["engine_version"],
-        "params": json.loads(run["params_json"]),
         "counts": {k: len(v) for k, v in buckets.items()},
         "long": buckets["long"],
         "short": buckets["short"],
         "flat": buckets["flat"],
         "watchlist": watchlist,
+        "strategies": strategies,
     }
