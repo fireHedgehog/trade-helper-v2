@@ -19,7 +19,7 @@ edited forever.
 | Providers | Alpaca (equities/crypto/options), FRED (macro/commodities), issuer holdings scrapes |
 | Secrets | OS keychain via `keyring` — **never** in the DB, an API response, or a log |
 
-## The seven pages
+## The eight pages
 
 | Page | Route | What it answers |
 | --- | --- | --- |
@@ -28,6 +28,7 @@ edited forever.
 | **Trend** | `/trend` | Every symbol's current Donchian-breakout state — holding-long / holding-short / flat — as three sorted boards + a fixed watchlist strip. |
 | **Timing** | `/timing/:symbol?` | The same rule drilled into one symbol: a broker-style multi-pane chart with entry/exit markers, a trade table, and standard performance metrics. Run is a live scratchpad — it saves nothing. |
 | **Strategies** | `/strategies` | The parameter sets the Trend run uses. A minimal registry (`naive-donchian-v1` + a bond slow-entry variant); assign a strategy to a symbol selection. See `08-strategy-management.md`. |
+| **Sizing** | `/sizing` | A live parameter sandbox: given the board's on-signal names + a risk-ladder you drag, how big should each position be and what is holding it back. Places no order, adds no engine — pure arithmetic over the board. See `09-position-sizing.md`. |
 | **Data management** | `/data-management` | The only place data enters the app — one paced background fetch per source, with a live progress bar. |
 | **Credentials** | `/credentials` | Configure + verify provider keys. Data-driven from a provider registry. |
 
@@ -41,9 +42,10 @@ edited forever.
 
 ## Status (2026-08-31)
 
-All seven pages are built and working end to end. The Naive Donchian V1
+All eight pages are built and working end to end. The Naive Donchian V1
 benchmark research is frozen (`docs/strategy-experiments/naive-donchian-v1-result.md`)
-and its entry cluster is wired in via the `signal_strategies` registry. Depth
-work remains (more signal models, walk-forward tuning, an options-analysis
-page) — not new surfaces. Backend pytest suite passes; the frontend
-type-checks.
+and its entry cluster is wired in via the `signal_strategies` registry. The
+Sizing sandbox is the newest surface — advisory arithmetic over the board, no
+engine, no new table. Depth work remains (more signal models, walk-forward
+tuning, an options-analysis page) — not new surfaces. Backend pytest suite
+passes; the frontend type-checks.

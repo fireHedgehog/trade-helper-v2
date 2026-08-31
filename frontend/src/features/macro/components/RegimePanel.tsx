@@ -66,7 +66,7 @@ function PersonaRow({ m }: { m: RegimeMessage }) {
         {m.vote && (
           <Chip
             size="small"
-            label={`${m.vote}${m.conviction != null ? ` · ${Math.round(m.conviction)}` : ""}`}
+            label={`${m.vote}${m.conviction != null ? ` · ${m.conviction}` : ""}`}
             color={m.vote === "ON" ? "success" : m.vote === "OFF" ? "error" : "default"}
             variant="outlined"
           />

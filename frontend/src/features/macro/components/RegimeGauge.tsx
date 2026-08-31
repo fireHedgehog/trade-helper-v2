@@ -60,7 +60,7 @@ export function RegimeGauge({ score, confidence, onVotes, offVotes, neutralVotes
           }}
         >
           <Typography variant="h3" sx={{ color, lineHeight: 1 }}>
-            {score === null ? "—" : Math.round(v)}
+            {score === null ? "—" : v.toFixed(1)}
           </Typography>
           <Typography variant="caption" sx={{ color }}>
             {zoneLabel(v)}
@@ -70,7 +70,7 @@ export function RegimeGauge({ score, confidence, onVotes, offVotes, neutralVotes
 
       <Box sx={{ width: "100%", maxWidth: 260 }}>
         <Typography variant="caption" color="text.secondary">
-          confidence {confidence === null ? "—" : Math.round(confidence)}
+          confidence {confidence === null ? "—" : confidence.toFixed(1)}
         </Typography>
         <LinearProgress
           variant="determinate"

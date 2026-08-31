@@ -342,13 +342,14 @@ def _board_entry(row: dict) -> dict:
         "current_stop": row["current_stop"],
         "vol_60d": row.get("vol_60d"),
         "momentum": None,
+        "sector": None,
     }
 
 
 def _empty_entry(symbol: str) -> dict:
     return {"symbol": symbol, "state": None, "state_since": None, "entry_price": None,
             "last_close": None, "unrealized_pct": None, "current_stop": None, "vol_60d": None,
-            "momentum": None}
+            "momentum": None, "sector": None}
 
 
 def _momentum_map(conn: sqlite3.Connection) -> dict[str, dict]:
@@ -377,6 +378,24 @@ def _with_momentum(entry: dict, mom: dict[str, dict]) -> dict:
     return entry
 
 
+def _sector_map(conn: sqlite3.Connection) -> dict[str, str]:
+    """symbol -> GICS sector string from `assets`. Advisory grouping only: the
+    /sizing page uses it for sleeve budgets and the per-sector cap. A symbol
+    with no sector (ETFs, freshly synced names) is simply absent — the caller
+    buckets it as 'Other'. Not a signal input, never touches the engine."""
+    out: dict[str, str] = {}
+    for r in conn.execute(
+        "SELECT symbol, sector FROM assets WHERE sector IS NOT NULL AND sector <> ''"
+    ):
+        out[r["symbol"]] = r["sector"]
+    return out
+
+
+def _with_sector(entry: dict, sectors: dict[str, str]) -> dict:
+    entry["sector"] = sectors.get(entry["symbol"])
+    return entry
+
+
 def _vol_60d(bars: list[dict]) -> float | None:
     """Annualised 60-day return volatility — the position-sizing σ from the
     frozen research (distinct from the engine's 20-day ATR, which sizes stops).
@@ -399,12 +418,13 @@ def _vol_60d_for(conn: sqlite3.Connection, symbol: str) -> float | None:
 def get_board(conn: sqlite3.Connection) -> dict:
     run = repo.latest_universe_run(conn)
     mom = _momentum_map(conn)
+    sectors = _sector_map(conn)
     watch = repo.stats_for_symbols(conn, [ohlc.normalize_symbol(s) for s in TREND_WATCHLIST])
     def _watch_row(s: str) -> dict:
         e = _board_entry(watch[s]) if s in watch else _empty_entry(s)
         if e["vol_60d"] is None:  # no stored run for this watchlist name — compute now
             e["vol_60d"] = _vol_60d_for(conn, s)
-        return _with_momentum(e, mom)
+        return _with_sector(_with_momentum(e, mom), sectors)
 
     watchlist = [
         {
@@ -418,7 +438,8 @@ def get_board(conn: sqlite3.Connection) -> dict:
         return {"status": "not_computed", "watchlist": watchlist, "strategies": strategies,
                 "long": [], "short": [], "flat": []}
 
-    rows = [_with_momentum(_board_entry(r), mom) for r in repo.board_rows(conn, run["run_id"])]
+    rows = [_with_sector(_with_momentum(_board_entry(r), mom), sectors)
+            for r in repo.board_rows(conn, run["run_id"])]
     buckets: dict[str, list[dict]] = {"long": [], "short": [], "flat": []}
     for r in rows:
         buckets.get(r["state"], buckets["flat"]).append(r)
