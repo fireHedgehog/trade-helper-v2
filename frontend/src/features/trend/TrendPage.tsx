@@ -22,11 +22,17 @@ import GrainRounded from "@mui/icons-material/GrainRounded";
 import ThunderstormRounded from "@mui/icons-material/ThunderstormRounded";
 import WbCloudyRounded from "@mui/icons-material/WbCloudyRounded";
 import WbSunnyRounded from "@mui/icons-material/WbSunnyRounded";
+import MilitaryTechRounded from "@mui/icons-material/MilitaryTechRounded";
+import TrendingUpRounded from "@mui/icons-material/TrendingUpRounded";
+import TrendingFlatRounded from "@mui/icons-material/TrendingFlatRounded";
+import TrendingDownRounded from "@mui/icons-material/TrendingDownRounded";
+import SouthEastRounded from "@mui/icons-material/SouthEastRounded";
+import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 
 import { FetchPanel } from "@/features/data-management/components/FetchPanel";
 
 import { trendApi } from "./api";
-import type { BoardResponse, BoardRow, BoardStrategy, WatchSection } from "./types";
+import type { BoardResponse, BoardRow, BoardStrategy, MomentumInfo, WatchSection } from "./types";
 
 const NA = "—";
 const green = "#1f9d55";
@@ -81,6 +87,78 @@ function VolCell({ v }: { v: number | null | undefined }) {
         >
           <s.Icon sx={{ fontSize: 15 }} />
           {pct}
+        </Box>
+      </TableCell>
+    </Tooltip>
+  );
+}
+
+// Cross-sectional momentum: where this name ranks against the whole scored
+// universe (the Multisectional composite, 0–100). Advisory only — it never
+// fires an order, it colours the trend entry. Same restraint as VolCell:
+// colour on glyph + number, a faint pill only at the extremes.
+const MOM_STEPS = [
+  { min: 80, label: "peer leader", color: "#1f9d55", Icon: MilitaryTechRounded },
+  { min: 60, label: "peer-strong", color: "#4f9d2f", Icon: TrendingUpRounded },
+  { min: 40, label: "middling", color: "#8a8f98", Icon: TrendingFlatRounded },
+  { min: 20, label: "peer-weak", color: "#dd6b20", Icon: TrendingDownRounded },
+  { min: -Infinity, label: "laggard", color: "#d64545", Icon: SouthEastRounded },
+] as const;
+const momStep = (score: number, leader: boolean) =>
+  leader ? MOM_STEPS[0] : (MOM_STEPS.find((s) => score >= s.min) ?? MOM_STEPS[MOM_STEPS.length - 1]);
+
+function MomCell({ row }: { row: BoardRow }) {
+  const m: MomentumInfo | null | undefined = row.momentum;
+  if (m == null)
+    return (
+      <TableCell align="right" sx={{ color: "text.disabled" }}>
+        {NA}
+      </TableCell>
+    );
+  const s = momStep(m.score, m.leader);
+  const held = row.state === "long" || row.state === "short";
+  // the informative case: the trend entry and the peer rank disagree
+  const conflict =
+    (row.state === "long" && m.score < 40) || (row.state === "short" && m.score >= 60);
+  const agree = row.state === "long" && (m.score >= 80 || m.leader);
+  const tip =
+    `${s.label} · momentum ${Math.round(m.score)}/100 vs the scored universe` +
+    (m.leader ? " · top-decile relative-strength leader" : "") +
+    (m.persistence ? ` · led ${Math.round(m.persistence * 100)}% of recent weeks` : "") +
+    (conflict
+      ? row.state === "long"
+        ? " — ⚠ trend is long but this name lags its peers; size down or skip"
+        : " — ⚠ trend is short but this name leads its peers; shorting into strength"
+      : agree
+        ? " — trend entry and peer strength agree"
+        : "") +
+    ". Context for the trend entry, not a signal.";
+  const pill = conflict
+    ? { bgcolor: "rgba(214,69,69,0.12)", borderRadius: 1, px: 0.75 }
+    : agree
+      ? { bgcolor: "rgba(31,157,85,0.12)", borderRadius: 1, px: 0.75 }
+      : null;
+  return (
+    <Tooltip title={tip} arrow>
+      <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+        <Box
+          component="span"
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.5,
+            color: conflict && held ? red : s.color,
+            fontWeight: 600,
+            fontVariantNumeric: "tabular-nums",
+            ...(pill ?? {}),
+          }}
+        >
+          {conflict && held ? (
+            <WarningAmberRounded sx={{ fontSize: 15 }} />
+          ) : (
+            <s.Icon sx={{ fontSize: 15 }} />
+          )}
+          {Math.round(m.score)}
         </Box>
       </TableCell>
     </Tooltip>
@@ -222,6 +300,7 @@ function BoardTable({
             <TableCell>Symbol</TableCell>
             <TableCell>Flat since</TableCell>
             <TableCell align="right">Vol 60d</TableCell>
+            <MomHeader />
           </TableRow>
         </TableHead>
         <TableBody>
@@ -232,6 +311,7 @@ function BoardTable({
               </TableCell>
               <TableCell>{r.state_since ?? NA}</TableCell>
               <VolCell v={r.vol_60d} />
+              <MomCell row={r} />
             </TableRow>
           ))}
         </TableBody>
@@ -253,6 +333,7 @@ function BoardTable({
             <TableCell align="right">Unreal.</TableCell>
             <Tooltip title="Current stop-loss price - the engine's trailing or initial stop" arrow><TableCell align="right">Stop</TableCell></Tooltip>
             <TableCell align="right">Vol 60d</TableCell>
+            <MomHeader />
           </TableRow>
         </TableHead>
         <TableBody>
@@ -279,6 +360,7 @@ function BoardTable({
                 </TableCell>
                 <TableCell align="right">{flat ? NA : money(r.current_stop)}</TableCell>
                 <VolCell v={r.vol_60d} />
+                <MomCell row={r} />
               </TableRow>
             );
           })}
@@ -354,7 +436,18 @@ function SymLink({ symbol }: { symbol: string }) {
   );
 }
 
-const WATCH_COLS = 9;
+const WATCH_COLS = 10;
+
+function MomHeader() {
+  return (
+    <Tooltip
+      title="Cross-sectional momentum 0–100 — where this name ranks against the whole scored universe (the Multisectional composite). Advisory context on the trend entry, not a signal. ⚠ marks a held position that disagrees with its peer rank."
+      arrow
+    >
+      <TableCell align="right">Mom.</TableCell>
+    </Tooltip>
+  );
+}
 
 function WatchRow({ r }: { r: BoardRow }) {
   const flat = !r.state || r.state === "flat";
@@ -376,6 +469,7 @@ function WatchRow({ r }: { r: BoardRow }) {
       </TableCell>
       <TableCell align="right">{flat ? NA : money(r.current_stop)}</TableCell>
       <VolCell v={r.vol_60d} />
+      <MomCell row={r} />
     </TableRow>
   );
 }
@@ -395,6 +489,7 @@ function WatchlistTable({ sections }: { sections: WatchSection[] }) {
             <TableCell align="right">Unreal.</TableCell>
             <Tooltip title="Current stop-loss price - the engine's trailing or initial stop" arrow><TableCell align="right">Stop</TableCell></Tooltip>
             <TableCell align="right">Vol 60d</TableCell>
+            <MomHeader />
           </TableRow>
         </TableHead>
         <TableBody>

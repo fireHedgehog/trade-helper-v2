@@ -1,3 +1,9 @@
+export interface MomentumInfo {
+  score: number; // cross-sectional composite 0–100 from the last Multisectional ranking
+  leader: boolean; // top-decile relative-strength leader
+  persistence: number | null; // fraction of recent weekly formations spent in the lead
+}
+
 export interface BoardRow {
   symbol: string;
   state: "long" | "short" | "flat" | null;
@@ -7,6 +13,7 @@ export interface BoardRow {
   unrealized_pct: number | null;
   current_stop: number | null;
   vol_60d?: number | null; // annualised 60-day return vol — watchlist rows only
+  momentum?: MomentumInfo | null; // advisory peer-strength context, not a signal
 }
 
 export interface WatchSection {

@@ -18,6 +18,7 @@ import statistics
 import time
 
 from app.features.data_management import runs as fetch_runs
+from app.features.multisectional import ranking as xsranking
 from app.features.signals import data as ohlc
 from app.features.signals import engine, keylevels, metrics, repository as repo
 from app.features.signals.params import ENGINE_VERSION, SignalParams
@@ -340,12 +341,40 @@ def _board_entry(row: dict) -> dict:
         "unrealized_pct": row["unrealized_pct"],
         "current_stop": row["current_stop"],
         "vol_60d": row.get("vol_60d"),
+        "momentum": None,
     }
 
 
 def _empty_entry(symbol: str) -> dict:
     return {"symbol": symbol, "state": None, "state_since": None, "entry_price": None,
-            "last_close": None, "unrealized_pct": None, "current_stop": None, "vol_60d": None}
+            "last_close": None, "unrealized_pct": None, "current_stop": None, "vol_60d": None,
+            "momentum": None}
+
+
+def _momentum_map(conn: sqlite3.Connection) -> dict[str, dict]:
+    """Per-symbol cross-sectional momentum from the last stored Multisectional
+    ranking snapshot. Advisory context on the board — NOT a signal, not run
+    here, never blocks a Donchian entry. Empty when the ranking was never
+    computed. See docs/strategy-experiments/xsec-momentum-v1-result.md."""
+    try:
+        snap = xsranking.latest_ranking(conn)
+    except Exception:
+        return {}
+    out: dict[str, dict] = {}
+    for r in snap.get("rows", []):
+        if r.get("score") is None:
+            continue
+        out[r["symbol"]] = {
+            "score": round(float(r["score"]), 1),
+            "leader": bool(r.get("is_current_leader")),
+            "persistence": r.get("leadership_persistence"),
+        }
+    return out
+
+
+def _with_momentum(entry: dict, mom: dict[str, dict]) -> dict:
+    entry["momentum"] = mom.get(entry["symbol"])
+    return entry
 
 
 def _vol_60d(bars: list[dict]) -> float | None:
@@ -369,12 +398,13 @@ def _vol_60d_for(conn: sqlite3.Connection, symbol: str) -> float | None:
 
 def get_board(conn: sqlite3.Connection) -> dict:
     run = repo.latest_universe_run(conn)
+    mom = _momentum_map(conn)
     watch = repo.stats_for_symbols(conn, [ohlc.normalize_symbol(s) for s in TREND_WATCHLIST])
     def _watch_row(s: str) -> dict:
         e = _board_entry(watch[s]) if s in watch else _empty_entry(s)
         if e["vol_60d"] is None:  # no stored run for this watchlist name — compute now
             e["vol_60d"] = _vol_60d_for(conn, s)
-        return e
+        return _with_momentum(e, mom)
 
     watchlist = [
         {
@@ -388,7 +418,7 @@ def get_board(conn: sqlite3.Connection) -> dict:
         return {"status": "not_computed", "watchlist": watchlist, "strategies": strategies,
                 "long": [], "short": [], "flat": []}
 
-    rows = [_board_entry(r) for r in repo.board_rows(conn, run["run_id"])]
+    rows = [_with_momentum(_board_entry(r), mom) for r in repo.board_rows(conn, run["run_id"])]
     buckets: dict[str, list[dict]] = {"long": [], "short": [], "flat": []}
     for r in rows:
         buckets.get(r["state"], buckets["flat"]).append(r)

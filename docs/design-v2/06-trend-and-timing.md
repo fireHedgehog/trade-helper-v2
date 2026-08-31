@@ -122,13 +122,23 @@ counts). Or `status:"not_computed"`.
 `<FetchPanel kind="signal_universe">` (button + progress + cancel) · the
 **watchlist table** — one table with an Excel-style divider row (`colSpan`,
 tinted, short, uppercase) per section, each name showing state · entry ·
-unrealized % red/green · stop · **Vol 60d**, or "–" when flat · **Holding long /
-Holding short / Flat** tables (all carry the Vol 60d column). `Vol 60d` is the
-stored annualised 60-day return vol (`signal_symbol_stats.vol_60d`, migration
-`0015`) rendered as a calm→turbulent severity chip — an escalating weather icon
-(sun → cloud → drizzle → wind → storm) and a green→red colour ramp at 15 / 25 /
-40 / 60 % thresholds; a reference for the "size by volatility" line, not a
-signal. The Watchlist header has a collapsible **"Position allocation
+unrealized % red/green · stop · **Vol 60d** · **Mom.**, or "–" when flat ·
+**Holding long / Holding short / Flat** tables (all carry both extra columns).
+`Vol 60d` is the stored annualised 60-day return vol
+(`signal_symbol_stats.vol_60d`, migration `0015`) rendered as a calm→turbulent
+severity chip — an escalating weather icon (sun → cloud → drizzle → wind →
+storm) and a green→red colour ramp at 15 / 25 / 40 / 60 % thresholds; a
+reference for the "size by volatility" line, not a signal. `Mom.` is the
+cross-sectional momentum score 0–100 — the symbol's row in the **last stored
+Multisectional ranking snapshot** (`ranking_runs`, joined in `get_board`, no run
+of its own), five tiers leader → laggard with a trend-arrow icon. It is
+**advisory context on the Donchian entry, never a signal**: a held long that
+scores < 40 (or a held short that scores ≥ 60) shows a ⚠ — the trend fired but
+the name disagrees with its peer rank (see
+`docs/strategy-experiments/xsec-momentum-v1-result.md` — the momentum research
+concluded there IS an edge but it is not wired in as an engine; this column is
+the single-account way to use it). Empty (all "–") until the Multisectional page
+has been recomputed once. The Watchlist header has a collapsible **"Position allocation
 (advisory)"** panel — static reference text (inverse-vol sizing,
 ~12% vol target, ~10% position cap, sleeve budgets 50/20/15/5/10, long-only
 default with bonds + BTC as the short exceptions, weekly re-check) plus the
