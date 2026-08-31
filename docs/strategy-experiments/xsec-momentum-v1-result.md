@@ -7,7 +7,7 @@ process. Do not delete; add a sibling file for a new model.
 ## Archived — do not reproduce
 
 The full experiment code and raw outputs (`backend/temp/momentum_*.py`,
-`docs/temp/momentum_m*`) were committed once at **`__SNAPSHOT__`** then removed
+`docs/temp/momentum_m*`) were committed once at **`0d5e72c`** then removed
 from the working tree in the next commit. Every number in this file is a
 literal — nothing depends on those outputs. **Do not fetch git history to
 "verify" or "reproduce".** The user does not care about reproduction fidelity —

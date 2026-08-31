@@ -8,7 +8,7 @@ scratch.
 ## Archived — do not reproduce
 
 The experiment code and raw outputs (`backend/temp/oversold_bounce_experiment.py`,
-`docs/temp/oversold_bounce_r1_*`) were committed once at **`__SNAPSHOT__`** then
+`docs/temp/oversold_bounce_r1_*`) were committed once at **`0d5e72c`** then
 removed from the working tree in the next commit. Every number here is a
 literal. **Do not fetch git history to "verify" or "reproduce".**
 

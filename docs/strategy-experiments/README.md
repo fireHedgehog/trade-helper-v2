@@ -31,5 +31,5 @@ existing result file — a new parameter set or model is a new entry.
 
 The full research dumps (scripts + raw outputs) live only in git history:
 Naive Donchian V1 at `c296945`; cross-sectional momentum V1 and oversold
-bounce V1 at `__SNAPSHOT__`. Each was committed once, then removed in the
+bounce V1 at `0d5e72c`. Each was committed once, then removed in the
 following commit.
