@@ -415,7 +415,7 @@ def _vol_60d_for(conn: sqlite3.Connection, symbol: str) -> float | None:
         return None
 
 
-def get_board(conn: sqlite3.Connection) -> dict:
+def get_board(conn: sqlite3.Connection, charts: bool = False) -> dict:
     run = repo.latest_universe_run(conn)
     mom = _momentum_map(conn)
     sectors = _sector_map(conn)
@@ -433,6 +433,15 @@ def get_board(conn: sqlite3.Connection) -> dict:
         }
         for title, syms in TREND_WATCHLIST_SECTIONS
     ]
+    if charts:  # opt-in: attach per-watchlist-row mini-chart bars + trade markers
+        wl_syms = [r["symbol"] for sec in watchlist for r in sec["rows"]]
+        bars_map = repo.trailing_bars(conn, wl_syms)
+        events_map = repo.recent_events(conn, wl_syms)
+        for sec in watchlist:
+            for r in sec["rows"]:
+                b = bars_map.get(r["symbol"])
+                r["chart"] = {"bars": b, "events": events_map.get(r["symbol"], [])} if b else None
+
     strategies = repo.list_strategies(conn)
     if run is None:
         return {"status": "not_computed", "watchlist": watchlist, "strategies": strategies,

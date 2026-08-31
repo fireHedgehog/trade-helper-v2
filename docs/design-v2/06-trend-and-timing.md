@@ -138,7 +138,21 @@ the name disagrees with its peer rank (see
 `docs/strategy-experiments/xsec-momentum-v1-result.md` — the momentum research
 concluded there IS an edge but it is not wired in as an engine; this column is
 the single-account way to use it). Empty (all "–") until the Multisectional page
-has been recomputed once. The Watchlist header has a collapsible **"Position allocation
+has been recomputed once.
+
+The Watchlist header carries a **`Table | Charts`** toggle (default **Table**,
+never sticky). **Charts** mode fetches `GET /api/signals/board?charts=1` (opt-in;
+~1.3 MB — adds, per watchlist row, `chart: {bars: last 480 daily, events: last
+12 trades}` from `repository.trailing_bars` / `recent_events`) and renders each
+section as a responsive grid of `MiniChart`s — `repeat(3,1fr)` → 2 → 1 on
+narrow screens. Each mini is a `lightweight-charts` close line + toggleable
+SMA 5/10/50/100 ribbon + a volume pane + tiny `▲L`/`▲S` entry and `▼out` exit
+markers, static (no zoom/pan). Charts mode also shows `Daily | Weekly` (client
+resample; weekly + 1Y ≈ 52 bars), a `1M / 3M / 1Y` window, and per-MA chips. A
+one-line action string per name (`S 7-20→8-04 · L 8-14→8-24`) sits above each
+chart. The long/short/flat boards stay tables regardless.
+
+The Watchlist header also has a collapsible **"Position allocation
 (advisory)"** panel — static reference text (inverse-vol sizing,
 ~12% vol target, ~10% position cap, sleeve budgets 50/20/15/5/10, long-only
 default with bonds + BTC as the short exceptions, weekly re-check) plus the

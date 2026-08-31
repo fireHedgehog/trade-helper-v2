@@ -3,9 +3,8 @@ import { api } from "@/shared/api/client";
 import type { MacroContext, RegimeZone, SizingBoard } from "./types";
 
 interface RegimeLatest {
-  run?: null;
   score?: number | null;
-  status?: string;
+  status?: string; // "ok" when a real run exists; "not_computed" / absent otherwise
   trading_date?: string;
 }
 
@@ -25,7 +24,9 @@ function zoneFromScore(score: number): RegimeZone {
 export async function loadMacroContext(): Promise<MacroContext> {
   try {
     const r = (await api.get<RegimeLatest>("/macro/ai-regime/latest")) ?? {};
-    if (r && r.run !== null && typeof r.score === "number" && (r.status ?? "ok") === "ok") {
+    // A real run returns a numeric score and status "ok"; the not-computed
+    // shape has no score (or status !== "ok"). Either way we fall through.
+    if (typeof r.score === "number" && (r.status ?? "ok") === "ok") {
       return {
         source: "ai-regime",
         score: r.score,

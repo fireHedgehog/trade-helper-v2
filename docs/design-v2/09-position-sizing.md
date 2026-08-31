@@ -31,19 +31,22 @@ Every step only ever **shrinks** a weight, so the table reads left to right:
    `k_max × NAV`. Board rows written before migration 0015 carry no
    `vol_60d`; they are sized off a placeholder **25%** σ and flagged (re-run the
    Trend backtest for the real figure).
-2. **Per-name cap** — `min(w_i, per-name cap %)` (P3). Not redistributed.
+2. **Per-name cap** — `min(w_i, per-name cap %)` (P3); the clipped weight is
+   **redistributed** to the still-under-cap names in proportion to their
+   weight, iterated until it settles (matches `momentum_m4_sizing.py`).
 3. **Per-sector cap + sleeve budget** — each sleeve's allowance is
    `per-sector cap % × target gross`, minus what the *deployed-by-sleeve* table
    already holds; the sleeve's new weights are scaled to fit the headroom (S4).
    The optional coarse sleeve budget (Equities / Bonds / Crypto / Other) caps
    each group the same way.
 4. **Whole-book vol target** — estimated book vol from the name vols with a flat
-   assumed pairwise correlation of 0.5 (or a manual override); scale the whole
-   book by `min(1, vol target / est book vol)`.
-5. **Macro overlay** — if enabled, multiply gross by a zone scalar
-   (risk-on ×1, neutral ×`neutralScale` default 0.65, risk-off ×`riskOffScale`
-   default 0.35). Risk-off additionally zeroes names with weak / missing peer
-   rank ("keep only the strongest").
+   assumed pairwise correlation of **0.35** (blunt — a trend book's *realised*
+   pairwise correlation sits well below 0.5; `bookVolOverridePct` is the escape
+   hatch); scale the whole book by `min(1, vol target / est book vol)`.
+5. **Macro overlay** — **off by default**. When enabled, multiply gross by a zone
+   scalar (risk-on ×1, neutral ×`neutralScale` default 0.65, risk-off
+   ×`riskOffScale` default 0.35). Risk-off additionally zeroes names whose peer
+   rank is **known-weak** (`momentum < 50`); names with no rank are kept.
 
 Then `target $ = target % × NAV`, `shares = floor(target $ / last_close)`.
 
@@ -68,23 +71,31 @@ scaling (vol-target, a neutral / risk-off macro overlay) shrinks every target
 uniformly — that is normal operation, shown in the hero, and does **not** turn
 rows into WAIT.
 
-- **WAIT** — risk-off dropped this name outright (weak / missing peer rank), or
-  its target is too small to ticket for some other reason.
-- **HOLD** — the per-sector cap squeezed this name to ~nothing: its sleeve is at
-  its cap from your deployed-by-sleeve table, no room here.
+- **TRIM** — your deployed-by-sleeve table has this name's sleeve **over** its
+  cap. A cut candidate, not an add — trim the weakest peer-ranked names in the
+  sleeve. Per-sleeve (the tool has no per-name holdings). Highest precedence.
+- **WAIT** — risk-off dropped this name outright (known-weak peer rank), or its
+  target is too small to ticket for some other reason.
+- **BLOCKED** — the per-sector cap squeezed this name to ~nothing: its sleeve is
+  at its cap from your deployed-by-sleeve table, no room here.
 - **LIGHT** — a cap (per-name or per-sector) trimmed this name below its
   inverse-vol weight, but it still has a real target.
 - **ADD** — clean; there is head-room and only the uniform book scaling applied.
 
-The table has a verdict filter (four checkboxes, all on) with live counts, so
-"how many WAIT / HOLD and why" is one glance.
+The table has a verdict filter (five checkboxes, all on) with live counts, so
+"how many TRIM / BLOCKED / WAIT and why" is one glance.
 
 ## Outputs
 
-- **Hero** — one line + one number: head-room `$` across N names (green) /
-  whole-book throttle scalar (amber) / deployed ≈ target (grey).
-- **Gross bar** — deployed ┃ can-add ┃ room-to-k_max ┃ macro-blocked, with a
-  target tick; plus a one-line *binding constraint*.
+- **Hero** — one line + one number: head-room `$` to add across N names (green) /
+  **`$` to trim** when deployed is above the target book (red) / whole-book
+  throttle scalar (amber) / deployed ≈ target (grey).
+- **Gross bar** — deployed ┃ **red over-target trim band** ┃ can-add ┃
+  room-to-k_max ┃ macro-blocked, with a target tick; plus a one-line *binding
+  constraint*.
+- **Sleeve load** — an over-cap sleeve turns red and shows `▼ trim N%`.
+- **In-page guide** — a collapsed `<SizingGuide>` accordion: the parameter
+  reference table, the verdict legend, and the known blunt edges.
 - **Sleeve load** — deployed + proposed vs the sector cap, per sleeve.
 - **k_max sensitivity** — resulting target gross at k_max ∈ {0.5, 1, 1.5, 2}.
 - **Per-name table** — a tight 6 columns (symbol · sleeve · L/S · mom, Vol,

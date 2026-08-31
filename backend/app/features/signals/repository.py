@@ -186,6 +186,77 @@ def board_rows(conn: sqlite3.Connection, run_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def trailing_bars(conn: sqlite3.Connection, symbols: list[str], per: int = 480) -> dict[str, list[dict]]:
+    """Last `per` daily bars per symbol for the Trend mini-charts (opt-in
+    `?charts=1`) — adjusted OHLCV for equities/ETFs, raw for `*/USD` crypto."""
+    if not symbols:
+        return {}
+    out: dict[str, list[dict]] = {s: [] for s in symbols}
+    equities = [s for s in symbols if "/" not in s]
+    if equities:
+        ph = ",".join("?" for _ in equities)
+        for r in conn.execute(
+            f"""
+            SELECT symbol, date, o, h, l, c, v FROM (
+                SELECT symbol, date, adj_open o, adj_high h, adj_low l, adj_close c, adj_volume v,
+                       ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) rn
+                  FROM price_bars WHERE symbol IN ({ph}) AND adj_close IS NOT NULL
+            ) WHERE rn <= ? ORDER BY symbol, date
+            """,
+            (*equities, per),
+        ):
+            out[r["symbol"]].append({
+                "t": r["date"],
+                "o": round(r["o"], 3), "h": round(r["h"], 3),
+                "l": round(r["l"], 3), "c": round(r["c"], 3),
+                "v": int(r["v"] or 0),
+            })
+    cryptos = [s for s in symbols if "/" in s]
+    if cryptos:
+        ph = ",".join("?" for _ in cryptos)
+        for r in conn.execute(
+            f"""
+            SELECT symbol, date, o, h, l, c, v FROM (
+                SELECT symbol, date, open o, high h, low l, close c, volume v,
+                       ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) rn
+                  FROM crypto_bars WHERE symbol IN ({ph})
+            ) WHERE rn <= ? ORDER BY symbol, date
+            """,
+            (*cryptos, per),
+        ):
+            out[r["symbol"]].append({
+                "t": r["date"],
+                "o": round(r["o"], 3), "h": round(r["h"], 3),
+                "l": round(r["l"], 3), "c": round(r["c"], 3),
+                "v": int(r["v"] or 0),
+            })
+    return {s: v for s, v in out.items() if v}
+
+
+def recent_events(conn: sqlite3.Connection, symbols: list[str], per: int = 12) -> dict[str, list[dict]]:
+    """The last `per` trades per symbol (current run only — `wipe_symbol` keeps
+    one run's events at a time), oldest first, for the mini-chart markers."""
+    if not symbols:
+        return {}
+    out: dict[str, list[dict]] = {s: [] for s in symbols}
+    ph = ",".join("?" for _ in symbols)
+    for r in conn.execute(
+        f"""
+        SELECT symbol, direction, entry_date, entry_price, exit_date, exit_price, exit_reason FROM (
+            SELECT symbol, direction, entry_date, entry_price, exit_date, exit_price, exit_reason,
+                   ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY entry_date DESC) rn
+              FROM signal_events WHERE symbol IN ({ph})
+        ) WHERE rn <= ? ORDER BY symbol, entry_date
+        """,
+        (*symbols, per),
+    ):
+        out[r["symbol"]].append({
+            "dir": r["direction"], "entry_date": r["entry_date"], "entry_price": r["entry_price"],
+            "exit_date": r["exit_date"], "exit_price": r["exit_price"], "exit_reason": r["exit_reason"],
+        })
+    return {s: v for s, v in out.items() if v}
+
+
 def stats_for_symbols(conn: sqlite3.Connection, symbols: list[str]) -> dict[str, dict]:
     if not symbols:
         return {}

@@ -14,6 +14,8 @@ import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
@@ -32,6 +34,8 @@ import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 import { FetchPanel } from "@/features/data-management/components/FetchPanel";
 
 import { trendApi } from "./api";
+import { WatchlistCharts } from "./components/WatchlistCharts";
+import { MA_RAMP, type MiniTf, type MiniWindow } from "./components/MiniChart";
 import type { BoardResponse, BoardRow, BoardStrategy, MomentumInfo, WatchSection } from "./types";
 
 const NA = "—";
@@ -165,15 +169,36 @@ function MomCell({ row }: { row: BoardRow }) {
   );
 }
 
+const MA_CHOICES = [5, 10, 50, 100];
+
 export function TrendPage() {
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [showFlat, setShowFlat] = useState(false);
   const [showAlloc, setShowAlloc] = useState(false);
 
-  const loadBoard = useCallback(() => {
-    void trendApi.board().then(setBoard);
+  // Watchlist view: default is always the compact table; "charts" is opt-in and
+  // triggers a heavier board fetch (?charts=1) the first time it's opened.
+  const [wlView, setWlView] = useState<"table" | "charts">("table");
+  const [chartsLoaded, setChartsLoaded] = useState(false);
+  const [miniTf, setMiniTf] = useState<MiniTf>("D");
+  const [miniWindow, setMiniWindow] = useState<MiniWindow>("3M");
+  const [miniMas, setMiniMas] = useState<number[]>([...MA_CHOICES]);
+
+  const loadBoard = useCallback((charts = false) => {
+    void trendApi.board(charts).then((b) => {
+      setBoard(b);
+      if (charts) setChartsLoaded(true);
+    });
   }, []);
-  useEffect(loadBoard, [loadBoard]);
+  useEffect(() => {
+    loadBoard(false);
+  }, [loadBoard]);
+  useEffect(() => {
+    if (wlView === "charts" && !chartsLoaded) loadBoard(true);
+  }, [wlView, chartsLoaded, loadBoard]);
+
+  const toggleMa = (n: number) =>
+    setMiniMas((xs) => (xs.includes(n) ? xs.filter((x) => x !== n) : [...xs, n].sort((a, b) => a - b)));
 
   const notComputed = board?.status === "not_computed";
 
@@ -198,7 +223,11 @@ export function TrendPage() {
         <TextField select size="small" label="Model" sx={{ width: 240 }} value="donchian">
           <MenuItem value="donchian">Donchian breakout (Turtle)</MenuItem>
         </TextField>
-        <FetchPanel kind="signal_universe" buttonLabel="Run trend backtest" onDone={loadBoard} />
+        <FetchPanel
+          kind="signal_universe"
+          buttonLabel="Run trend backtest"
+          onDone={() => loadBoard(wlView === "charts")}
+        />
         {board?.computed_at && (
           <Typography variant="caption" color="text.secondary">
             last run {new Date(board.computed_at).toLocaleString()}
@@ -214,16 +243,94 @@ export function TrendPage() {
       )}
 
       <Paper sx={{ p: 2, mb: 2 }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          sx={{ alignItems: "center", mb: 1, flexWrap: "wrap" }}
+        >
           <Typography variant="subtitle2">Watchlist</Typography>
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={wlView}
+            onChange={(_, v) => v && setWlView(v)}
+          >
+            <ToggleButton value="table">Table</ToggleButton>
+            <ToggleButton value="charts">Charts</ToggleButton>
+          </ToggleButtonGroup>
           <Button size="small" onClick={() => setShowAlloc((s) => !s)}>
             {showAlloc ? "Hide position allocation ▾" : "Position allocation (advisory) ▸"}
           </Button>
+
+          {wlView === "charts" && (
+            <>
+              <Box sx={{ flexBasis: "100%", height: 0 }} />
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={miniTf}
+                onChange={(_, v) => v && setMiniTf(v)}
+              >
+                <ToggleButton value="D">Daily</ToggleButton>
+                <ToggleButton value="W">Weekly</ToggleButton>
+              </ToggleButtonGroup>
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={miniWindow}
+                onChange={(_, v) => v && setMiniWindow(v)}
+              >
+                <ToggleButton value="1M">1M</ToggleButton>
+                <ToggleButton value="3M">3M</ToggleButton>
+                <ToggleButton value="1Y">1Y</ToggleButton>
+              </ToggleButtonGroup>
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                <Typography variant="caption" color="text.secondary">
+                  MA
+                </Typography>
+                {MA_CHOICES.map((n) => {
+                  const on = miniMas.includes(n);
+                  return (
+                    <Chip
+                      key={n}
+                      size="small"
+                      label={n}
+                      clickable
+                      onClick={() => toggleMa(n)}
+                      variant={on ? "filled" : "outlined"}
+                      sx={{
+                        height: 22,
+                        fontVariantNumeric: "tabular-nums",
+                        borderColor: MA_RAMP[n],
+                        color: on ? "#fff" : MA_RAMP[n],
+                        bgcolor: on ? MA_RAMP[n] : "transparent",
+                        "&:hover": { bgcolor: on ? MA_RAMP[n] : "transparent" },
+                      }}
+                    />
+                  );
+                })}
+              </Stack>
+            </>
+          )}
         </Stack>
         <Collapse in={showAlloc}>
           <AllocationNote strategies={board?.strategies ?? []} />
         </Collapse>
-        <WatchlistTable sections={board?.watchlist ?? []} />
+        {wlView === "table" ? (
+          <WatchlistTable sections={board?.watchlist ?? []} />
+        ) : !chartsLoaded ? (
+          <Typography color="text.secondary" sx={{ py: 3 }}>
+            Loading charts…
+          </Typography>
+        ) : (
+          <WatchlistCharts
+            sections={board?.watchlist ?? []}
+            tf={miniTf}
+            windowKey={miniWindow}
+            mas={miniMas}
+          />
+        )}
       </Paper>
 
       {board?.status === "ok" && (
@@ -269,7 +376,7 @@ export function TrendPage() {
   );
 }
 
-function StateCell({ row }: { row: BoardRow }) {
+export function StateCell({ row }: { row: BoardRow }) {
   if (!row.state || row.state === "flat")
     return <Chip size="small" variant="outlined" label="flat" />;
   return (
@@ -428,7 +535,7 @@ function AllocationNote({ strategies }: { strategies: BoardStrategy[] }) {
   );
 }
 
-function SymLink({ symbol }: { symbol: string }) {
+export function SymLink({ symbol }: { symbol: string }) {
   return (
     <Link component={RouterLink} to={`/timing/${encodeURIComponent(symbol)}`} sx={{ fontWeight: 600 }}>
       {symbol}

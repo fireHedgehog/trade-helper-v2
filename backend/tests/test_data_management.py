@@ -216,17 +216,17 @@ def test_memberships_sync_folds_new_index_members_into_active_universe(client, m
     assert client.get("/api/data/assets/NEWCO").json()["asset"]["active"] == 1
 
 
-def test_asset_prices_skips_today_and_batches_the_rest(client, monkeypatch):
-    """A symbol whose last_fetched is today is skipped without any provider
-    call; symbols that share a start date go out in one raw + one adjusted
-    request, not a pair per symbol."""
+def test_asset_prices_skips_recent_and_batches_the_rest(client, monkeypatch):
+    """A symbol fetched within the retry cooldown is skipped without any
+    provider call; symbols that share a start date go out in one raw + one
+    adjusted request, not a pair per symbol."""
     import time
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
 
     from app.db.connection import get_connection
     from app.features.data_management import prices
 
-    today = datetime.now(timezone.utc).date().isoformat()
+    recent = (datetime.now(timezone.utc) - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     calls: list[tuple[tuple[str, ...], str]] = []
 
     class FakeClient:
@@ -250,13 +250,13 @@ def test_asset_prices_skips_today_and_batches_the_rest(client, monkeypatch):
                 "VALUES (?,?, 'us_equity', 'active', 1)",
                 (sym, f"{sym} Inc"),
             )
-        # AAA was already pulled today -> must be skipped with zero calls.
+        # AAA was pulled minutes ago -> must be skipped with zero calls.
         # BBB + CCC share a last_date -> one batch covers both.
         conn.executemany(
             "INSERT INTO price_bar_stats (symbol, bar_count, first_date, last_date, "
             "last_close, last_fetched) VALUES (?,?,?,?,?,?)",
             [
-                ("AAA", 1, "2024-01-01", "2024-06-01", 1.0, today + "T09:00:00.000Z"),
+                ("AAA", 1, "2024-01-01", "2024-06-01", 1.0, recent),
                 ("BBB", 1, "2024-01-01", "2024-06-01", 1.0, "2020-01-01T00:00:00.000Z"),
                 ("CCC", 1, "2024-01-01", "2024-06-01", 1.0, "2020-01-01T00:00:00.000Z"),
             ],
@@ -289,13 +289,13 @@ def test_option_snapshots_store_a_small_grid(client, monkeypatch):
     """Stub the chain; the handler keeps only the 6-tenor x 7-moneyness grid,
     not every strike/expiry it was handed."""
     import time
-    from datetime import date, timedelta
+    from datetime import datetime, timedelta, timezone
 
     from app.db.connection import get_connection
     from app.features.data_management import options as opt
 
     spot = 100.0
-    today = date.today()
+    today = datetime.now(timezone.utc).date()  # match options._today (UTC, not local)
     # expirations that land near the 7/30/60/90/120/180 ladder, plus noise
     exps = [today + timedelta(days=d) for d in (7, 21, 35, 65, 95, 125, 150, 185)]
     strikes = [round(70 + 2.5 * i, 1) for i in range(25)]  # 70.0 .. 130.0

@@ -4,6 +4,24 @@ export interface MomentumInfo {
   persistence: number | null; // fraction of recent weekly formations spent in the lead
 }
 
+export interface MiniBar {
+  t: string; // YYYY-MM-DD
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;
+}
+
+export interface MiniEvent {
+  dir: "long" | "short";
+  entry_date: string;
+  entry_price: number | null;
+  exit_date: string | null; // null → still open
+  exit_price: number | null;
+  exit_reason: string | null;
+}
+
 export interface BoardRow {
   symbol: string;
   state: "long" | "short" | "flat" | null;
@@ -14,6 +32,7 @@ export interface BoardRow {
   current_stop: number | null;
   vol_60d?: number | null; // annualised 60-day return vol — watchlist rows only
   momentum?: MomentumInfo | null; // advisory peer-strength context, not a signal
+  chart?: { bars: MiniBar[]; events: MiniEvent[] } | null; // only with ?charts=1
 }
 
 export interface WatchSection {

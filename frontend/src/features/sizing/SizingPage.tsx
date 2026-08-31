@@ -18,14 +18,16 @@ import {
   amber,
   green,
   grey,
+  red,
   zeroDeployed,
 } from "./constants";
 import { SizingControls } from "./components/SizingControls";
+import { SizingGuide } from "./components/SizingGuide";
 import { SizingTable } from "./components/SizingTable";
 import { GrossBar, KmaxSensitivity, SectorBar } from "./components/SizingViz";
 import type { MacroContext, SizingBoard, SizingParams, Verdict } from "./types";
 
-const VERDICTS: Verdict[] = ["ADD", "LIGHT", "HOLD", "WAIT"];
+const VERDICTS: Verdict[] = ["ADD", "LIGHT", "BLOCKED", "TRIM", "WAIT"];
 
 const DEFAULT_PARAMS: SizingParams = {
   nav: 1_000_000,
@@ -42,7 +44,9 @@ const DEFAULT_PARAMS: SizingParams = {
   scopeWatchlist: false,
   mode: "full",
   newDays: 10,
-  macroEnabled: true,
+  // Off by default: the baseline view is the pure risk ladder. Turning this on
+  // layers the macro-regime throttle over the top (the "institutional" view).
+  macroEnabled: false,
   neutralScale: 0.65,
   riskOffScale: 0.35,
   deployed: zeroDeployed(),
@@ -76,7 +80,8 @@ export function SizingPage() {
   const [showVerdict, setShowVerdict] = useState<Record<Verdict, boolean>>({
     ADD: true,
     LIGHT: true,
-    HOLD: true,
+    BLOCKED: true,
+    TRIM: true,
     WAIT: true,
   });
 
@@ -87,7 +92,7 @@ export function SizingPage() {
   }, [board, macro, deferredParams]);
 
   const verdictCounts = useMemo(() => {
-    const c: Record<Verdict, number> = { ADD: 0, LIGHT: 0, HOLD: 0, WAIT: 0 };
+    const c: Record<Verdict, number> = { ADD: 0, LIGHT: 0, BLOCKED: 0, TRIM: 0, WAIT: 0 };
     result?.rows.forEach((r) => (c[r.verdict] += 1));
     return c;
   }, [result]);
@@ -147,6 +152,15 @@ export function SizingPage() {
           <b>Run trend backtest</b> on the Trend page for real inverse-vol weights.
         </Alert>
       )}
+      {result && result.otherNoSectorCount > 0 && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          {result.otherNoSectorCount} name{result.otherNoSectorCount === 1 ? " has" : "s have"} no
+          GICS sector tag and fall into the <b>Other</b> sleeve — the per-sector cap is looser for
+          them until the memberships sync fills the tag in.
+        </Alert>
+      )}
+
+      <SizingGuide sx={{ mb: 2 }} />
 
       <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ alignItems: "flex-start" }}>
         <Paper
@@ -330,33 +344,39 @@ function Hero({
   const combined = result.macroScale * result.volScale;
   const scaled = result.macroScale < 1 || result.volScale < 0.995;
 
-  let tone: "add" | "hold" | "empty";
+  let tone: "add" | "reduce" | "hold" | "empty";
   if (!result.rows.length) tone = "empty";
+  else if (result.overshootPct >= 1) tone = "reduce";
   else if (result.headroomPct >= 1) tone = "add";
   else tone = "hold";
 
-  const color = tone === "add" ? green : scaled && tone === "hold" ? amber : grey;
+  const color =
+    tone === "add" ? green : tone === "reduce" ? red : scaled && tone === "hold" ? amber : grey;
   const big =
     tone === "add"
       ? usd(result.headroomUsd)
-      : tone === "empty"
-        ? "—"
-        : result.deployedGrossPct >= 1
-          ? `${result.deployedGrossPct.toFixed(0)}%`
-          : `×${combined.toFixed(2)}`;
+      : tone === "reduce"
+        ? usd(result.overshootUsd)
+        : tone === "empty"
+          ? "—"
+          : result.deployedGrossPct >= 1
+            ? `${result.deployedGrossPct.toFixed(0)}%`
+            : `×${combined.toFixed(2)}`;
   const line =
     tone === "add"
       ? `Add across ${result.addCount} ADD name${result.addCount === 1 ? "" : "s"} · +${result.headroomPct.toFixed(0)}% of NAV`
-      : tone === "empty"
-        ? "No on-signal names in scope"
-        : result.deployedGrossPct >= 1
-          ? "Deployed ≈ target — nothing to add right now"
-          : "The regime has the book near flat — hold";
+      : tone === "reduce"
+        ? `Deployed is ${result.overshootPct.toFixed(0)}% of NAV over the target book — trim, don't add`
+        : tone === "empty"
+          ? "No on-signal names in scope"
+          : result.deployedGrossPct >= 1
+            ? "Deployed ≈ target — nothing to add right now"
+            : "The regime has the book near flat — hold";
 
   return (
     <Paper sx={{ p: 2.5, borderLeft: `4px solid ${color}` }}>
       <Typography variant="overline" color="text.secondary">
-        {tone === "add" ? "Head-room" : "Status"}
+        {tone === "add" ? "Head-room" : tone === "reduce" ? "Over budget" : "Status"}
       </Typography>
       <Typography sx={{ fontSize: 40, fontWeight: 800, lineHeight: 1.1, color, fontVariantNumeric: "tabular-nums" }}>
         {big}

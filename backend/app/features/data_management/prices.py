@@ -7,14 +7,17 @@ the handler avoids hitting the provider at all when it can:
 
 * the bars come from the **`sip` consolidated feed** (config
   `alpaca_price_feed`): history back to 2016 with real market-wide volume,
-  vs. the `iex` feed's ~mid-2020 start and ~3% of volume. The free plan will
-  not serve SIP's most recent ~15 min, so SIP requests end at
-  `today - alpaca_sip_end_lag_days` (the current session's bar lands on the
-  next run).
-* incremental mode skips any symbol whose `price_bar_stats.last_fetched` is
-  already today's (UTC) calendar date — nothing new posts until the next
-  session's close, so a re-run the same day is a no-op. `mode="full"`
-  ignores this and re-pulls the whole history.
+  vs. the `iex` feed's ~mid-2020 start and ~3% of volume. The free plan
+  refuses SIP data for the current **America/New_York** day (`403`), so
+  requests end at "yesterday in ET", rolled back over weekends — computed in
+  ET, NOT the server's UTC date, so a run from a UTC+12/13 timezone doesn't
+  trail the real US date by a day (`_data_end`).
+* incremental mode skips a symbol that is already current through that end,
+  or that was hit within `_RETRY_COOLDOWN` (6 h) and found nothing new — so a
+  weekend / holiday re-run doesn't spam the provider, but a re-run after the
+  next session clears the embargo does pick the new bar up. `mode="full"`
+  ignores both and re-pulls the whole history. The `(symbol, date)` upsert
+  makes any repeat fetch idempotent — a day is never appended twice.
 * symbols that do need data are grouped by their incremental start date and
   fetched in multi-symbol batches (one raw + one adjusted request per
   batch), not one pair of requests per symbol.
@@ -25,10 +28,24 @@ from __future__ import annotations
 import sqlite3
 import time
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from app.core.config import get_settings
 from app.features.data_management import runs
 from app.providers.clients.alpaca_client import AlpacaClient
+from app.providers.clients.http import FetchHTTPError
+
+_ET = ZoneInfo("America/New_York")
+# After a run that found nothing new for a symbol, don't re-hit the provider
+# for it again within this window — suppresses weekend / holiday spam without
+# blocking a pickup once a new session's bar clears the SIP embargo.
+_RETRY_COOLDOWN = timedelta(hours=6)
+# The free Alpaca plan refuses SIP data that is "too recent" with a 403; the
+# exact cut-over (ET midnight vs the next session's close) is fuzzy, so on that
+# error we retreat the request end one day at a time and, if it never clears,
+# mark the symbols skipped rather than failed.
+_SIP_EMBARGO_MARKER = "recent sip data"
+_SIP_EMBARGO_MAX_RETREAT = 3
 
 _UPSERT = """
 INSERT INTO price_bars (
@@ -45,18 +62,35 @@ ON CONFLICT(symbol, date) DO UPDATE SET
 """
 
 
-def _today() -> date:
-    return datetime.now(timezone.utc).date()
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
 
 
-def _data_end(today: date) -> date:
-    """Last date a request may ask for. SIP won't serve its most recent
-    minutes on the free plan, so hold the end back a day; other feeds can go
-    to today."""
+def _data_end(now_utc: datetime) -> date:
+    """Last date a request may ask for.
+
+    Computed in **America/New_York**, not the server's UTC calendar date — a
+    run from a UTC+12/13 timezone would otherwise trail the real US date by a
+    day. On the `sip` feed the free Alpaca plan refuses the **current ET day**
+    entirely (`403 "subscription does not permit querying recent SIP data"`),
+    so the newest servable bar is the previous trading day; that session's bar
+    lands on the first run after ET midnight. `alpaca_sip_end_lag_days` holds
+    it back further. Other feeds have no embargo and can go to today.
+
+    Holidays are not special-cased: a request that spans one just returns no
+    bars, the upsert is a no-op, and `last_date` never advances past the true
+    last session.
+    """
     settings = get_settings()
-    if settings.alpaca_price_feed == "sip":
-        return today - timedelta(days=max(1, settings.alpaca_sip_end_lag_days))
-    return today
+    today_et = now_utc.astimezone(_ET).date()
+    if settings.alpaca_price_feed != "sip":
+        return today_et
+    d = today_et - timedelta(days=1)  # SIP free plan embargoes the current ET day
+    for _ in range(max(0, settings.alpaca_sip_end_lag_days)):
+        d -= timedelta(days=1)
+    while d.weekday() >= 5:  # roll Sat=5 / Sun=6 back to a weekday
+        d -= timedelta(days=1)
+    return d
 
 
 def _batch_size(span_days: int) -> int:
@@ -78,14 +112,27 @@ def _targets(conn: sqlite3.Connection, scope: str, scope_arg: str | None) -> lis
     return [r["symbol"] for r in conn.execute("SELECT symbol FROM assets WHERE active = 1 ORDER BY symbol")]
 
 
+def _fetched_within_cooldown(last_fetched: str | None, now_utc: datetime) -> bool:
+    if not last_fetched:
+        return False
+    try:
+        lf = datetime.fromisoformat(last_fetched.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if lf.tzinfo is None:
+        lf = lf.replace(tzinfo=timezone.utc)
+    return now_utc - lf < _RETRY_COOLDOWN
+
+
 def _plan(
-    conn: sqlite3.Connection, targets: list[str], mode: str, today: date, data_end: date
+    conn: sqlite3.Connection, targets: list[str], mode: str, now_utc: datetime, data_end: date
 ) -> tuple[list[str], dict[str, list[str]]]:
     """Split targets into (skipped, {start_date: [symbols]}).
 
-    Incremental mode skips a symbol that was already fetched today or is
-    already current through `data_end`; everything else is grouped by the date
-    its fetch should start from so same-start symbols batch into one request.
+    Incremental mode skips a symbol that is already current through `data_end`,
+    or that we hit within `_RETRY_COOLDOWN` and found nothing new for (weekend /
+    holiday spam guard); everything else is grouped by the date its fetch should
+    start from so same-start symbols batch into one request.
     """
     settings = get_settings()
     skipped: list[str] = []
@@ -94,15 +141,15 @@ def _plan(
         row = conn.execute(
             "SELECT last_date, last_fetched FROM price_bar_stats WHERE symbol = ?", (symbol,)
         ).fetchone()
-        if mode != "full" and row and (row["last_fetched"] or "")[:10] == today.isoformat():
-            skipped.append(symbol)  # already pulled today — nothing new until the next close
-            continue
         if mode == "full" or not (row and row["last_date"]):
             start = settings.history_start_date
         else:
             start = (date.fromisoformat(row["last_date"]) + timedelta(days=1)).isoformat()
         if date.fromisoformat(start) > data_end:
             skipped.append(symbol)  # already current through the readable end
+            continue
+        if mode != "full" and _fetched_within_cooldown(row["last_fetched"] if row else None, now_utc):
+            skipped.append(symbol)  # tried recently, provider had nothing new
             continue
         groups.setdefault(start, []).append(symbol)
     return skipped, groups
@@ -178,17 +225,40 @@ def _touch_fetched(conn: sqlite3.Connection, symbol: str) -> None:
     )
 
 
+class _SipEmbargo(RuntimeError):
+    """SIP end date still refused after retreating the max number of days."""
+
+
+async def _fetch_pair(client: AlpacaClient, batch: list[str], start: str, end: str, feed: str):
+    """(raw, adj, end_used). On a SIP-embargo 403 the request end is walked back
+    one day at a time (down to `start`) before giving up."""
+    cur = end
+    for _ in range(_SIP_EMBARGO_MAX_RETREAT + 1):
+        try:
+            raw = await client.get_stock_bars(batch, start, cur, "raw", feed=feed)
+            adj = await client.get_stock_bars(batch, start, cur, "all", feed=feed)
+            return raw, adj, cur
+        except FetchHTTPError as exc:
+            if getattr(exc, "status", None) != 403 or _SIP_EMBARGO_MARKER not in str(exc).lower():
+                raise
+            prev = (date.fromisoformat(cur) - timedelta(days=1)).isoformat()
+            if prev < start:
+                raise _SipEmbargo(str(exc)) from exc
+            cur = prev
+    raise _SipEmbargo("SIP end refused after retreating the maximum number of days")
+
+
 async def run_asset_prices(
     conn: sqlite3.Connection, run_id: int, mode: str, scope: str, scope_arg: str | None
 ) -> None:
     feed = get_settings().alpaca_price_feed
     targets = _targets(conn, scope, scope_arg)
     runs.set_planned(conn, run_id, len(targets))
-    today = _today()
-    data_end = _data_end(today)
+    now_utc = _now_utc()
+    data_end = _data_end(now_utc)
     end = data_end.isoformat()
 
-    skipped, groups = _plan(conn, targets, mode, today, data_end)
+    skipped, groups = _plan(conn, targets, mode, now_utc, data_end)
     for symbol in skipped:
         runs.raise_if_cancelled(run_id)
         runs.start_target(conn, run_id, symbol)
@@ -210,8 +280,17 @@ async def run_asset_prices(
 
                 t0 = time.monotonic()
                 try:
-                    raw = await client.get_stock_bars(batch, start, end, "raw", feed=feed)
-                    adj = await client.get_stock_bars(batch, start, end, "all", feed=feed)
+                    raw, adj, end_used = await _fetch_pair(client, batch, start, end, feed)
+                except _SipEmbargo:
+                    # nothing available yet on the free plan — not an error;
+                    # the cooldown + "already current" checks will retry later
+                    per = int((time.monotonic() - t0) * 1000 / len(batch))
+                    for j, symbol in enumerate(batch):
+                        _touch_fetched(conn, symbol)
+                        runs.finish_target(conn, run_id, symbol, status="skipped",
+                                           requests=2 if j == 0 else 0, duration_ms=per,
+                                           error="SIP data not yet released for this range")
+                    continue
                 except Exception as exc:  # noqa: BLE001 - the whole batch failed
                     per = int((time.monotonic() - t0) * 1000 / len(batch))
                     for j, symbol in enumerate(batch):
@@ -221,6 +300,9 @@ async def run_asset_prices(
                     continue
 
                 per = int((time.monotonic() - t0) * 1000 / len(batch))
+                if end_used != end:
+                    conn.execute("UPDATE fetch_runs SET current_target = ? WHERE id = ?",
+                                 (f"{label} (SIP end → {end_used})", run_id))
                 for j, symbol in enumerate(batch):
                     rows = _merge(raw.get(symbol, []), adj.get(symbol, []), feed)
                     if rows:

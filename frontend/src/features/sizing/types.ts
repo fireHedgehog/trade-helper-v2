@@ -52,7 +52,7 @@ export interface SizingParams {
   deployed: Record<Sleeve, number>; // already-held % of NAV per sleeve
 }
 
-export type Verdict = "ADD" | "LIGHT" | "HOLD" | "WAIT";
+export type Verdict = "ADD" | "LIGHT" | "BLOCKED" | "TRIM" | "WAIT";
 
 export interface SizingRow {
   symbol: string;
@@ -78,6 +78,7 @@ export interface SleeveLoad {
   deployedPct: number;
   newPct: number;
   capPct: number;
+  trimPct: number; // deployed above this sleeve's cap — how much to cut here
   over: boolean;
 }
 
@@ -85,10 +86,13 @@ export interface SizingResult {
   rows: SizingRow[];
   excluded: { symbol: string; reason: string }[];
   assumedVolCount: number; // rows sized off the placeholder σ (pre-0015 board run)
+  otherNoSectorCount: number; // rows with no sector tag, bucketed to Other
   targetGrossPct: number;
   deployedGrossPct: number;
   headroomPct: number;
   headroomUsd: number;
+  overshootPct: number; // deployed above the target book — trim, don't add
+  overshootUsd: number;
   addCount: number;
   cashAfterPct: number;
   maxNamePct: number;
@@ -98,6 +102,7 @@ export interface SizingResult {
   macroScale: number;
   bindingConstraint: string;
   kmaxSensitivity: { k: number; grossPct: number }[];
-  // segmented-gross-bar inputs (all % of NAV)
-  bar: { deployed: number; canAdd: number; roomToKmax: number; macroBlocked: number };
+  // segmented-gross-bar inputs (all % of NAV). `held` = deployed up to target;
+  // `over` = deployed above target (the trim band).
+  bar: { held: number; over: number; canAdd: number; roomToKmax: number; macroBlocked: number };
 }

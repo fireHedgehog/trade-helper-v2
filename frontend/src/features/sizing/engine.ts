@@ -28,7 +28,12 @@ import type {
   Verdict,
 } from "./types";
 
-const ASSUMED_PAIR_CORR = 0.5; // for the book-vol estimate — deliberately blunt
+// Flat pairwise correlation for the parametric book-vol estimate. A trend book
+// is all long-equity-beta, but inverse-vol weighting + partial diversification
+// pull the *realised* pairwise correlation well below the naive 0.5; the M4
+// research (realised portfolio vol) lands near ~0.35. Deliberately blunt — the
+// "assumed book vol" override on the panel is the escape hatch.
+const ASSUMED_PAIR_CORR = 0.35;
 // Board rows written before migration 0015 carry no vol_60d. Rather than drop
 // them, size them off a placeholder σ and flag it — a fresh Trend backtest
 // fills in the real figure.
@@ -45,6 +50,7 @@ interface Candidate {
   symbol: string;
   state: "long" | "short";
   sleeve: Sleeve;
+  noSectorTag: boolean; // bucketed to a sleeve with no `sector` from the API
   vol60d: number;
   assumedVol: boolean;
   lastClose: number;
@@ -88,10 +94,12 @@ function gatherCandidates(board: SizingBoard, p: SizingParams): {
       continue;
     }
     const hasVol = r.vol_60d != null && r.vol_60d > 0;
+    const sleeve = sleeveFor({ symbol: r.symbol, sector: r.sector });
     candidates.push({
       symbol: r.symbol,
       state: r.state as "long" | "short",
-      sleeve: sleeveFor({ symbol: r.symbol, sector: r.sector }),
+      sleeve,
+      noSectorTag: !r.sector && sleeve === "Other",
       vol60d: hasVol ? (r.vol_60d as number) : FALLBACK_VOL,
       assumedVol: !hasVol,
       lastClose: r.last_close,
@@ -114,6 +122,31 @@ function estimateBookVol(weightsFrac: number[], vols: number[]): number {
   return Math.sqrt(Math.max(v, 0));
 }
 
+// Per-name cap WITH spill redistribution — matches the frozen-research sizing
+// script (momentum_m4_sizing.py). A name over the cap is clipped; the freed
+// weight is handed to the still-under-cap names in proportion to their current
+// weight, iterated until it settles. Total gross is preserved (up to n × cap).
+function applyPerNameCap(raw: number[], cap: number): number[] {
+  const w = raw.slice();
+  for (let iter = 0; iter < 6; iter++) {
+    let spill = 0;
+    const under: number[] = [];
+    for (let i = 0; i < w.length; i++) {
+      if (w[i] > cap + 1e-9) {
+        spill += w[i] - cap;
+        w[i] = cap;
+      } else if (w[i] < cap - 1e-9) {
+        under.push(i);
+      }
+    }
+    if (spill < 1e-6 || under.length === 0) break;
+    const usum = under.reduce((a, i) => a + w[i], 0);
+    if (usum <= 0) break;
+    for (const i of under) w[i] += spill * (w[i] / usum);
+  }
+  return w;
+}
+
 // Steps 1–3 (inverse-vol → per-name cap → per-sector cap / sleeve budget) for a
 // given k_max. Returns the post-cap weight (% NAV) per candidate, index-aligned.
 function weightsAfterCaps(
@@ -126,7 +159,7 @@ function weightsAfterCaps(
   const invVolSum = invVol.reduce((a, b) => a + b, 0) || 1;
 
   const raw = invVol.map((iv) => (iv / invVolSum) * refGross);
-  const afterName = raw.map((w) => Math.min(w, p.perNameCapPct));
+  const afterName = applyPerNameCap(raw, p.perNameCapPct);
   const afterSector = afterName.slice();
 
   // per-sector cap: allowance is a fraction of ref gross, minus what the
@@ -182,7 +215,7 @@ function grossForKmax(cands: Candidate[], p: SizingParams, macro: MacroContext, 
   const dropWeak = p.macroEnabled && macro.zone === "risk-off";
   let gross = 0;
   cands.forEach((c, i) => {
-    if (dropWeak && (c.momentum == null || c.momentum < 50)) return;
+    if (dropWeak && c.momentum != null && c.momentum < 50) return; // known-weak only
     gross += afterSector[i] * volScale * macroScale;
   });
   return gross;
@@ -203,13 +236,16 @@ export function computeSizing(
   const { candidates, excluded } = gatherCandidates(board, p);
   const deployedGrossPct = SLEEVES.reduce((a, s) => a + (p.deployed[s] ?? 0), 0);
 
-  const emptyBar = { deployed: deployedGrossPct, canAdd: 0, roomToKmax: 0, macroBlocked: 0 };
+  const emptyBar = { held: deployedGrossPct, over: 0, canAdd: 0, roomToKmax: 0, macroBlocked: 0 };
   const assumedVolCount = candidates.filter((c) => c.assumedVol).length;
+  const otherNoSectorCount = candidates.filter((c) => c.noSectorTag).length;
 
   if (!candidates.length) {
     return {
-      rows: [], excluded, assumedVolCount,
-      targetGrossPct: 0, deployedGrossPct, headroomPct: 0, headroomUsd: 0, addCount: 0,
+      rows: [], excluded, assumedVolCount, otherNoSectorCount,
+      targetGrossPct: 0, deployedGrossPct, headroomPct: 0, headroomUsd: 0,
+      overshootPct: 0, overshootUsd: 0, // no signals in scope → nothing to say about the book
+      addCount: 0,
       cashAfterPct: Math.max(0, 100 - deployedGrossPct), maxNamePct: 0,
       sleeveLoads: sleeveLoads(p, []), estBookVolPct: 0, volScale: 1,
       macroScale: macroGrossScale(p, macro),
@@ -232,10 +268,12 @@ export function computeSizing(
   const rows: SizingRow[] = candidates.map((c, i) => {
     const notes: string[] = [];
     if (c.assumedVol) notes.push("assumed 25% vol — re-run Trend for the real σ");
+    if (c.noSectorTag) notes.push("no sector tag — bucketed to Other");
     const rawPct = raw[i];
     const namePct = afterName[i];
     const sectorPct = afterSector[i];
     if (namePct < rawPct - 1e-6) notes.push(`per-name cap ${p.perNameCapPct}% (P3)`);
+    else if (namePct > rawPct + 1e-6) notes.push("picked up spill from capped names");
     if (sectorPct < namePct - 1e-6) {
       const allowance = (p.perSectorCapPct / 100) * p.kMax * 100;
       const headroom = Math.max(0, allowance - (p.deployed[c.sleeve] ?? 0));
@@ -253,15 +291,23 @@ export function computeSizing(
     }
     let targetPct = volPct * macroScale;
     let dropped = false;
-    if (dropWeak && (c.momentum == null || c.momentum < 50)) {
+    if (dropWeak && c.momentum != null && c.momentum < 50) {
       targetPct = 0;
       dropped = true;
-      notes.push("macro risk-off — held back (weak / no peer rank)");
+      notes.push(`macro risk-off — held back (peer rank ${Math.round(c.momentum)} < 50)`);
     } else if (p.macroEnabled && macroScale < 1) {
       notes.push(`macro ${macro.zone} ×${macroScale.toFixed(2)}`);
     }
     const sleeveCapBit = sectorPct < namePct - 1e-6; // the per-sector cap trimmed this name
-    if (namePct >= rawPct - 1e-6 && sectorPct >= namePct - 1e-6 && targetPct >= 0.05) {
+    // Your deployed-by-sleeve table has this name's sleeve above its own cap —
+    // it is a candidate to cut, not to add. (Per-sleeve, since the tool has no
+    // per-name holdings — trim the weakest peer-ranked names in the sleeve.)
+    const sleeveCapPct = (p.perSectorCapPct / 100) * p.kMax * 100;
+    const sleeveTrimPct = Math.max(0, (p.deployed[c.sleeve] ?? 0) - sleeveCapPct);
+    if (sleeveTrimPct > 0.5) {
+      notes.push(`${c.sleeve} is ${sleeveTrimPct.toFixed(0)}% over its ${p.perSectorCapPct}% cap — trim this sleeve`);
+    }
+    if (namePct >= rawPct - 1e-6 && sectorPct >= namePct - 1e-6 && targetPct >= 0.05 && sleeveTrimPct <= 0.5) {
       notes.push(`${rawPct.toFixed(1)}% → ${targetPct.toFixed(1)}% — room to add`);
     }
 
@@ -272,9 +318,11 @@ export function computeSizing(
     // neutral / risk-off macro overlay) shrinks every target uniformly — that
     // is normal operation, surfaced in the hero, NOT a per-row WAIT.
     let verdict: Verdict;
-    if (dropped) verdict = "WAIT"; // risk-off dropped this name outright
+    if (sleeveTrimPct > 0.5)
+      verdict = "TRIM"; // your book is over-allocated to this sleeve — cut here
+    else if (dropped) verdict = "WAIT"; // risk-off dropped this name outright
     else if (sleeveCapBit && sectorPct < namePct * 0.5)
-      verdict = "HOLD"; // the sector cap squeezed this name to ~nothing — no room in the sleeve
+      verdict = "BLOCKED"; // the sector cap squeezed this name to ~nothing — no room in the sleeve
     else if (sectorPct < rawPct - 1e-6) verdict = "LIGHT"; // a cap trimmed this name, still sized
     else if (targetPct < 0.05) verdict = "WAIT"; // otherwise too small to ticket
     else verdict = "ADD";
@@ -303,27 +351,34 @@ export function computeSizing(
 
   const targetGrossPct = rows.reduce((a, r) => a + r.targetPct, 0);
   const headroomPct = Math.max(0, targetGrossPct - deployedGrossPct);
+  const overshootPct = Math.max(0, deployedGrossPct - targetGrossPct);
   const addCount = rows.filter((r) => r.verdict === "ADD").length;
   const maxNamePct = rows.reduce((a, r) => Math.max(a, r.targetPct), 0);
   const loads = sleeveLoads(p, rows);
 
-  // segmented gross bar (all % of NAV, clamped so the bar never exceeds 100)
+  // segmented gross bar (all % of NAV, clamped so the bar never exceeds 100).
+  // held ┃ over (red, = deployed above target) ┃ can-add ┃ room-to-k_max ┃ macro-blocked
   const kmaxCeil = p.kMax * 100;
+  const barMax = Math.min(Math.max(kmaxCeil, deployedGrossPct), 100);
   const grossNoMacro = rows.reduce((a, r) => a + r.afterVolTargetPct, 0);
   const macroBlocked = Math.max(0, grossNoMacro - targetGrossPct);
+  const held = Math.min(deployedGrossPct, targetGrossPct);
+  const over = Math.min(overshootPct, Math.max(0, 100 - held));
   const canAdd = headroomPct;
-  const held = Math.min(deployedGrossPct, 100);
-  const roomToKmax = Math.max(0, Math.min(kmaxCeil, 100) - held - canAdd - macroBlocked);
-  const bar = { deployed: held, canAdd, roomToKmax, macroBlocked };
+  const roomToKmax = Math.max(0, barMax - held - over - canAdd - macroBlocked);
+  const bar = { held, over, canAdd, roomToKmax, macroBlocked };
 
   return {
     rows,
     excluded,
     assumedVolCount,
+    otherNoSectorCount,
     targetGrossPct,
     deployedGrossPct,
     headroomPct,
     headroomUsd: (headroomPct / 100) * p.nav,
+    overshootPct,
+    overshootUsd: (overshootPct / 100) * p.nav,
     addCount,
     cashAfterPct: Math.max(0, 100 - Math.max(deployedGrossPct, targetGrossPct)),
     maxNamePct,
@@ -334,6 +389,7 @@ export function computeSizing(
     bindingConstraint: bindingConstraint(p, macro, {
       volScale,
       macroScale,
+      overshootPct,
       grossCappedPct: rows.reduce((a, r) => a + r.afterSectorCapPct, 0),
       nNameCapped: rows.filter((r) => r.afterNameCapPct < r.invVolRawPct - 1e-6).length,
       anySectorTrim: rows.some((r) => r.afterSectorCapPct < r.afterNameCapPct - 1e-6),
@@ -355,7 +411,15 @@ function sleeveLoads(p: SizingParams, rows: SizingRow[]) {
   return SLEEVES.map((s) => {
     const deployedPct = p.deployed[s] ?? base[s];
     const newPct = newBySleeve.get(s) ?? 0;
-    return { sleeve: s, deployedPct, newPct, capPct, over: deployedPct + newPct > capPct + 1e-6 };
+    const trimPct = Math.max(0, deployedPct - capPct);
+    return {
+      sleeve: s,
+      deployedPct,
+      newPct,
+      capPct,
+      trimPct,
+      over: deployedPct + newPct > capPct + 1e-6,
+    };
   }).filter((l) => l.deployedPct > 0 || l.newPct > 0);
 }
 
@@ -365,12 +429,16 @@ function bindingConstraint(
   x: {
     volScale: number;
     macroScale: number;
+    overshootPct: number;
     grossCappedPct: number;
     nNameCapped: number;
     anySectorTrim: boolean;
     worstSleeve?: Sleeve;
   },
 ): string {
+  if (x.overshootPct >= 1) {
+    return `Deployed is ${x.overshootPct.toFixed(0)}% of NAV above the target book — trim, don't add.`;
+  }
   if (p.macroEnabled && x.macroScale < 1 && x.macroScale <= x.volScale) {
     return `Macro overlay (${macro.zone}${macro.score != null ? ` · ${macro.label}` : ""}) is binding — whole-book gross ×${x.macroScale.toFixed(2)}.`;
   }

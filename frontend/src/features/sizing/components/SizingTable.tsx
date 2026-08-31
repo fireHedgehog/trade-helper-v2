@@ -20,7 +20,8 @@ const VERDICT: Record<
 > = {
   ADD: { color: "success", variant: "filled" },
   LIGHT: { color: "warning", variant: "outlined" },
-  HOLD: { color: "default", variant: "outlined" },
+  BLOCKED: { color: "default", variant: "outlined" },
+  TRIM: { color: "error", variant: "filled" },
   WAIT: { color: "error", variant: "outlined" },
 };
 

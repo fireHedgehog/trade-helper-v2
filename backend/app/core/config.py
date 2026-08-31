@@ -52,10 +52,12 @@ class Settings(BaseSettings):
 
     # Equity bar feed. The free plan's `iex` feed only archives ~mid-2020 and
     # carries just IEX's ~3% of volume; `sip` (consolidated tape) goes back to
-    # 2016 with real volume, but the free plan forbids reading its most recent
-    # ~15 min — so SIP requests end at `today - alpaca_sip_end_lag_days`.
+    # 2016 with real volume, but the free plan refuses SIP data for the current
+    # ET day (403). So `sip` requests end at "yesterday in America/New_York"
+    # (rolled back over weekends) — see `prices._data_end`. This knob holds the
+    # end back that many *extra* calendar days; leave at 0.
     alpaca_price_feed: str = "sip"
-    alpaca_sip_end_lag_days: int = 1
+    alpaca_sip_end_lag_days: int = 0
 
     # Trailing window (days) re-fetched every incremental macro/commodity run
     # to pick up FRED revisions.

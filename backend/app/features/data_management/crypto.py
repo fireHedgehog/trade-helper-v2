@@ -1,4 +1,10 @@
-"""Crypto daily bars (BTC/USD, ETH/USD) — one Alpaca pass, no adjustment."""
+"""Crypto daily bars (BTC/USD, ETH/USD) — one Alpaca pass, no adjustment.
+
+Requests end at **yesterday (UTC)**: the current UTC day's bar is still
+forming, and storing that partial bar would feed a half-day close into the
+signal engine / 60-day vol. The `(symbol, date)` upsert keeps every re-fetch
+idempotent, so the completed day lands cleanly on the next run.
+"""
 
 from __future__ import annotations
 
@@ -70,7 +76,8 @@ async def run_crypto_bars(conn: sqlite3.Connection, run_id: int, mode: str) -> N
         )
     ] or ["BTC/USD", "ETH/USD"]
     runs.set_planned(conn, run_id, len(targets))
-    today = datetime.now(timezone.utc).date().isoformat()
+    # End at yesterday (UTC) — the current day's bar is still forming.
+    end = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
 
     async with AlpacaClient() as client:
         for symbol in targets:
@@ -79,7 +86,11 @@ async def run_crypto_bars(conn: sqlite3.Connection, run_id: int, mode: str) -> N
             t0 = time.monotonic()
             try:
                 start = _start_for(conn, symbol, mode)
-                bars = (await client.get_crypto_bars([symbol], start, today)).get(symbol, [])
+                if start > end:  # already current through yesterday
+                    runs.finish_target(conn, run_id, symbol, status="skipped", requests=0,
+                                       duration_ms=int((time.monotonic() - t0) * 1000))
+                    continue
+                bars = (await client.get_crypto_bars([symbol], start, end)).get(symbol, [])
                 n = _write(conn, symbol, bars) if bars else 0
                 runs.finish_target(
                     conn, run_id, symbol, status="ok", rows=n, requests=1,

@@ -3,20 +3,22 @@ import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
-import { SLEEVE_SHORT, amber, green, grey } from "../constants";
+import { SLEEVE_SHORT, amber, green, grey, red } from "../constants";
 import type { SizingResult } from "../types";
 
 const HATCH = `repeating-linear-gradient(45deg, ${amber}, ${amber} 3px, transparent 3px, transparent 7px)`;
 
-// Segmented gross bar: held ┃ can-add ┃ room-to-k_max ┃ macro-blocked, scaled
-// so the full width is max(100, k_max×100)% of NAV. More legible than a gauge —
-// you see the head-room and which band is capping you in one glance.
+// Segmented gross bar: held ┃ over (red, deployed above target) ┃ can-add ┃
+// room-to-k_max ┃ macro-blocked, scaled so the full width is
+// max(100, k_max×100)% of NAV. You see the head-room — or the over-shoot — and
+// which band is capping you in one glance.
 export function GrossBar({ result, kMaxPct }: { result: SizingResult; kMaxPct: number }) {
   const { bar, targetGrossPct } = result;
   const scale = Math.max(100, kMaxPct);
   const seg = (v: number) => `${(v / scale) * 100}%`;
   const segs: { key: string; w: number; bg: string; label: string }[] = [
-    { key: "held", w: bar.deployed, bg: grey, label: `Deployed ${bar.deployed.toFixed(0)}%` },
+    { key: "held", w: bar.held, bg: grey, label: `Deployed ${bar.held.toFixed(0)}%` },
+    { key: "over", w: bar.over, bg: red, label: `Over target — trim ${bar.over.toFixed(0)}%` },
     { key: "add", w: bar.canAdd, bg: green, label: `Can add ${bar.canAdd.toFixed(0)}%` },
     { key: "room", w: bar.roomToKmax, bg: "transparent", label: `Room to k_max ${bar.roomToKmax.toFixed(0)}%` },
     { key: "macro", w: bar.macroBlocked, bg: HATCH, label: `Macro-blocked ${bar.macroBlocked.toFixed(0)}%` },
@@ -60,8 +62,9 @@ export function GrossBar({ result, kMaxPct }: { result: SizingResult; kMaxPct: n
         />
       </Box>
       <Stack direction="row" spacing={2} sx={{ mt: 0.75, flexWrap: "wrap" }}>
-        <Legend swatch={grey} label={`Deployed ${bar.deployed.toFixed(0)}%`} />
-        <Legend swatch={green} label={`Can add ${bar.canAdd.toFixed(0)}%`} />
+        <Legend swatch={grey} label={`Deployed ${bar.held.toFixed(0)}%`} />
+        {bar.over > 0.05 && <Legend swatch={red} label={`Trim ${bar.over.toFixed(0)}%`} />}
+        {bar.canAdd > 0.05 && <Legend swatch={green} label={`Can add ${bar.canAdd.toFixed(0)}%`} />}
         {bar.macroBlocked > 0.05 && <Legend swatch={HATCH} label={`Macro-blocked ${bar.macroBlocked.toFixed(0)}%`} />}
         <Legend swatch="text.primary" label={`Target gross ${targetGrossPct.toFixed(0)}%`} tick />
       </Stack>
@@ -122,13 +125,14 @@ export function SectorBar({ result }: { result: SizingResult }) {
               <Box sx={{ position: "absolute", left: w(l.capPct), top: -2, bottom: -2, width: 2, bgcolor: "text.primary", opacity: 0.55 }} />
             </Box>
             <Typography variant="caption" sx={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: l.over ? "error.main" : "text.secondary" }}>
-              {(l.deployedPct + l.newPct).toFixed(0)}%
+              {l.trimPct > 0.5 ? `▼ trim ${l.trimPct.toFixed(0)}%` : `${(l.deployedPct + l.newPct).toFixed(0)}%`}
             </Typography>
           </Box>
         );
       })}
       <Typography variant="caption" color="text.secondary">
-        Grey = already deployed · green = proposed add · tick = {result.sleeveLoads[0]?.capPct.toFixed(0)}% sector cap
+        Grey = already deployed · green = proposed add · red / ▼ = deployed over the{" "}
+        {result.sleeveLoads[0]?.capPct.toFixed(0)}% sector cap (tick)
       </Typography>
     </Stack>
   );

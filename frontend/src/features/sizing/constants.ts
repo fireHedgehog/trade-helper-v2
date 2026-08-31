@@ -94,11 +94,13 @@ export const DEPLOYED_PRESETS: { key: string; label: string; map: Partial<Record
     },
   },
   {
+    // Deliberately past the 30% sector cap on Tech — shows the TRIM verdict +
+    // the red over-target band immediately.
     key: "tech-heavy",
     label: "Tech-heavy (crowded)",
     map: {
-      "Information Technology": 24, "Communication Services": 9, "Consumer Discretionary": 8,
-      "Health Care": 3, Financials: 3, Industrials: 2, Bonds: 4, Crypto: 3, Other: 2,
+      "Information Technology": 38, "Communication Services": 12, "Consumer Discretionary": 8,
+      "Health Care": 3, Financials: 3, Bonds: 4, Crypto: 3, Other: 2,
     },
   },
   {

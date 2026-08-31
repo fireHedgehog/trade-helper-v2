@@ -120,5 +120,7 @@ def run_universe():
 
 
 @router.get("/board")
-def board(conn: sqlite3.Connection = Depends(db_dependency)):
-    return service.get_board(conn)
+def board(charts: bool = False, conn: sqlite3.Connection = Depends(db_dependency)):
+    # charts=1 attaches per-watchlist-row mini-chart bars + trade markers (~200 KB);
+    # the Trend page requests it only in "graph mode".
+    return service.get_board(conn, charts=charts)
