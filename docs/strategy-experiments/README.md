@@ -14,6 +14,14 @@ Naming: `<model-name>-<version>-result.md`.
    frozen trend benchmark. Five stages (entry horizon, exit architecture,
    direction, portfolio) + a cost-×2 sanity check. Wired into the app via the
    `signal_strategies` registry (migration `0014`).
+2. [`xsec-momentum-v1-result.md`](xsec-momentum-v1-result.md) — cross-sectional
+   relative-strength momentum. Four stages (selection, exit, direction, sizing)
+   + a cost-×2 check. A real edge (long-only, monthly, SMA_100 gate, vol-target
+   sizing) but **research only** — not yet wired in; needs a portfolio-level
+   runner path.
+3. [`oversold-bounce-v1-result.md`](oversold-bounce-v1-result.md) — short-term
+   mean reversion. **Negative result**: no tradeable bounce alpha in this
+   universe. Nothing built; the Multisectional reversal list stays a UI flag.
 
 ## Adding a new one
 
@@ -21,5 +29,7 @@ Research a genuinely different model, freeze the decision, then add
 `<name>-<version>-result.md` here and a line to the list above. Never rewrite an
 existing result file — a new parameter set or model is a new entry.
 
-The one full research dump (scripts + raw outputs) is in git history at commit
-`c296945` and nowhere else.
+The full research dumps (scripts + raw outputs) live only in git history:
+Naive Donchian V1 at `c296945`; cross-sectional momentum V1 and oversold
+bounce V1 at `__SNAPSHOT__`. Each was committed once, then removed in the
+following commit.
