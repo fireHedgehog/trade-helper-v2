@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import statistics
 import time
 
 from app.features.data_management import runs as fetch_runs
@@ -346,6 +347,22 @@ def _empty_entry(symbol: str) -> dict:
             "last_close": None, "unrealized_pct": None, "current_stop": None}
 
 
+def _vol_60d(conn: sqlite3.Connection, symbol: str) -> float | None:
+    """Annualised 60-day return volatility — the position-sizing σ from the
+    frozen research (distinct from the engine's 20-day ATR, which sizes stops).
+    Watchlist reference only."""
+    try:
+        bars = ohlc.load_ohlc(conn, symbol)
+    except Exception:
+        return None
+    closes = [float(b["c"]) for b in bars[-61:]]
+    if len(closes) < 21:
+        return None
+    rets = [closes[i] / closes[i - 1] - 1.0 for i in range(1, len(closes))]
+    sd = statistics.pstdev(rets)
+    return sd * (252 ** 0.5) if sd else None
+
+
 def get_board(conn: sqlite3.Connection) -> dict:
     run = repo.latest_universe_run(conn)
     watch = repo.stats_for_symbols(conn, [ohlc.normalize_symbol(s) for s in TREND_WATCHLIST])
@@ -353,7 +370,8 @@ def get_board(conn: sqlite3.Connection) -> dict:
         {
             "title": title,
             "rows": [
-                _board_entry(watch[s]) if s in watch else _empty_entry(s)
+                {**(_board_entry(watch[s]) if s in watch else _empty_entry(s)),
+                 "vol_60d": _vol_60d(conn, s)}
                 for s in (ohlc.normalize_symbol(x) for x in syms)
             ],
         }

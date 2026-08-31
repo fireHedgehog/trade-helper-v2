@@ -295,7 +295,10 @@ function SymLink({ symbol }: { symbol: string }) {
   );
 }
 
-const WATCH_COLS = 8;
+const WATCH_COLS = 9;
+
+const volPct = (v: number | null | undefined) =>
+  v == null ? NA : `${Math.round(v * 100)}%`;
 
 function WatchRow({ r }: { r: BoardRow }) {
   const flat = !r.state || r.state === "flat";
@@ -316,6 +319,7 @@ function WatchRow({ r }: { r: BoardRow }) {
         {flat ? NA : signedPct(r.unrealized_pct)}
       </TableCell>
       <TableCell align="right">{flat ? NA : money(r.current_stop)}</TableCell>
+      <TableCell align="right">{volPct(r.vol_60d)}</TableCell>
     </TableRow>
   );
 }
@@ -334,6 +338,7 @@ function WatchlistTable({ sections }: { sections: WatchSection[] }) {
             <TableCell align="right">Last</TableCell>
             <TableCell align="right">Unreal.</TableCell>
             <TableCell align="right">Stop</TableCell>
+            <TableCell align="right">Vol 60d</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>

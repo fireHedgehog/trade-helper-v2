@@ -6,6 +6,7 @@ export interface BoardRow {
   last_close: number | null;
   unrealized_pct: number | null;
   current_stop: number | null;
+  vol_60d?: number | null; // annualised 60-day return vol — watchlist rows only
 }
 
 export interface WatchSection {
