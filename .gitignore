@@ -47,3 +47,10 @@ database/*.sqlite3-journal
 
 # --- Logs ---
 *.log
+
+# --- Disposable research scratch (keep only the READMEs; the one historical
+#     dump is preserved in git history at commit c296945) ---
+backend/temp/*
+!backend/temp/README.md
+docs/temp/*
+!docs/temp/README.md

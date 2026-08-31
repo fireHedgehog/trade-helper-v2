@@ -42,7 +42,7 @@ What exists now:
   note** (inverse-vol sizing, ~12% vol target, ~10% position cap, sleeve
   budgets 50/20/15/5/10, long-only default with bonds + BTC as the short
   exceptions, weekly re-check). No portfolio engine — reference text only, from
-  the frozen research (`docs/temp/NAIVE_DONCHIAN_V1_RESEARCH_HANDOFF.md`).
+  the frozen research (`docs/strategy-experiments/README.md`).
 
 Deliberately NOT built (the rest of this doc): a separate immutable
 version table, a dedicated `signal_strategy_assignments` table with priority /
