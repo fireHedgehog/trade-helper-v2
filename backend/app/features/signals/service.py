@@ -168,7 +168,7 @@ def run_for_symbol(conn: sqlite3.Connection, symbol: str) -> dict:
         repo.wipe_symbol(conn, symbol)
         repo.insert_events(conn, run_id, symbol, result.trades)
         repo.upsert_symbol_stats(conn, run_id, symbol, params_json, state, m,
-                                 strategy_id=resolved["id"])
+                                 strategy_id=resolved["id"], vol_60d=_vol_60d(bars))
         repo.insert_chart(conn, run_id, symbol, fr["payload"])
         repo.finish_run(conn, run_id, "succeeded", 1, len(result.trades))
         conn.execute("COMMIT")
@@ -313,7 +313,7 @@ def run_universe(conn: sqlite3.Connection, run_id: int, mode: str = "incremental
                 repo.wipe_symbol(conn, symbol)
                 repo.insert_events(conn, sig_run_id, symbol, result.trades)
                 repo.upsert_symbol_stats(conn, sig_run_id, symbol, params_json, state, m,
-                                         strategy_id=strategy_id)
+                                         strategy_id=strategy_id, vol_60d=_vol_60d(bars))
                 conn.execute("COMMIT")
                 total_events += len(result.trades)
                 done += 1
@@ -339,22 +339,19 @@ def _board_entry(row: dict) -> dict:
         "last_close": row["last_close"],
         "unrealized_pct": row["unrealized_pct"],
         "current_stop": row["current_stop"],
+        "vol_60d": row.get("vol_60d"),
     }
 
 
 def _empty_entry(symbol: str) -> dict:
     return {"symbol": symbol, "state": None, "state_since": None, "entry_price": None,
-            "last_close": None, "unrealized_pct": None, "current_stop": None}
+            "last_close": None, "unrealized_pct": None, "current_stop": None, "vol_60d": None}
 
 
-def _vol_60d(conn: sqlite3.Connection, symbol: str) -> float | None:
+def _vol_60d(bars: list[dict]) -> float | None:
     """Annualised 60-day return volatility — the position-sizing σ from the
     frozen research (distinct from the engine's 20-day ATR, which sizes stops).
-    Watchlist reference only."""
-    try:
-        bars = ohlc.load_ohlc(conn, symbol)
-    except Exception:
-        return None
+    Board / watchlist reference column only."""
     closes = [float(b["c"]) for b in bars[-61:]]
     if len(closes) < 21:
         return None
@@ -363,17 +360,26 @@ def _vol_60d(conn: sqlite3.Connection, symbol: str) -> float | None:
     return sd * (252 ** 0.5) if sd else None
 
 
+def _vol_60d_for(conn: sqlite3.Connection, symbol: str) -> float | None:
+    try:
+        return _vol_60d(ohlc.load_ohlc(conn, symbol))
+    except Exception:
+        return None
+
+
 def get_board(conn: sqlite3.Connection) -> dict:
     run = repo.latest_universe_run(conn)
     watch = repo.stats_for_symbols(conn, [ohlc.normalize_symbol(s) for s in TREND_WATCHLIST])
+    def _watch_row(s: str) -> dict:
+        e = _board_entry(watch[s]) if s in watch else _empty_entry(s)
+        if e["vol_60d"] is None:  # no stored run for this watchlist name — compute now
+            e["vol_60d"] = _vol_60d_for(conn, s)
+        return e
+
     watchlist = [
         {
             "title": title,
-            "rows": [
-                {**(_board_entry(watch[s]) if s in watch else _empty_entry(s)),
-                 "vol_60d": _vol_60d(conn, s)}
-                for s in (ohlc.normalize_symbol(x) for x in syms)
-            ],
+            "rows": [_watch_row(s) for s in (ohlc.normalize_symbol(x) for x in syms)],
         }
         for title, syms in TREND_WATCHLIST_SECTIONS
     ]

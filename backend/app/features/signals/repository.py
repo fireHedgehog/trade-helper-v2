@@ -178,7 +178,7 @@ def board_rows(conn: sqlite3.Connection, run_id: int) -> list[dict]:
     rows = conn.execute(
         """
         SELECT symbol, state, state_since, entry_price, last_close, last_date,
-               unrealized_pct, current_stop
+               unrealized_pct, current_stop, vol_60d
           FROM signal_symbol_stats WHERE run_id = ?
         """,
         (run_id,),
@@ -193,7 +193,7 @@ def stats_for_symbols(conn: sqlite3.Connection, symbols: list[str]) -> dict[str,
     rows = conn.execute(
         f"""
         SELECT s.symbol, s.state, s.state_since, s.entry_price, s.last_close,
-               s.unrealized_pct, s.current_stop
+               s.unrealized_pct, s.current_stop, s.vol_60d
           FROM signal_symbol_stats s
          WHERE s.symbol IN ({ph})
         """,
@@ -228,24 +228,24 @@ def insert_events(conn: sqlite3.Connection, run_id: int, symbol: str, trades: li
 
 def upsert_symbol_stats(conn: sqlite3.Connection, run_id: int, symbol: str, params_json: str,
                         state: dict, metrics: dict, profile: str | None = None,
-                        strategy_id: int | None = None) -> None:
+                        strategy_id: int | None = None, vol_60d: float | None = None) -> None:
     conn.execute(
         """
         INSERT INTO signal_symbol_stats (run_id, symbol, params_json, state, state_since,
             entry_price, last_close, last_date, unrealized_pct, current_stop, metrics_json,
-            updated_at, profile, strategy_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            updated_at, profile, strategy_id, vol_60d)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(run_id, symbol) DO UPDATE SET
             params_json=excluded.params_json, state=excluded.state, state_since=excluded.state_since,
             entry_price=excluded.entry_price, last_close=excluded.last_close, last_date=excluded.last_date,
             unrealized_pct=excluded.unrealized_pct, current_stop=excluded.current_stop,
             metrics_json=excluded.metrics_json, updated_at=excluded.updated_at, profile=excluded.profile,
-            strategy_id=excluded.strategy_id
+            strategy_id=excluded.strategy_id, vol_60d=excluded.vol_60d
         """,
         (run_id, symbol, params_json, state["state"], state["state_since"],
          state["entry_price"], state["last_close"], state["last_date"],
          state["unrealized_pct"], state["current_stop"], json.dumps(metrics), _now(), profile,
-         strategy_id),
+         strategy_id, vol_60d),
     )
 
 

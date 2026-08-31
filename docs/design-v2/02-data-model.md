@@ -71,7 +71,7 @@ No persisted "macro regime" — the composite is computed live (doc 04).
 | `assets.strategy_id` / `crypto_assets.strategy_id` | — | Which `signal_strategies` row a symbol runs. Explicit on every active row (default → V1, `ETF_BONDS` → slow-entry); NULL falls back to the default. |
 | `signal_runs` | `run_id` | One per Run. `scope ∈ {single, universe}`, `symbol` (single only), `params_json` (a resolver marker for universe runs), `engine_version`, `status`, counts. |
 | `signal_events` | `id` | The trade list: `direction`, `entry_date/price`, `exit_date/price/reason` (NULL while open), `bars_held`, `return_pct`, `return_r`, `mae_atr`, `mfe_atr`, `initial_stop`. Index `(symbol, entry_date)`. |
-| `signal_symbol_stats` | `(run_id, symbol)` | Cached board state + `metrics_json` + the exact `params_json` and `strategy_id` used: `state ∈ {long,short,flat}`, `state_since`, `entry_price`, `last_close`, `unrealized_pct`, `current_stop`. |
+| `signal_symbol_stats` | `(run_id, symbol)` | Cached board state + `metrics_json` + the exact `params_json` and `strategy_id` used: `state ∈ {long,short,flat}`, `state_since`, `entry_price`, `last_close`, `unrealized_pct`, `current_stop`, `vol_60d` (annualised 60-day return vol, a board reference column). |
 | `signal_chart` | `(run_id, symbol)` | Timing-only chart payload JSON: `{overlays (donchian_up/dn, stop_line), equity, key_levels, daily}`. **Not** written by universe runs. |
 
 **Invariant:** a symbol has at most one `signal_symbol_stats` row at a time —

@@ -122,9 +122,14 @@ counts). Or `status:"not_computed"`.
 `<FetchPanel kind="signal_universe">` (button + progress + cancel) · the
 **watchlist table** — one table with an Excel-style divider row (`colSpan`,
 tinted, short, uppercase) per section, each name showing state · entry ·
-unrealized % red/green · stop, or "–" when flat · **Holding long / Holding
-short / Flat** tables. The Watchlist header has a collapsible **"Position
-allocation (advisory)"** panel — static reference text (inverse-vol sizing,
+unrealized % red/green · stop · **Vol 60d**, or "–" when flat · **Holding long /
+Holding short / Flat** tables (all carry the Vol 60d column). `Vol 60d` is the
+stored annualised 60-day return vol (`signal_symbol_stats.vol_60d`, migration
+`0015`) rendered as a calm→turbulent severity chip — an escalating weather icon
+(sun → cloud → drizzle → wind → storm) and a green→red colour ramp at 15 / 25 /
+40 / 60 % thresholds; a reference for the "size by volatility" line, not a
+signal. The Watchlist header has a collapsible **"Position allocation
+(advisory)"** panel — static reference text (inverse-vol sizing,
 ~12% vol target, ~10% position cap, sleeve budgets 50/20/15/5/10, long-only
 default with bonds + BTC as the short exceptions, weekly re-check) plus the
 live per-strategy symbol counts. No portfolio engine — text only, from the

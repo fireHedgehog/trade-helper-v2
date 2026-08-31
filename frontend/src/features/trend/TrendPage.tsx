@@ -14,8 +14,14 @@ import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TextField from "@mui/material/TextField";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
+import AirRounded from "@mui/icons-material/AirRounded";
+import GrainRounded from "@mui/icons-material/GrainRounded";
+import ThunderstormRounded from "@mui/icons-material/ThunderstormRounded";
+import WbCloudyRounded from "@mui/icons-material/WbCloudyRounded";
+import WbSunnyRounded from "@mui/icons-material/WbSunnyRounded";
 
 import { FetchPanel } from "@/features/data-management/components/FetchPanel";
 
@@ -31,6 +37,55 @@ const signedPct = (v: number | null) =>
   v == null ? NA : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`;
 const daysSince = (iso: string | null) =>
   iso == null ? NA : Math.round((Date.now() - new Date(iso + "T00:00:00Z").getTime()) / 864e5);
+
+// 60-day annualised return vol → a calm→turbulent severity scale. The icon
+// escalates (sun → cloud → drizzle → wind → storm); the colour ramps green →
+// red. Deliberately restrained: colour on the glyph + number only, no cell fill
+// except the top bucket. Thresholds are round numbers, not tuned.
+const VOL_STEPS = [
+  { max: 0.15, label: "calm", color: "#1f9d55", Icon: WbSunnyRounded },
+  { max: 0.25, label: "steady", color: "#7a9e1f", Icon: WbCloudyRounded },
+  { max: 0.4, label: "choppy", color: "#c98a12", Icon: GrainRounded },
+  { max: 0.6, label: "volatile", color: "#dd6b20", Icon: AirRounded },
+  { max: Infinity, label: "wild", color: "#d64545", Icon: ThunderstormRounded },
+] as const;
+const volStep = (v: number) => VOL_STEPS.find((s) => v < s.max) ?? VOL_STEPS[VOL_STEPS.length - 1];
+
+function VolCell({ v }: { v: number | null | undefined }) {
+  if (v == null)
+    return (
+      <TableCell align="right" sx={{ color: "text.disabled" }}>
+        {NA}
+      </TableCell>
+    );
+  const s = volStep(v);
+  const pct = `${Math.round(v * 100)}%`;
+  return (
+    <Tooltip title={`${s.label} · ${pct} annualised 60-day volatility`} arrow>
+      <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+        <Box
+          component="span"
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.5,
+            color: s.color,
+            fontWeight: 600,
+            fontVariantNumeric: "tabular-nums",
+            ...(s.label === "wild" && {
+              bgcolor: "rgba(214,69,69,0.12)",
+              borderRadius: 1,
+              px: 0.75,
+            }),
+          }}
+        >
+          <s.Icon sx={{ fontSize: 15 }} />
+          {pct}
+        </Box>
+      </TableCell>
+    </Tooltip>
+  );
+}
 
 export function TrendPage() {
   const [board, setBoard] = useState<BoardResponse | null>(null);
@@ -166,6 +221,7 @@ function BoardTable({
           <TableRow>
             <TableCell>Symbol</TableCell>
             <TableCell>Flat since</TableCell>
+            <TableCell align="right">Vol 60d</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -175,6 +231,7 @@ function BoardTable({
                 <SymLink symbol={r.symbol} />
               </TableCell>
               <TableCell>{r.state_since ?? NA}</TableCell>
+              <VolCell v={r.vol_60d} />
             </TableRow>
           ))}
         </TableBody>
@@ -194,7 +251,8 @@ function BoardTable({
             <TableCell align="right">Entry</TableCell>
             <TableCell align="right">Last</TableCell>
             <TableCell align="right">Unreal.</TableCell>
-            <TableCell align="right">Stop</TableCell>
+            <Tooltip title="Current stop-loss price - the engine's trailing or initial stop" arrow><TableCell align="right">Stop</TableCell></Tooltip>
+            <TableCell align="right">Vol 60d</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -220,6 +278,7 @@ function BoardTable({
                   {flat ? NA : signedPct(r.unrealized_pct)}
                 </TableCell>
                 <TableCell align="right">{flat ? NA : money(r.current_stop)}</TableCell>
+                <VolCell v={r.vol_60d} />
               </TableRow>
             );
           })}
@@ -297,9 +356,6 @@ function SymLink({ symbol }: { symbol: string }) {
 
 const WATCH_COLS = 9;
 
-const volPct = (v: number | null | undefined) =>
-  v == null ? NA : `${Math.round(v * 100)}%`;
-
 function WatchRow({ r }: { r: BoardRow }) {
   const flat = !r.state || r.state === "flat";
   const up = (r.unrealized_pct ?? 0) >= 0;
@@ -319,7 +375,7 @@ function WatchRow({ r }: { r: BoardRow }) {
         {flat ? NA : signedPct(r.unrealized_pct)}
       </TableCell>
       <TableCell align="right">{flat ? NA : money(r.current_stop)}</TableCell>
-      <TableCell align="right">{volPct(r.vol_60d)}</TableCell>
+      <VolCell v={r.vol_60d} />
     </TableRow>
   );
 }
@@ -337,7 +393,7 @@ function WatchlistTable({ sections }: { sections: WatchSection[] }) {
             <TableCell align="right">Entry</TableCell>
             <TableCell align="right">Last</TableCell>
             <TableCell align="right">Unreal.</TableCell>
-            <TableCell align="right">Stop</TableCell>
+            <Tooltip title="Current stop-loss price - the engine's trailing or initial stop" arrow><TableCell align="right">Stop</TableCell></Tooltip>
             <TableCell align="right">Vol 60d</TableCell>
           </TableRow>
         </TableHead>
