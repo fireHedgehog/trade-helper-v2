@@ -128,7 +128,7 @@ allocation (advisory)"** panel — static reference text (inverse-vol sizing,
 ~12% vol target, ~10% position cap, sleeve budgets 50/20/15/5/10, long-only
 default with bonds + BTC as the short exceptions, weekly re-check) plus the
 live per-strategy symbol counts. No portfolio engine — text only, from the
-frozen research in `docs/strategy-experiments/result.md`. Symbol →
+frozen research in `docs/strategy-experiments/naive-donchian-v1-result.md`. Symbol →
 `/timing/:symbol` — where, because `latest_run_for_symbol` joins via
 `signal_symbol_stats`, the universe run's trades / metrics / state are shown,
 with an info banner: "press Run for the Donchian overlay, equity curve, and

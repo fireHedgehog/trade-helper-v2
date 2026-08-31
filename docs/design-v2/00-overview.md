@@ -42,7 +42,7 @@ edited forever.
 ## Status (2026-08-31)
 
 All seven pages are built and working end to end. The Naive Donchian V1
-benchmark research is frozen (`docs/strategy-experiments/result.md`)
+benchmark research is frozen (`docs/strategy-experiments/naive-donchian-v1-result.md`)
 and its entry cluster is wired in via the `signal_strategies` registry. Depth
 work remains (more signal models, walk-forward tuning, an options-analysis
 page) — not new surfaces. Backend pytest suite passes; the frontend
