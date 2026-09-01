@@ -98,35 +98,117 @@ marks a position exited (stop / Donchian reversal / flip), the next reconcile
 closes it at the open. This is the faithful reproduction; the journal then tells
 us whether "exit at next open after a close-based stop" survives real gaps.
 
-### D. The journal (`schema/migrations/00NN_paper.sql`)
+### D. The journal — every valuable datum (`schema/migrations/00NN_paper.sql`)
+
+The point of the journal is that **years later you can answer "why was this
+position this size on this day, and how did it work out"** — the decision
+trail, the trade lifecycle, the book each day, and the derived research views.
+Nothing is thrown away.
+
+**Durable header — survives a paper-account reset:**
 
 | Table | Row |
 | --- | --- |
-| `paper_experiments` | one per run — name, `alpaca_paper` cred key, universe (`full` \| `watchlist` \| custom), start_nav, started_at, status. Every row below carries `experiment_id`. |
-| `paper_runs` | one per reconcile — ts, NAV before/after, target gross, orders submitted/filled/rejected, macro zone used, sizing-params JSON |
-| `paper_orders` | mirror of `/v2/orders` — symbol, side, qty, submitted_at, alpaca_order_id, status, filled_qty/avg_price/at, reject reason, the `signal_events.id` that triggered it |
-| `paper_fills` | mirror of `/v2/account/activities?FILL` — the authoritative fill log |
-| `paper_positions_daily` | our EOD snapshot — date, symbol, qty, avg_entry, market_value, unrealized_pl, current_stop |
-| `paper_equity` | mirror of `/v2/account/portfolio/history` — date, equity, pl, pl_pct |
-| `paper_trades` | matched round-trips — entry/exit price + date, realized P&L, R multiple, bars held, exit_reason (mapped from the signal), fill slippage vs the backtest's open |
+| `paper_experiments` | **the journal ID.** name, `alpaca_paper` cred key, universe (`full` \| `watchlist` \| custom), start_nav, started_at, ended_at, end_reason (`blew_up` \| `manual` \| `running`), final_equity, params_json (sizing params + strategy_id + engine_version). Every row below carries `experiment_id`. Never deleted. |
 
-The round-trip matcher (open → close per symbol) produces the "clean trading
-journal". Every trade links back to its `signal_events` row (why it exists).
+**The decision trail — the "流水账" (`paper_decisions`, one row per
+reconcile × symbol that mattered):**
 
-### E. UI — `/paper` (minimal)
+reconcile_date · symbol · in_universe · **the sizing waterfall snapshot at that
+moment** — inverse-vol raw wt · after per-name cap (+ did it bind) · sleeve,
+sleeve deployed %, sleeve headroom, after per-sector cap · est book vol,
+vol-target scalar, after vol-target · **macro zone + macro scalar** · final
+target wt / $ / shares · held_qty · target_qty · delta · **verdict** ∈
+`ADD / TRIM / HOLD / EXIT / BLOCKED / SKIP` · **`reason` (one human string)**,
+e.g.
 
-Equity curve (from `portfolio_history`) · positions table (symbol, qty, entry,
-mark, unrealized, stop, days held) · order log · the trade journal (closed
-round-trips with R / P&L / reason / slippage) · **Reconcile now** and
-**Flatten all** buttons · a `paper_enabled` kill switch. Reuse the density +
-mini-chart components.
+- `ADD` — "new long; Tech sleeve 18% of 30% cap → room; macro neutral ×0.65; target 0.9% NAV, hold 0 → buy 12 sh"
+- `TRIM` — "still long; vol-target scalar 0.80→0.62 (book vol 19%); target 0.6%→0.4%; sell 4 sh"
+- `EXIT` — "Donchian exit stop_trailing on the 09-03 close; close 18 sh at next open"
+- `BLOCKED` — "want +0.5% but Energy sleeve at 30% cap; no order"
+- `HOLD` — "within the 15% rebalance band; no order"
+
+Each decision links to the `signal_events.id` it came from and (if an order
+resulted) to `paper_orders.id`.
+
+**Orders & fills — mirrored from Alpaca:**
+
+| Table | Row |
+| --- | --- |
+| `paper_orders` | `/v2/orders` mirror — side, qty, submitted_at, status, filled_qty / avg_price / at, reject reason, `decision_id`, **`ref_open` (that day's open) + `slippage` (fill − ref_open, bps and R)** |
+| `paper_fills` | `/v2/account/activities?FILL` mirror — the authoritative fill log |
+
+**The trade — matched round-trip (`paper_trades`):**
+
+open (date, price, shares, opening `decision_id` + `signal_events.id`, entry
+reason) · **adds/trims during the hold** (list of `decision_id` + reason) ·
+exit (date, price, shares, exit reason from the signal's `exit_reason`) ·
+**outcome** — realized P&L $ / % · **R multiple** (P&L ÷ initial risk =
+(entry − initial_stop) × shares) · bars held · **MAE / MFE** (worst / best
+mark-to-market during the hold, ATR units) · exposure-weighted return · **entry
+context** (macro zone, book gross, this name's vol-60 and momentum rank at
+entry).
+
+**The book each day:**
+
+| Table | Row |
+| --- | --- |
+| `paper_equity` | `/v2/account/portfolio/history` mirror — date, equity, cash, daily P&L $ / % |
+| `paper_book_daily` | our aggregates — gross %, # positions, largest position %, largest sector %, trailing realised book vol, macro zone, vol-target scalar, cash-drag % |
+| `paper_positions_daily` | per-name EOD mark — date, symbol, qty, avg_entry, market_value, unrealized_pl, current_stop, dist-to-stop |
+
+**Derived research views** (nightly rollup or computed on read):
+
+- **Live vs the frozen backtest**, side by side — win rate, avg win/loss %,
+  payoff, expectancy in R, profit factor, SQN, avg/median hold, max consecutive
+  losses. This comparison is the whole point.
+- **Exit-reason breakdown** — % of closed trades by `stop_initial /
+  stop_trailing / donchian_reversal / flip`, and the avg R of each bucket.
+- **The stop-scratch question** — R distribution of trades that stopped out
+  within N days of entry. A fat −0.8…−1R cluster in week one *is* the bleed the
+  stress test is looking for, now measured.
+- **Slippage summary** — mean / median fill slippage vs the assumed open, in
+  bps and R; total drag over the run vs the backtest's `slippage_atr 0.05`.
+- **Sizing-layer attribution** — how often each cap bound; average gross the
+  vol-target scalar removed; average gross the macro overlay removed. Which
+  layer costs return / does work.
+- **Regime attribution** — P&L on risk-on vs neutral vs risk-off days; did the
+  ×0.65 / ×0.35 throttle cut losses in bad regimes or just cap the upside.
+- **Theoretical vs realised book** — symbols wanted but not gotten (halted, no
+  data, cap-blocked).
+
+### E. Page — **Paper Trading** (new nav item `/paper`)
+
+A research page, not a trading terminal. Reuses the density + mini-chart
+components. Layout:
+
+1. **Experiment switcher** — pick a `paper_experiments` row (the journal ID):
+   name · universe · start NAV · status · days running · equity · total return
+   · maxDD.
+2. **Equity panel** — curve + drawdown vs SPY buy-hold, with a gross-exposure
+   overlay and regime-zone shading.
+3. **Live vs backtest** — the small stats table (D, first bullet). The headline.
+4. **Open positions** — symbol · shares · entry · mark · unreal $ / % / R ·
+   days · stop · dist-to-stop · last decision reason. Mini-chart on expand.
+5. **The ledger** — reverse-chronological `paper_decisions` ⋈ orders ⋈ fills:
+   `[date] [symbol] ADD/TRIM/EXIT — reason — order N sh @ px (slippage) — P&L if
+   closing`. Filter by symbol / verdict / date. This is the left-hand
+   operations record tied to the right-hand trade record.
+6. **Trade journal** — closed `paper_trades`, each an expandable story (entry
+   reason → adds/trims → exit reason, R, P&L, MAE/MFE, hold, entry context).
+   Sort by R / P&L / date.
+7. **Research rollups** — the exit-reason breakdown, the stop-scratch
+   distribution, slippage summary, sizing-layer + regime attribution (charts).
+8. **Controls** (collapsed): Reconcile now · Flatten all · mark experiment
+   ended · `paper_enabled` kill switch.
 
 ### F. Orchestration
 
-Manual **Reconcile now** button first (via `worker.submit("paper_reconcile")`).
-Add a daily cron once it's proven. One continuous run from a fixed start NAV
-(e.g. $100k). **Do not reset mid-experiment** — a blow-up is a result. Reset
-only for a new experiment version.
+Manual **Reconcile now** button first (`worker.submit("paper_reconcile")`).
+Daily cron once proven. One continuous run per experiment from a fixed start
+NAV (e.g. $100k). **Do not reset mid-experiment** — a blow-up is a result;
+`end_reason = blew_up` and the journal stays. Reset only to start a new
+experiment version (new `paper_experiments` row = new journal ID).
 
 ## Experiments
 
@@ -170,10 +252,12 @@ short book.
 
 | Phase | Work | ~Effort |
 | --- | --- | --- |
-| 0 | `alpaca_paper` cred + `alpaca_trading` client + read-only `/paper` showing the paper account (proves the link) | ½ day |
-| 1 | Python `target_book()` + `/signals/target-book` + sandbox points at it | 1–2 days |
-| 2 | `paper_reconcile` job — target → cancel → deltas → fills → snapshot; manual button | 1–2 days |
-| 3 | `paper_*` tables + round-trip matcher + `/paper` UI + Flatten all | 2–3 days |
-| 4 | daily cron; then let it run for months | ½ day |
+| 0 | `alpaca_paper` cred + `alpaca_trading` client + `paper_experiments` table + a read-only **Paper Trading** nav item showing the paper account (proves the link) | ½–1 day |
+| 1 | Python `target_book()` + `/signals/target-book` + sandbox points at it (single source of truth) | 1–2 days |
+| 2 | `paper_reconcile` job — target → decisions (with reason strings) → cancel → deltas → mirror orders/fills/equity → daily snapshot; manual **Reconcile now** button | 2–3 days |
+| 3 | full `paper_*` schema + round-trip matcher + the `/paper` page (experiment switcher, equity, ledger, trade journal) + Flatten all | 3–4 days |
+| 4 | research rollups (live-vs-backtest, exit-reason, stop-scratch, slippage, attribution) + block-bootstrap Monte Carlo script | 2 days |
+| 5 | daily cron; then let A and B run for months | ½ day |
 
-Total ≈ 1–1.5 weeks focused, for a faithful minimal system.
+Total ≈ 2 weeks focused, for a faithful minimal system with a research-grade
+journal.
