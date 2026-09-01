@@ -73,8 +73,9 @@ def build_overview(conn: sqlite3.Connection) -> dict:
 
     obs = _all_obs(conn)
     as_of = max((r["last_date"] for r in catalog if r["last_date"]), default=None)
+    freqs = {r["series_id"]: r["frequency"] for r in catalog}
 
-    composite = comp.compute(obs, as_of)
+    composite = comp.compute(obs, freqs, as_of)
     contrib_by_id = {f.series_id: f for f in composite.factors}
     label_by_id = {r["series_id"]: (r["short_label"] or r["title"] or r["series_id"]) for r in catalog}
     reading = _composite_reading(composite, label_by_id)
@@ -89,10 +90,13 @@ def build_overview(conn: sqlite3.Connection) -> dict:
         )
         change_1m = change_12m = None
         vals = [v for _, v in series_obs]
-        if len(vals) > 1 and vals[-2]:
-            change_1m = round((vals[-1] / vals[-2] - 1) * 100, 3)
-        if len(vals) > 12 and vals[-13]:
-            change_12m = round((vals[-1] / vals[-13] - 1) * 100, 3)
+        per_year = comp._OBS_PER_YEAR[comp._freq_key(r["frequency"])]
+        m_step = max(1, round(per_year / 12))  # ~one month of observations
+        y_step = max(1, per_year)              # ~one year
+        if len(vals) > m_step and vals[-1 - m_step]:
+            change_1m = round((vals[-1] / vals[-1 - m_step] - 1) * 100, 3)
+        if len(vals) > y_step and vals[-1 - y_step]:
+            change_12m = round((vals[-1] / vals[-1 - y_step] - 1) * 100, 3)
 
         f = contrib_by_id.get(sid)
         cats.setdefault(r["category"], []).append(
@@ -115,6 +119,8 @@ def build_overview(conn: sqlite3.Connection) -> dict:
                 "composite_rationale": f.rationale if f else None,
                 "composite_caveat": (f.caveat or None) if f else None,
                 "composite_z": (round(f.z, 3) if f and f.z is not None else None),
+                "composite_window_years": (f.window_years if f else None),
+                "composite_short_window": (f.short_window if f else None),
                 "composite_contribution": (
                     round(f.contribution, 3) if f and f.contribution is not None else None
                 ),
@@ -128,7 +134,11 @@ def build_overview(conn: sqlite3.Connection) -> dict:
             "zone": composite.zone,
             "n_used": composite.n_used,
             "reading": reading,
-            "note": "Naive, equal-weight, hand-assigned signs. Not validated.",
+            "window_years": comp.Z_WINDOW_YEARS,
+            "note": (
+                f"Naive, equal-weight, hand-assigned signs; robust median/MAD z "
+                f"vs a fixed {comp.Z_WINDOW_YEARS:g}-year window. Not validated."
+            ),
         },
         "categories": [
             {"key": k, "label": _CATEGORY_LABELS[k], "series": cats.get(k, [])}

@@ -11,16 +11,27 @@ Pure, disclosed, recomputed live per request (no persisted score).
 - **`_SPECS: dict[series_id, FactorSpec]`** — one entry per scored series.
   `FactorSpec(feature, sign, confidence, rationale, caveat, two_sided)`.
   `feature ∈ {level, yoy, mom3}` (e.g. `FEDFUNDS` uses `mom3` — policy
-  *direction*, not level). `sign` = +1 if higher ⇒ more risk-on, −1 if
-  higher ⇒ more risk-off. Every sign is derived from the series'
-  transmission mechanism, with `rationale` / `caveat` strings surfaced in the
-  UI. **24 series scored** across inflation / rates / growth / labor / risk /
-  money-fx. `DGS2` and `M2SL` are tracked but **not scored** (redundant /
-  regime-unstable) and render as "not scored" cards.
-- **Pipeline:** per series → signed z-score of the chosen feature over a
-  trailing ~5y window → mean of the *available* signed contributions
-  (equal-weight, stated as such) → logistic squash → **0–100** + a zone
-  label.
+  *direction*, not level). `yoy` / `mom3` are computed over ~1 year / ~1
+  quarter of observations, **derived from each series' FRED frequency**
+  (Daily / Weekly / Monthly / Quarterly), never a fixed observation count — so
+  weekly `WALCL` yoy is a real 52-week change, not 12 weeks. `sign` = +1 if
+  higher ⇒ more risk-on, −1 if higher ⇒ more risk-off. Every sign is derived
+  from the series' transmission mechanism, with `rationale` / `caveat` strings
+  surfaced in the UI. **24 series scored** across inflation / rates / growth /
+  labor / risk / money-fx. `DGS2` and `M2SL` are tracked but **not scored**
+  (redundant / regime-unstable) and render as "not scored" cards.
+- **Pipeline:** per series → chosen feature → **robust median/MAD z-score**
+  (scaled to σ; falls back to mean/SD on a >½-constant window; winsorised to
+  ±5) over a **fixed `Z_WINDOW_YEARS = 10` *calendar* window**, converted to an
+  observation count
+  via the series' frequency (`_window_obs`) so a monthly and a daily series are
+  standardised over the same span of *time*, not the same number of points →
+  signed → mean of the *available* contributions (equal-weight, stated as
+  such) → logistic squash → **0–100** + a zone label. A series with < 60% of
+  the window in history is still scored but carries `short_window: true` on its
+  card. (10y spans a full business cycle and excludes the structurally
+  different 1970s–80s; median/MAD stops one COVID / Jun-2022 print from
+  flattening every later reading.)
 - **Asymmetric clip** for `two_sided=True` factors (CPI ×4, WTI, DGS10,
   DTWEXBGS): the risk-off direction is uncapped (`RISK_OFF_FLOOR = −3.0`) but
   the "favourable" direction saturates at `FAVOURABLE_CAP = +1.0` — because
@@ -34,13 +45,19 @@ Pure, disclosed, recomputed live per request (no persisted score).
 Optional. **Button-only**, cached once per `trading_date` (UNIQUE on
 `ai_regime_runs`). The structural analysts use a **compact macro-financial
 snapshot only** (no equities / crypto / gold): per-series feature vectors +
-30/60-point arrays for the key rate/credit/vol series. The separate catalyst
-overlay may web-search dated current events and market-pricing confirmation.
+30/60-point arrays for the key rate/credit/vol series. The snapshot's `z_win` /
+`pctile_win` fields use the **same `_window_obs` / `_robust_z` standardisation
+as the naive composite** — a fixed 10-year calendar window on a *stationary*
+feature (the composite's feature where it scores the series, a bare level for
+the mean-reverting market series, else a year-on-year change), **never a
+z-score of a raw trending level**; `z_short_hist` flags a thin-history series.
+The separate catalyst overlay may web-search dated current events and
+market-pricing confirmation.
 
 - **7 personas + a reconciler (medium/large).** `risk_on` / `risk_off` one-sided advocates;
   `inflation` / `credit_vol` / `growth_labor` / `rates_curve` neutral domain
   analysts; `macro_catalyst` is a separate web-searched event overlay, not a
-  structural vote. Prompt text in `prompts.toml` (`version = 5`).
+  structural vote. Prompt text in `prompts.toml` (`version = 6`).
 - **Rounds:** (1) independent persona votes; (2) advocates rebut each other
   (large budget only); (3) reconciler → holistic score + confidence.
 - **Domain weights** (`prompts.toml [weights]`): base `credit_vol 0.30 /
@@ -52,11 +69,21 @@ overlay may web-search dated current events and market-pricing confirmation.
   reconciler_score`. `code_weighted_score` is deterministic — `Σ weight ·
   conviction · signed_vote` over the neutral analysts (advocates excluded).
 - **Macro catalyst overlay:** medium/large runs make one Responses API web-search
-  call for material events from the last 7 days. It defaults to neutral, is
-  excluded from structural tallies and weights, and is capped at ±5 before a
-  deterministic confidence, already-priced, and 3-day half-life reduction.
-  Mostly-priced or unsourced events contribute zero; unavailable web search
-  degrades to neutral without failing the structural run.
+  call for material events from the last 7 days. It exists **because the FRED /
+  issuer snapshot is released with days-to-weeks lag** — it is the only part of
+  the run that can see past that lag. The prompt (`version = 6`) tells it so:
+  the structural snapshot is *known-stale* (every series carries `as_of`), an
+  event missing from it is the expected case, and confirmation/magnitude come
+  from **dated web sources on the post-event market move**, not from the
+  snapshot. The snapshot is used only for the pre-event baseline level and the
+  double-count check (`as_of` vs event date — only the move that post-dates the
+  freshest relevant `as_of` is incremental). It runs on the reconciler token
+  budget with a one-shot retry on a truncated/invalid JSON body (a prior bug
+  silently dropped truncated catalyst answers as "no event"). It is excluded
+  from structural tallies and weights, capped at ±5, then cut deterministically
+  for conviction, `pricing_status` (`mostly_priced` → 0), and a 3-day
+  half-life. Unsourced events and unavailable web search still degrade to
+  neutral without failing the structural run.
 - **Calibration (code, after the blend):** agreement ceiling,
   both-advocates-confident penalty, stale-input penalty
   (`2·period + typical_lag + 12` day threshold), naive-divergence penalty,

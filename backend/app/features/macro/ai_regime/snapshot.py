@@ -14,6 +14,8 @@ import json
 import math
 import sqlite3
 
+from app.features.macro import composite as _c
+
 # Series whose *shape* matters — get a trajectory array (budget-controlled length).
 KEY_SERIES = [
     "DGS2", "DGS10", "DGS30", "T10Y2Y", "T10Y3M", "T10YIE",
@@ -45,16 +47,16 @@ def _abs_change(vals: list[float], step: int) -> float | None:
     return vals[-1] - vals[-1 - step]
 
 
-def _z_and_pctile(vals: list[float], window: int) -> tuple[float | None, int | None]:
-    if len(vals) < 12:
-        return None, None
-    tail = vals[-window:] if len(vals) > window else vals
-    mu = sum(tail) / len(tail)
-    var = sum((x - mu) ** 2 for x in tail) / (len(tail) - 1)
-    sd = math.sqrt(var)
-    z = 0.0 if sd == 0 else (vals[-1] - mu) / sd
-    below = sum(1 for x in tail if x <= vals[-1])
-    return round(z, 2), round(100 * below / len(tail))
+def _feat_z_pctile(feat: list[float], window: int) -> tuple[float | None, int | None, bool]:
+    """Robust z + windowed percentile of a *stationary* feature series, over the
+    same fixed calendar window the naive composite uses. Percentile = the share
+    of the window at or below the latest reading."""
+    if len(feat) < 8:
+        return None, None, True
+    z, short = _c._robust_z(feat, window)
+    tail = feat[-window:]
+    below = sum(1 for x in tail if x <= feat[-1])
+    return (None if z is None else round(z, 2)), round(100 * below / len(tail)), short
 
 
 def _trend_word(vals: list[float]) -> str:
@@ -98,7 +100,14 @@ def _macro_features(conn: sqlite3.Connection) -> tuple[dict, str | None]:
         # rates/spreads/indices: report absolute change; index levels: % change.
         use_abs = sid in KEY_SERIES or sid in ("FEDFUNDS", "UNRATE", "UMCSENT")
         chg = _abs_change if use_abs else _pct_change
-        z, pctile = _z_and_pctile(vals, 5 * 252)
+        # Standardise a STATIONARY feature, not the raw level: the composite's
+        # feature where it scores this series, a bare level for the
+        # mean-reverting market series, else a year-on-year change. Same fixed
+        # calendar window as the naive composite.
+        spec = _c._SPECS.get(sid)
+        feature = spec.feature if spec is not None else ("level" if sid in KEY_SERIES else "yoy")
+        feat = _c._feature_series(series, feature, r["frequency"])
+        z, pctile, short_hist = _feat_z_pctile(feat, _c._window_obs(r["frequency"]))
         out[sid] = {
             "label": r["short_label"] or sid,
             "cat": r["category"],
@@ -108,8 +117,10 @@ def _macro_features(conn: sqlite3.Connection) -> tuple[dict, str | None]:
             ("d1m_abs" if use_abs else "d1m_pct"): _round(chg(vals, s1)),
             ("d3m_abs" if use_abs else "d3m_pct"): _round(chg(vals, s3)),
             ("d12m_abs" if use_abs else "d12m_pct"): _round(chg(vals, s12)),
-            "z_5y": z,
-            "pctile_5y": pctile,
+            "z_win": z,
+            "pctile_win": pctile,
+            "z_window_years": _c.Z_WINDOW_YEARS,
+            "z_short_hist": short_hist,
             "trend": _trend_word(vals),
         }
     return out, as_of

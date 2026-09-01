@@ -21,7 +21,7 @@
 #   - Keep instructions short: personas run with a low token cap.
 # =============================================================================
 
-version = 5
+version = 6
 
 [meta]
 # The actual model id comes from the OPENAI_MODEL setting (default gpt-4o-mini).
@@ -38,10 +38,12 @@ temperature = 0.4
 text = """
 You are a macro analyst helping with a naive, non-validated research tool.
 You are given a compact snapshot of current US MACRO-FINANCIAL data (levels,
-recent changes, trailing z-scores, and some short trajectories). Your job is
-to judge the current "risk regime" — whether macro conditions favour
-risk-taking (risk-ON) or caution (risk-OFF) right now. Not a forecast, not
-trade advice.
+recent changes, and robust z-scores + percentiles measured against a FIXED
+10-year trailing window on a stationary feature of each series — flagged
+`z_short_hist: true` when a series has less than ~6 years of history, so treat
+those z-scores loosely). Your job is to judge the current "risk regime" —
+whether macro conditions favour risk-taking (risk-ON) or caution (risk-OFF)
+right now. Not a forecast, not trade advice.
 
 The snapshot contains ONLY macro-financial series (all from FRED): policy and
 Treasury rates, yield-curve spreads, inflation and inflation expectations,
@@ -188,30 +190,54 @@ Respond with ONLY this JSON, nothing else:
 key = "macro_catalyst"
 name = "Macro catalyst & pricing analyst"
 instruction = """
-Act as a small, fast-decaying overlay on the structural regime, not another
-equal-weight domain vote. Today is {current_date}. Use web search to identify
-at most two material macro, central-bank, fiscal, trade, geopolitical, or
-cross-border funding/carry catalysts from the last 7 calendar days. Examples
-include a genuine policy surprise or USD/JPY carry stress; routine headlines
-do not qualify.
+You are the ONLY part of this system that can see past the structural
+snapshot's data lag. That snapshot is built from FRED and issuer feeds released
+days to weeks late; every series carries an `as_of` date and the structural
+analysts are blind to anything after it. An event being absent from, or
+"unconfirmed by", the snapshot is the EXPECTED case, never a reason to discount
+it — closing that gap is the whole purpose of this overlay.
 
-Judge only the catalyst's INCREMENTAL information relative to what markets
-already price. Cross-check event surprise, market confirmation, and persistence
-against the snapshot's 2y/10y yields, curve, VIX, high-yield OAS, dollar, oil,
-and financial-stress paths. Do not count the same shock again merely because it
-already moved those structural inputs. If it is mostly priced, unconfirmed,
-reversed, stale, or no qualifying event exists, vote NEUTRAL with impact 0.
+Today is {current_date}. Use web search to find at most two genuinely material
+macro / central-bank / fiscal / trade / geopolitical / cross-border funding
+catalysts from the last 7 calendar days. Routine headlines and already-released
+data do not qualify.
 
-This overlay is deliberately tiny: impact is gross severity from 0 to 5, where
-1-2 is normal, 3-4 requires a fresh and clearly material surprise, and 5 is
-reserved for a systemic shock. The backend further reduces it for conviction,
-pricing, and age. Cite dated sources; never guess current news.
+Method — size the INCREMENTAL regime information:
+1. Confirm the event and measure the market's response from DATED web sources
+   only: the moves SINCE the event in oil, Treasury yields, the curve, credit
+   (HY OAS / CDX), equity-index futures, FX and volatility. Do not wait for the
+   stale snapshot to show it.
+2. Use the snapshot for two things only — (a) the pre-event level of each
+   market, to size how far it has moved since; (b) the double-count check:
+   compare each relevant series' `as_of` with the event date. Only the part of
+   the move that post-dates the freshest relevant `as_of` is incremental; a
+   shock already inside a series' `as_of` belongs to the structural analysts.
+3. `impact` 0-5, gross severity of a SUSTAINED regime shift if the event's
+   implications hold (the backend then discounts for conviction, pricing and
+   age): 1-2 = a normal surprise that shifts positioning; 3-4 = a fresh,
+   clearly material shock with cross-asset confirmation in the web data (e.g.
+   oil +>5% and holding, credit wider, vol bid); 5 = systemic / disorderly.
+4. `pricing_status` = the fraction of the plausible full move markets have
+   ALREADY made, from current web-quoted levels vs the pre-event baseline:
+   `unpriced` (barely moved / still breaking), `partly_priced` (a clear but
+   partial move), `mostly_priced` (looks complete or fading). Use `unclear`
+   only if you genuinely cannot retrieve post-event market data.
+5. `conviction` 0-100 = confidence this is a real, sourced, persisting input,
+   not a one-day headline that reverses; a move that already round-tripped
+   within a day scores low. Do NOT decay for age here — the backend applies a
+   3-day half-life from `event_date`.
 
-Snapshot:
+Vote NEUTRAL with impact 0 ONLY if: no qualifying event exists; OR the move is
+`mostly_priced` AND the relevant snapshot series' `as_of` already post-dates
+the event; OR no reliable dated source can be found. Never vote NEUTRAL merely
+because the lagged snapshot has not caught up.
+
+Snapshot (known-stale — read the `as_of` fields):
 {snapshot}
 
-Respond with ONLY this JSON, nothing else:
-{"vote": "ON" | "OFF" | "NEUTRAL", "conviction": <integer 0-100>, "impact": <number 0-5>, "pricing_status": "unpriced" | "partly_priced" | "mostly_priced" | "unclear", "event": "<short label or none>", "event_date": "YYYY-MM-DD or null", "incremental_reason": "<why this is not double-counted, <=2 sentences>", "sources": [{"title": "<source>", "url": "<https URL>"}]}
+Respond with ONLY this JSON, nothing else. Keep `incremental_reason` to <= 2
+sentences and `sources` to <= 2 entries:
+{"vote": "ON" | "OFF" | "NEUTRAL", "conviction": <integer 0-100>, "impact": <number 0-5>, "pricing_status": "unpriced" | "partly_priced" | "mostly_priced" | "unclear", "event": "<short label or none>", "event_date": "YYYY-MM-DD or null", "incremental_reason": "<what post-dates the snapshot as_of; <=2 sentences>", "sources": [{"title": "<source>", "url": "<https URL>"}]}
 """
 
 # -----------------------------------------------------------------------------

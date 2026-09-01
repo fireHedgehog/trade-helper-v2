@@ -4,10 +4,12 @@ Fully disclosed, hand-assigned, equal-weight — labeled "naive, not validated"
 on the page. See docs/draft-design/10-macro-page-and-ai-regime.md §3 and the
 per-indicator sign audit in §3.1.
 
-For each series we pick a *feature* (level, YoY %, or 3-month change),
-standardise the latest value against the trailing window, apply a
+For each series we pick a *feature* (level, ~1-year % change, or ~3-month
+change), standardise the latest value against a FIXED trailing calendar
+window — the same number of years for every series, converted to that
+series' own sampling frequency — with a robust median/MAD z-score, apply a
 hand-assigned risk-on sign (+1 = risk-on, i.e. higher-feature ⇒ risk-on),
-average the signed z-scores, and squash to 0-100 with a logistic.
+average the signed contributions, and squash to 0-100 with a logistic.
 
 Each entry carries a one-line `rationale` (the transmission mechanism) and a
 `confidence` — surfaced on the card so the sign is auditable, not a black box.
@@ -16,10 +18,13 @@ Each entry carries a one-line `rationale` (the transmission mechanism) and a
 from __future__ import annotations
 
 import math
+import statistics
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-# feature: "level" | "yoy" (12-obs % change) | "mom3" (3-obs change of the level)
+# feature: "level" | "yoy" (~1-year % change) | "mom3" (~3-month change of the
+# level). The yoy / mom3 step counts are derived from each series' frequency
+# (Daily / Weekly / Monthly / Quarterly), never a fixed observation count.
 
 
 @dataclass(frozen=True)
@@ -196,8 +201,37 @@ _SPECS: dict[str, FactorSpec] = {
     ),
 }
 
-Z_WINDOW_YEARS = 5
+# One fixed standardisation window for every series, in CALENDAR years. ~10y
+# spans a full business cycle (both expansion and recession in-sample) and
+# excludes the structurally different 1970s-80s. It is converted to an
+# observation count per series via its FRED frequency, so a monthly series and
+# a daily series are standardised over the same span of time, not the same
+# number of points.
+Z_WINDOW_YEARS = 10.0
+_MIN_WINDOW_FRAC = 0.6  # < 60% of the target window available -> flag short_window
+_Z_CLIP = 5.0  # winsorise the standardised score: a near-flat window makes MAD
+               # tiny and z explode; beyond ~5 robust-sigmas the exact value is
+               # noise for a 0-100 gauge (the logistic has long since saturated).
 K = 1.0  # logistic steepness
+
+_OBS_PER_YEAR = {"daily": 252, "weekly": 52, "monthly": 12, "quarterly": 4, "annual": 1}
+
+
+def _freq_key(frequency: str | None) -> str:
+    f = (frequency or "").strip().lower()
+    if f.startswith("d"):
+        return "daily"
+    if f.startswith("w"):
+        return "weekly"
+    if f.startswith("q"):
+        return "quarterly"
+    if f.startswith(("a", "y")):
+        return "annual"
+    return "monthly"
+
+
+def _window_obs(frequency: str | None, years: float = Z_WINDOW_YEARS) -> int:
+    return max(8, round(years * _OBS_PER_YEAR[_freq_key(frequency)]))
 
 
 @dataclass
@@ -210,6 +244,8 @@ class Factor:
     caveat: str
     z: float | None
     contribution: float | None  # signed z, or None if not enough data
+    window_years: float | None = None
+    short_window: bool = False
 
 
 @dataclass
@@ -220,32 +256,44 @@ class Composite:
     n_used: int
 
 
-def _feature_series(obs: list[tuple[str, float]], feature: str) -> list[float]:
+def _feature_series(obs: list[tuple[str, float]], feature: str,
+                    frequency: str | None = None) -> list[float]:
     vals = [v for _, v in obs]
     if feature == "level":
         return vals
+    per_year = _OBS_PER_YEAR[_freq_key(frequency)]
     if feature == "yoy":
-        out = []
-        for i in range(12, len(vals)):
-            prev = vals[i - 12]
-            out.append((vals[i] / prev - 1.0) * 100.0 if prev else 0.0)
-        return out
+        step = max(1, per_year)  # one calendar year of observations
+        return [
+            (vals[i] / vals[i - step] - 1.0) * 100.0 if vals[i - step] else 0.0
+            for i in range(step, len(vals))
+        ]
     if feature == "mom3":
-        step = 3
+        step = max(1, round(per_year / 4))  # ~one quarter
         return [vals[i] - vals[i - step] for i in range(step, len(vals))]
     return vals
 
 
-def _zscore(series: list[float], window: int) -> float | None:
+def _robust_z(series: list[float], window: int) -> tuple[float | None, bool]:
+    """(z, short_window). Median / MAD scaled to sigma, so a single outlier
+    observation — a COVID print, a June-2022 CPI — cannot inflate the scale and
+    flatten every later reading toward zero. Falls back to mean / SD when the
+    window is more than half-constant (e.g. a policy rate pinned for years)."""
     if len(series) < 8:
-        return None
-    tail = series[-window:] if len(series) > window else series
-    mu = sum(tail) / len(tail)
-    var = sum((x - mu) ** 2 for x in tail) / (len(tail) - 1)
-    sd = math.sqrt(var)
-    if sd == 0:
-        return 0.0
-    return (series[-1] - mu) / sd
+        return None, True
+    tail = series[-window:]
+    short = len(tail) < max(8, round(_MIN_WINDOW_FRAC * window))
+    med = statistics.median(tail)
+    mad = statistics.median([abs(x - med) for x in tail])
+    scale = 1.4826 * mad
+    if scale == 0.0:
+        mu = sum(tail) / len(tail)
+        scale = (sum((x - mu) ** 2 for x in tail) / (len(tail) - 1)) ** 0.5
+        med = mu
+    if scale == 0.0:
+        return 0.0, short
+    z = (series[-1] - med) / scale
+    return max(-_Z_CLIP, min(_Z_CLIP, z)), short
 
 
 def _zone(score: float) -> str:
@@ -256,14 +304,20 @@ def _zone(score: float) -> str:
     return "risk-on"
 
 
-def compute(observations: dict[str, list[tuple[str, float]]], latest_date: str | None) -> Composite:
+def compute(
+    observations: dict[str, list[tuple[str, float]]],
+    frequencies: dict[str, str | None] | None = None,
+    latest_date: str | None = None,
+) -> Composite:
+    freqs = frequencies or {}
     factors: list[Factor] = []
     signed: list[float] = []
 
     for series_id, spec in _SPECS.items():
         obs = observations.get(series_id) or []
-        feat = _feature_series(obs, spec.feature)
-        z = _zscore(feat, Z_WINDOW_YEARS * 252)
+        freq = freqs.get(series_id)
+        feat = _feature_series(obs, spec.feature, freq)
+        z, short = _robust_z(feat, _window_obs(freq))
         contrib = None if z is None else spec.sign * z
         if contrib is not None and spec.two_sided:
             # risk-off direction uncapped; "favourable" direction saturates
@@ -271,7 +325,7 @@ def compute(observations: dict[str, list[tuple[str, float]]], latest_date: str |
         factors.append(
             Factor(
                 series_id, spec.feature, spec.sign, spec.confidence, spec.rationale,
-                spec.caveat, z, contrib,
+                spec.caveat, z, contrib, Z_WINDOW_YEARS, short,
             )
         )
         if contrib is not None:

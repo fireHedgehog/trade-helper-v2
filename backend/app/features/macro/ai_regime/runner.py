@@ -68,7 +68,11 @@ def _naive_score(conn: sqlite3.Connection) -> float | None:
     by: dict[str, list[tuple[str, float]]] = {}
     for r in obs_rows:
         by.setdefault(r["series_id"], []).append((r["date"], r["value"]))
-    return naive.compute(by, None).score
+    freqs = {
+        r["series_id"]: r["frequency"]
+        for r in conn.execute("SELECT series_id, frequency FROM macro_series_catalog")
+    }
+    return naive.compute(by, freqs, None).score
 
 
 def _cost(model_id: str, pt: int, ct: int) -> float | None:
@@ -145,11 +149,26 @@ async def run(
                 .replace("{current_date}", trading_date)
             )
             if p.key == "macro_catalyst":
+                # Web search + a sourced JSON body (a reason paragraph plus
+                # source URLs) needs far more room than a one-line structural
+                # vote; a body truncated at the token cap parses to {} and is
+                # then silently dropped as "no catalyst". Give it the
+                # reconciler's budget and retry once, larger, on a parse miss.
+                cat_cap = max(budget.reconciler_max_tokens, budget.persona_max_tokens)
                 try:
                     text, pt, ct = await web_chat(
-                        model_id, prompts.system, user, max_tokens=budget.persona_max_tokens
+                        model_id, prompts.system, user, max_tokens=cat_cap
                     )
                     parsed = _safe_json(text)
+                    if not parsed:
+                        text2, pt2, ct2 = await web_chat(
+                            model_id, prompts.system, user, max_tokens=cat_cap * 2
+                        )
+                        pt += pt2
+                        ct += ct2
+                        p2 = _safe_json(text2)
+                        if p2:
+                            text, parsed = text2, p2
                 except OpenAIError as exc:
                     logger.warning("Macro catalyst web search unavailable: %s", exc)
                     parsed = {
