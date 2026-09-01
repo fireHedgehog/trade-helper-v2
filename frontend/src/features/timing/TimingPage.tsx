@@ -23,6 +23,7 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 
 import { ApiError } from "@/shared/api/client";
+import { fmtTs } from "@/shared/format";
 
 import { EquityChart } from "./EquityChart";
 import { searchSymbols, timingApi, type SymbolOption } from "./api";
@@ -353,7 +354,7 @@ export function TimingPage() {
         </Button>
         {data?.computed_at && (
           <Typography variant="caption" color="text.secondary">
-            last run {new Date(data.computed_at).toLocaleString()}
+            last run {fmtTs(data.computed_at)}
           </Typography>
         )}
         {data?.stale && <Chip size="small" color="warning" label="newer bars — re-run" />}

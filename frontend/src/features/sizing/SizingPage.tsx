@@ -10,6 +10,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
 import { ApiError } from "@/shared/api/client";
+import { TextPeek } from "@/shared/components/TextPeek";
 
 import { sizingApi } from "./api";
 import { computeSizing } from "./engine";
@@ -302,7 +303,12 @@ export function SizingPage() {
                 )}
                 {result.excluded.length > 0 && (
                   <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                    Excluded: {result.excluded.map((e) => `${e.symbol} (${e.reason})`).join(", ")}
+                    <TextPeek
+                      value={`${result.excluded.length} excluded — ${result.excluded
+                        .map((e) => `${e.symbol} (${e.reason})`)
+                        .join(", ")}`}
+                      maxChars={44}
+                    />
                   </Typography>
                 )}
               </Paper>

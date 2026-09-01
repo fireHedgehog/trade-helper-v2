@@ -9,6 +9,9 @@ import Paper from "@mui/material/Paper";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 
+import { fmtTs } from "@/shared/format";
+import { TextPeek } from "@/shared/components/TextPeek";
+
 import { dataApi } from "./api";
 import { ActiveRunsBanner } from "./components/ActiveRunsBanner";
 import { DetailDialog } from "./components/DetailDialog";
@@ -52,6 +55,13 @@ function Section({
 const num = (v: unknown, digits = 2) =>
   typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: digits }) : "—";
 
+// compact-timestamp column: `2026-08-31T21:35:12.425Z` → `08-31 21:35`
+const tsCol = <T,>(key: string, label: string): Column<T> => ({
+  key,
+  label,
+  render: (r) => fmtTs((r as Record<string, unknown>)[key]),
+});
+
 const BAR_COLUMNS: Column<Record<string, unknown>>[] = [
   { key: "date", label: "Date" },
   { key: "close", label: "Close", align: "right", render: (r) => num(r.close) },
@@ -59,15 +69,15 @@ const BAR_COLUMNS: Column<Record<string, unknown>>[] = [
   { key: "volume", label: "Volume", align: "right", render: (r) => num(r.volume, 0) },
   { key: "trade_count", label: "Trades", align: "right", render: (r) => num(r.trade_count, 0) },
   { key: "vwap", label: "VWAP", align: "right", render: (r) => num(r.vwap) },
-  { key: "fetched_at", label: "Fetched" },
+  tsCol("fetched_at", "Fetched"),
 ];
 
 const OBS_COLUMNS: Column<Record<string, unknown>>[] = [
   { key: "date", label: "Date" },
   { key: "value", label: "Value", align: "right", render: (r) => num(r.value, 4) },
-  { key: "realtime_start", label: "Vintage start" },
-  { key: "realtime_end", label: "Vintage end" },
-  { key: "fetched_at", label: "Fetched" },
+  tsCol("realtime_start", "Vintage start"),
+  tsCol("realtime_end", "Vintage end"),
+  tsCol("fetched_at", "Fetched"),
 ];
 
 const MEMBER_COLUMNS: Column<Record<string, unknown>>[] = [
@@ -112,7 +122,7 @@ function AssetsPanel({ tick, bump }: { tick: number; bump: () => void }) {
       { key: "first_date", label: "First" },
       { key: "last_date", label: "Last" },
       { key: "last_close", label: "Last close", align: "right", render: (r) => num(r.last_close) },
-      { key: "last_fetched", label: "Fetched" },
+      tsCol("last_fetched", "Fetched"),
     ],
     [],
   );
@@ -169,7 +179,7 @@ function MacroPanel({ tick, bump }: { tick: number; bump: () => void }) {
     { key: "first_date", label: "First" },
     { key: "last_date", label: "Last" },
     { key: "last_value", label: "Latest", align: "right", render: (r) => num(r.last_value, 4) },
-    { key: "last_fetched", label: "Fetched" },
+    tsCol("last_fetched", "Fetched"),
   ];
 
   return (
@@ -224,7 +234,7 @@ function MembershipsPanel({ tick, bump }: { tick: number; bump: () => void }) {
       render: (r) => num(r.in_universe_count, 0),
     },
     { key: "last_source_as_of", label: "Source as-of" },
-    { key: "last_synced_at", label: "Synced" },
+    tsCol("last_synced_at", "Synced"),
   ];
 
   return (
@@ -272,7 +282,7 @@ function CryptoPanel({ tick, bump }: { tick: number; bump: () => void }) {
     { key: "first_date", label: "First" },
     { key: "last_date", label: "Last" },
     { key: "last_close", label: "Last close", align: "right", render: (r) => num(r.last_close) },
-    { key: "last_fetched", label: "Fetched" },
+    tsCol("last_fetched", "Fetched"),
   ];
 
   return (
@@ -312,13 +322,13 @@ function CommoditiesPanel({ tick, bump }: { tick: number; bump: () => void }) {
     { key: "first_date", label: "First" },
     { key: "last_date", label: "Last" },
     { key: "last_value", label: "Latest", align: "right", render: (r) => num(r.last_value, 3) },
-    { key: "last_fetched", label: "Fetched" },
+    tsCol("last_fetched", "Fetched"),
   ];
 
   const OBS: Column<Record<string, unknown>>[] = [
     { key: "date", label: "Date" },
     { key: "price", label: "Price", align: "right", render: (r) => num(r.price, 3) },
-    { key: "fetched_at", label: "Fetched" },
+    tsCol("fetched_at", "Fetched"),
   ];
 
   return (
@@ -372,7 +382,7 @@ function OptionsPanel({ tick, bump }: { tick: number; bump: () => void }) {
       align: "right",
       render: (r) => num(r.snapshot_days, 0),
     },
-    { key: "last_snapshot", label: "Last snapshot" },
+    tsCol("last_snapshot", "Last snapshot"),
     {
       key: "last_day_rows",
       label: "Grid rows / day",
@@ -385,7 +395,7 @@ function OptionsPanel({ tick, bump }: { tick: number; bump: () => void }) {
       align: "right",
       render: (r) => num(r.snapshot_rows, 0),
     },
-    { key: "last_fetched", label: "Fetched" },
+    tsCol("last_fetched", "Fetched"),
   ];
 
   return (
@@ -446,7 +456,7 @@ function RunHistoryPanel({ tick }: { tick: number }) {
       render: (r) => `${r.completed_targets}/${r.planned_targets}`,
     },
     { key: "rows_written", label: "Rows", align: "right", render: (r) => num(r.rows_written, 0) },
-    { key: "started_at", label: "Started" },
+    tsCol("started_at", "Started"),
   ];
 
   return (
@@ -475,7 +485,7 @@ function RunHistoryPanel({ tick }: { tick: number }) {
             { key: "coverage_start", label: "From" },
             { key: "coverage_end", label: "To" },
             { key: "duration_ms", label: "ms", align: "right" },
-            { key: "error", label: "Error" },
+            { key: "error", label: "Error", render: (r) => <TextPeek value={(r as Record<string, unknown>).error} /> },
           ]}
           fetcher={(page, pageSize) =>
             Promise.resolve({

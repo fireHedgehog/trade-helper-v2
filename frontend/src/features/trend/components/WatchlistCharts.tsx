@@ -50,11 +50,8 @@ export function WatchlistCharts({ sections, tf, windowKey, mas }: Props) {
             sx={{
               display: "grid",
               gap: 1.5,
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "repeat(2, 1fr)",
-                md: "repeat(3, 1fr)",
-              },
+              // max 2 across — wider charts so the bars read clearly
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
             }}
           >
             {sec.rows.map((r) => {
@@ -101,7 +98,7 @@ export function WatchlistCharts({ sections, tf, windowKey, mas }: Props) {
                   ) : (
                     <Box
                       sx={{
-                        height: 150,
+                        height: 172,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",

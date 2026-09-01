@@ -6,6 +6,9 @@ import CloseIcon from "@mui/icons-material/Close";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 
+import { fmtTs, isTsKey } from "@/shared/format";
+import { TextPeek } from "@/shared/components/TextPeek";
+
 import type { Page } from "../types";
 import { ServerTable, type Column } from "./ServerTable";
 
@@ -53,7 +56,13 @@ export function DetailDialog<T>({
                   {k}
                 </Typography>
                 <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
-                  {v === null || v === undefined || v === "" ? "—" : String(v)}
+                  {v === null || v === undefined || v === "" ? (
+                    "—"
+                  ) : isTsKey(k) ? (
+                    fmtTs(v)
+                  ) : (
+                    <TextPeek value={v} maxChars={52} />
+                  )}
                 </Typography>
               </Box>
             ))}

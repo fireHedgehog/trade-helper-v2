@@ -70,7 +70,7 @@ interface Props {
   height?: number;
 }
 
-export function MiniChart({ bars, events, tf, windowKey, mas, height = 150 }: Props) {
+export function MiniChart({ bars, events, tf, windowKey, mas, height = 172 }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
   const theme = useTheme();
   const { mode, systemMode } = useColorScheme();

@@ -27,6 +27,39 @@ export const theme = createTheme({
   components: {
     MuiButton: { defaultProps: { disableElevation: true } },
     MuiPaper: { defaultProps: { variant: "outlined" } },
+
+    // --- density pass ------------------------------------------------------
+    // Excel-tight tables / chips / notices. Spacing + type only — no colour,
+    // palette, or brand change. Page-level padding (Paper `p`, section gaps,
+    // h5 titles) is still per-page.
+    MuiTable: { defaultProps: { size: "small" } },
+    MuiTableCell: {
+      styleOverrides: {
+        root: { padding: "3px 10px", fontSize: 13, lineHeight: 1.42 },
+        sizeSmall: { padding: "2px 8px" },
+        head: { fontWeight: 700, lineHeight: 1.3, whiteSpace: "nowrap" },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        sizeSmall: {
+          height: 19,
+          fontSize: 11,
+          "& .MuiChip-label": { paddingLeft: 6, paddingRight: 6 },
+        },
+      },
+    },
+    MuiAlert: {
+      styleOverrides: {
+        root: { paddingTop: 4, paddingBottom: 4, fontSize: 13 },
+        icon: { paddingTop: 6, paddingBottom: 6 },
+        message: { paddingTop: 4, paddingBottom: 4 },
+      },
+    },
+    MuiToggleButton: {
+      styleOverrides: { sizeSmall: { padding: "3px 10px", fontSize: 12, lineHeight: 1.3 } },
+    },
+    MuiListItemButton: { defaultProps: { dense: true } },
   },
 });
 

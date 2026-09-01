@@ -32,6 +32,7 @@ import SouthEastRounded from "@mui/icons-material/SouthEastRounded";
 import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 
 import { FetchPanel } from "@/features/data-management/components/FetchPanel";
+import { fmtTs } from "@/shared/format";
 
 import { trendApi } from "./api";
 import { WatchlistCharts } from "./components/WatchlistCharts";
@@ -182,7 +183,7 @@ export function TrendPage() {
   const [chartsLoaded, setChartsLoaded] = useState(false);
   const [miniTf, setMiniTf] = useState<MiniTf>("D");
   const [miniWindow, setMiniWindow] = useState<MiniWindow>("3M");
-  const [miniMas, setMiniMas] = useState<number[]>([...MA_CHOICES]);
+  const [miniMas, setMiniMas] = useState<number[]>([]); // MA lines off by default — pick your own
 
   const loadBoard = useCallback((charts = false) => {
     void trendApi.board(charts).then((b) => {
@@ -230,7 +231,7 @@ export function TrendPage() {
         />
         {board?.computed_at && (
           <Typography variant="caption" color="text.secondary">
-            last run {new Date(board.computed_at).toLocaleString()}
+            last run {fmtTs(board.computed_at)}
           </Typography>
         )}
       </Stack>

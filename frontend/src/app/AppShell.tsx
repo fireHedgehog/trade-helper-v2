@@ -130,7 +130,7 @@ export function AppShell() {
         <Divider />
 
         {/* nav */}
-        <List sx={{ px: open ? 1 : 0.5, py: 1, flexGrow: 1, overflowY: "auto" }}>
+        <List sx={{ px: open ? 0.75 : 0.5, py: 0.5, flexGrow: 1, overflowY: "auto" }}>
           {NAV_ITEMS.map((item) => (
             <Tooltip key={item.path} title={open ? "" : item.label} placement="right" arrow>
               <ListItemButton
@@ -138,9 +138,9 @@ export function AppShell() {
                 to={item.path}
                 sx={{
                   borderRadius: 1,
-                  mb: 0.5,
-                  minHeight: 42,
-                  px: open ? 1.5 : 0,
+                  mb: 0.25,
+                  minHeight: 32,
+                  px: open ? 1.25 : 0,
                   justifyContent: open ? "flex-start" : "center",
                   "&.active": {
                     bgcolor: "primary.main",
@@ -150,13 +150,13 @@ export function AppShell() {
                 }}
               >
                 <ListItemIcon
-                  sx={{ minWidth: 0, mr: open ? 1.5 : 0, justifyContent: "center", color: "inherit" }}
+                  sx={{ minWidth: 0, mr: open ? 1.25 : 0, justifyContent: "center", color: "inherit" }}
                 >
                   {NAV_ICON[item.path]}
                 </ListItemIcon>
                 {open && (
                   <ListItemText
-                    slotProps={{ primary: { sx: { fontSize: 14 } } }}
+                    slotProps={{ primary: { sx: { fontSize: 13 } } }}
                     primary={item.label}
                   />
                 )}
@@ -185,7 +185,7 @@ export function AppShell() {
         </Box>
       </Box>
 
-      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, p: 4 }}>
+      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, pl: 1.5, pr: 2, py: 1.5 }}>
         <Outlet />
       </Box>
     </Box>
