@@ -11,6 +11,7 @@ import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import TuneIcon from "@mui/icons-material/Tune";
+import HelpOutlineRounded from "@mui/icons-material/HelpOutlineRounded";
 
 import { ApiError } from "@/shared/api/client";
 
@@ -18,6 +19,7 @@ import { macroApi } from "../api";
 import type { BudgetPreset, ModelOption, RegimeMessage, RegimeRun } from "../types";
 import { RegimeControls } from "./RegimeControls";
 import { RegimeGauge } from "./RegimeGauge";
+import { RegimeGuide } from "./RegimeGuide";
 
 const LS_MODEL = "th.regime.model";
 const LS_BUDGET = "th.regime.budget";
@@ -112,6 +114,7 @@ export function RegimePanel({ naiveScore }: { naiveScore: number | null }) {
   const [error, setError] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(readLS(LS_CONTROLS) === "1");
   const [showDetails, setShowDetails] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const tick = useRef<number | undefined>(undefined);
   const loadedControls = useRef(false);
 
@@ -128,8 +131,14 @@ export function RegimePanel({ naiveScore }: { naiveScore: number | null }) {
     if (loadedRun && !run && readLS(LS_CONTROLS) === null) setShowControls(true);
   }, [loadedRun, run]);
 
-  // Model/budget lists (the models call pings OpenAI /v1/models) — only when
-  // the operable area is first shown.
+  // Budgets are a cheap local read (models.toml) — fetch on mount so the guide
+  // can render without opening the controls.
+  useEffect(() => {
+    void macroApi.budgets().then(setBudgets);
+  }, []);
+
+  // The model list pings OpenAI /v1/models — defer until the operable area is
+  // first shown.
   useEffect(() => {
     if (!showControls || loadedControls.current) return;
     loadedControls.current = true;
@@ -137,7 +146,6 @@ export function RegimePanel({ naiveScore }: { naiveScore: number | null }) {
       setModels(r.models);
       setModel((cur) => (cur && r.models.some((m) => m.id === cur) ? cur : r.default));
     });
-    void macroApi.budgets().then(setBudgets);
   }, [showControls]);
 
   useEffect(() => {
@@ -179,9 +187,22 @@ export function RegimePanel({ naiveScore }: { naiveScore: number | null }) {
   return (
     <Paper sx={{ p: 2.5, width: "100%" }}>
       <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-        <Typography variant="overline" color="text.secondary">
-          AI regime estimate — adversarial voting
-        </Typography>
+        <Box
+          onClick={() => setShowGuide((v) => !v)}
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.5,
+            cursor: "pointer",
+            color: "text.secondary",
+            "&:hover": { color: "text.primary" },
+          }}
+        >
+          <HelpOutlineRounded sx={{ fontSize: 15 }} />
+          <Typography variant="overline" color="inherit">
+            AI regime estimate — adversarial voting
+          </Typography>
+        </Box>
         <Button
           size="small"
           startIcon={<TuneIcon fontSize="small" />}
@@ -191,6 +212,12 @@ export function RegimePanel({ naiveScore }: { naiveScore: number | null }) {
           {showControls ? "Hide" : "Re-run / model"}
         </Button>
       </Stack>
+
+      {budgets.length > 0 && (
+        <Collapse in={showGuide}>
+          <RegimeGuide budgets={budgets} />
+        </Collapse>
+      )}
 
       {/* ---- dashboard (always visible) ---- */}
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3, mt: 1, alignItems: "flex-start" }}>
@@ -272,6 +299,15 @@ export function RegimePanel({ naiveScore }: { naiveScore: number | null }) {
               </Collapse>
             </>
           )}
+
+          <Typography
+            variant="caption"
+            color="text.disabled"
+            sx={{ display: "block", mt: 2 }}
+          >
+            AI-generated estimate. It may be wrong. Not investment advice. Naive-v1, not
+            statistically validated.
+          </Typography>
         </Box>
       </Box>
 
@@ -309,11 +345,6 @@ export function RegimePanel({ naiveScore }: { naiveScore: number | null }) {
           Cached once per day — “Re-run” forces a fresh run (e.g. to try a pricier model).
         </Typography>
       </Collapse>
-
-      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>
-        AI-generated estimate. It may be wrong. Not investment advice. Naive-v1, not
-        statistically validated.
-      </Typography>
     </Paper>
   );
 }

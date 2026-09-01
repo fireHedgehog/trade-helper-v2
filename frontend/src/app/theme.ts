@@ -28,6 +28,32 @@ export const theme = createTheme({
     MuiButton: { defaultProps: { disableElevation: true } },
     MuiPaper: { defaultProps: { variant: "outlined" } },
 
+    // Every genuinely interactive element gets the pointer cursor — MUI covers
+    // most, this catches the rest (clickable chips, the label+control combo,
+    // hover table rows, the Select trigger, custom role="button" boxes).
+    MuiCssBaseline: {
+      styleOverrides: {
+        [[
+          "a[href]",
+          "summary",
+          "[role='button']",
+          "[role='tab']",
+          "[role='option']",
+          ".MuiButtonBase-root",
+          ".MuiChip-clickable",
+          ".MuiFormControlLabel-root",
+          ".MuiTableRow-hover",
+          ".MuiSelect-select",
+          ".MuiAccordionSummary-root",
+        ].join(",")]: { cursor: "pointer" },
+        [[
+          ".MuiButtonBase-root.Mui-disabled",
+          ".MuiFormControlLabel-root.Mui-disabled",
+          ".MuiAccordionSummary-root.Mui-disabled",
+        ].join(",")]: { cursor: "default" },
+      },
+    },
+
     // --- density pass ------------------------------------------------------
     // Excel-tight tables / chips / notices. Spacing + type only — no colour,
     // palette, or brand change. Page-level padding (Paper `p`, section gaps,
