@@ -1,29 +1,44 @@
 # 10 — Paper trading (the stress test)
 
-**Goal.** Run the frozen Naive Donchian V1 signals + P4 sizing against an
-**Alpaca paper account**, unattended, for months, and keep a clean trade
-journal. The journal is the deliverable — "does the grind trend up or down" is
-the question, not "how fast does it blow up". Full universe, not the watchlist.
+**Goal.** Run the frozen Naive Donchian V1 signals + P4 sizing **long-only**
+against an **Alpaca paper account**, unattended, for months, and keep a clean
+trade journal. The journal is the deliverable — "does the grind trend up or
+down" is the question, not "how fast does it blow up".
+
+**Long only.** Drop the short book entirely — it matches the frozen research
+headline, and it sidesteps Alpaca's shortability rejections. The board still
+*computes* short state for display; paper ignores it.
 
 **Philosophy (from the ask).** Minimal. No per-trade risk limits, no daily
 loss circuit-breaker, no manual order approval. Faithful reproduction of the
 research, then watch. The one thing we do NOT reinvent is a fill simulator —
 **Alpaca's paper account is the source of truth** for positions, fills, and
-equity.
+equity, mirrored into our DB so a reset can't erase the record.
 
-## Can Alpaca do this — yes
+## Can Alpaca do this — yes, incl. full trade history
 
 - Paper trading is a separate account with its own key pair, base URL
   `https://paper-api.alpaca.markets`. Free, resettable from the dashboard.
-  Same Trading API surface as live (orders / positions / account).
+  Same Trading API surface as live.
 - New credential provider key **`alpaca_paper`** (the data key stays
-  `alpaca`). Store the base URL + key in `credentials` like every other
-  provider.
-- Paper supports: market/limit/stop/trailing/bracket orders, fractional +
-  notional orders, **shorting** (marginable + shortable + ETB names only —
-  expect 20–40 % of the short book to be rejected), crypto 24/7. No
-  commodities / FX (as everywhere).
-- Rate limit 200 req/min — a daily batch of a few hundred orders is fine.
+  `alpaca`). Store base URL + key in `credentials`.
+- Market/limit/stop/trailing/bracket orders, fractional + notional orders,
+  crypto 24/7. No commodities / FX. Rate limit 200 req/min — a daily batch of a
+  few hundred orders is fine.
+
+**History — every open and close is pullable:**
+
+| Endpoint | Gives |
+| --- | --- |
+| `GET /v2/account/activities?activity_types=FILL` | every fill / partial fill — symbol, side, qty, price, ts, order_id. Paginated, date-filterable. The authoritative fill log. |
+| `GET /v2/orders?status=all` | every order ever — open / filled / canceled / **rejected** / expired, with `filled_qty`, `filled_avg_price`, `submitted_at`, `filled_at`, reject reason. |
+| `GET /v2/account/portfolio/history` | the equity / P&L time series (1Min…1D over 1D…all). The equity curve — one call, not maintained by us. |
+| `GET /v2/positions` | current positions only (no history) — so the daily position snapshot is still ours. |
+
+**Reset caveat.** Resetting the paper account **wipes** Alpaca's
+activities / orders / portfolio history. So each reconcile **mirrors** the new
+activities + orders + portfolio-history rows into our `paper_*` tables — those
+are the durable research record across runs and resets.
 
 ## Will it get stopped out and lose everything on day 1 — no (unless you crank it)
 
@@ -72,12 +87,11 @@ Once per trading day, ~09:35 ET (matches `fill_at: open_next`):
    `|delta| × price < min_ticket` ($ threshold) or
    `|delta| / max(|target|, ε) < rebalance_band` (default ~15 % — anti-churn,
    not a risk limit; matches "don't fiddle between rebalances").
-4. Submit market `day` orders for the deltas. A rejected short → log it
-   ("wanted short X, not shortable") and move on; the realized book will
-   legitimately differ from the theoretical one.
+4. Submit market `day` orders for the deltas (long only — buy to open, sell to
+   close). A rejected order → log it and move on.
 5. Sanity clamp: refuse the whole batch if target gross > 2× NAV (config bug
    guard, not a strategy limit).
-6. ~15 min later: poll fills, write the journal.
+6. ~15 min later: mirror new fills / orders / portfolio-history into `paper_*`.
 
 **Exits.** Signal-driven only — no native stop orders. When the daily backtest
 marks a position exited (stop / Donchian reversal / flip), the next reconcile
@@ -88,11 +102,13 @@ us whether "exit at next open after a close-based stop" survives real gaps.
 
 | Table | Row |
 | --- | --- |
+| `paper_experiments` | one per run — name, `alpaca_paper` cred key, universe (`full` \| `watchlist` \| custom), start_nav, started_at, status. Every row below carries `experiment_id`. |
 | `paper_runs` | one per reconcile — ts, NAV before/after, target gross, orders submitted/filled/rejected, macro zone used, sizing-params JSON |
-| `paper_orders` | every order — symbol, side, qty, submitted_at, alpaca_order_id, status, filled_qty/avg_price/at, reject reason, the `signal_events.id` that triggered it |
-| `paper_positions_daily` | EOD snapshot — date, symbol, qty, avg_entry, market_value, unrealized_pl, current_stop |
-| `paper_equity` | date, portfolio_value, cash, long_mv, short_mv (or just mirror `portfolio_history`) |
-| `paper_trades` | matched round-trips — entry/exit price + date, realized P&L, R multiple, bars held, exit_reason (mapped from the signal), max fill slippage vs the backtest's open |
+| `paper_orders` | mirror of `/v2/orders` — symbol, side, qty, submitted_at, alpaca_order_id, status, filled_qty/avg_price/at, reject reason, the `signal_events.id` that triggered it |
+| `paper_fills` | mirror of `/v2/account/activities?FILL` — the authoritative fill log |
+| `paper_positions_daily` | our EOD snapshot — date, symbol, qty, avg_entry, market_value, unrealized_pl, current_stop |
+| `paper_equity` | mirror of `/v2/account/portfolio/history` — date, equity, pl, pl_pct |
+| `paper_trades` | matched round-trips — entry/exit price + date, realized P&L, R multiple, bars held, exit_reason (mapped from the signal), fill slippage vs the backtest's open |
 
 The round-trip matcher (open → close per symbol) produces the "clean trading
 journal". Every trade links back to its `signal_events` row (why it exists).
@@ -112,26 +128,43 @@ Add a daily cron once it's proven. One continuous run from a fixed start NAV
 (e.g. $100k). **Do not reset mid-experiment** — a blow-up is a result. Reset
 only for a new experiment version.
 
+## Experiments
+
+Two runs, in **parallel on two `alpaca_paper` accounts** (Alpaca allows
+several), keyed by `experiment_id`:
+
+- **A — full universe, long only.** Every `long` on-signal name (~200) + crypto
+  longs, P4 sizing. Lots of trades, fast signal; may draw down hard in
+  days/weeks. The "what the whole Donchian long book does live" journal.
+- **B — watchlist only, long only.** The curated ~26. Signals sparse → can run
+  months with capital intact. The "is the disciplined small book net-positive
+  over time" journal.
+
+**Monte Carlo is a backtest-side thing, not a live-paper thing.** A live paper
+account plays out **one path at wall-clock speed** — you can't compress it. If
+B is too quiet to be informative, the complement is a **block-bootstrap on the
+frozen Donchian P4 daily-return series** (a `docs/strategy-experiments/` script)
+→ a distribution of CAGR / maxDD / terminal wealth / P(ruin) over 10k resampled
+paths, in seconds. Repeated live runs (reset → run again) are the slow
+ground-truth for that distribution; the bootstrap is the fast estimate.
+
 ## The hard / risky parts (assessment)
 
 1. **Sizing port + single source of truth.** Reimplement the waterfall in
    Python, point the sandbox at it, delete the client-side copy. ~1–2 days.
-2. **Shortability.** ~20–40 % of the short book will be rejected. The journal
-   records it — a genuine finding (the frozen backtest assumed you could short
-   everything).
-3. **Fills / slippage.** Market orders at 09:35 ≠ the backtest's exact-open
+2. **Fills / slippage.** Market orders at 09:35 ≠ the backtest's exact-open
    fill. The journal measures the slippage the backtest ignored.
-4. **Stops as next-open exits.** We eat the overnight gap (the backtest models
+3. **Stops as next-open exits.** We eat the overnight gap (the backtest models
    "worse of open vs stop"). The journal tells us if that's survivable live.
-5. **Reconcile edge cases** — partial fills, still-open orders (cancel-all
+4. **Reconcile edge cases** — partial fills, still-open orders (cancel-all
    first), negative buying power (the 2× clamp), halts / delistings on single
    names (log, strand, move on — no handling).
 
 ## Not building (per "don't over-engineer")
 
 Per-trade risk limits · daily loss limit · position-count cap · manual order
-approval · multi-strategy / multi-account · a real-money path · smart execution
-· our own fill simulator · watchlist-only mode.
+approval · a real-money path · smart execution · our own fill simulator · a
+short book.
 
 ## Phasing / effort
 
