@@ -43,7 +43,8 @@ def save_config(conn: sqlite3.Connection, params: SignalParams, name: str | None
 
 # ---- run ----
 
-def _board_state(bars: list[dict], trades: list[dict], overlays: dict) -> dict:
+def _board_state(bars: list[dict], trades: list[dict], overlays: dict,
+                 pending_action: dict | None = None) -> dict:
     last_close = bars[-1]["c"]
     last_date = bars[-1]["date"]
     open_tr = next((t for t in trades if t["exit_date"] is None), None)
@@ -51,6 +52,7 @@ def _board_state(bars: list[dict], trades: list[dict], overlays: dict) -> dict:
         d = 1 if open_tr["direction"] == "long" else -1
         stops = [s for s in overlays["stop_line"] if s is not None]
         return {
+            "pending_action": pending_action,
             "state": open_tr["direction"], "state_since": open_tr["entry_date"],
             "entry_price": open_tr["entry_price"], "last_close": last_close, "last_date": last_date,
             "unrealized_pct": d * (last_close / open_tr["entry_price"] - 1.0),
@@ -58,6 +60,7 @@ def _board_state(bars: list[dict], trades: list[dict], overlays: dict) -> dict:
         }
     last_exit = trades[-1]["exit_date"] if trades else None
     return {"state": "flat", "state_since": last_exit, "entry_price": None,
+            "pending_action": pending_action,
             "last_close": last_close, "last_date": last_date,
             "unrealized_pct": None, "current_stop": None}
 
@@ -66,7 +69,7 @@ def _full_result(bars: list[dict], params: SignalParams) -> dict:
     """Run the engine and assemble the whole Timing payload. Pure — no DB."""
     result = engine.run(bars, params)
     m = metrics.summarise(result.trades, result.daily, bars)
-    state = _board_state(bars, result.trades, result.overlays)
+    state = _board_state(bars, result.trades, result.overlays, result.pending_action)
     strat_eq = engine.compound([d["strat_ret"] for d in result.daily])
     equity = {
         "dates": [d["date"] for d in result.daily],
@@ -100,6 +103,7 @@ def preview(conn: sqlite3.Connection, symbol: str, params: SignalParams) -> dict
         "symbol": symbol,
         "computed_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "preview": True,
+        "pending_action": fr["result"].pending_action,
         "engine_version": ENGINE_VERSION,
         "params": params.model_dump(),
         "stale": False,
@@ -209,16 +213,16 @@ def get_timing(conn: sqlite3.Connection, symbol: str) -> dict:
     chart = repo.get_chart(conn, symbol, run["run_id"]) or {}
 
     newest = ohlc.latest_price_date(conn, symbol)
-    run_through = bars[-1]["date"] if bars else None
-    # a fresh price bar exists that the stored run did not see
-    stale = bool(newest and chart.get("overlays", {}).get("dates")
-                 and newest > chart["overlays"]["dates"][-1])
+    run_through = stats.get("last_date")
+    stale = bool(newest and run_through and newest > run_through)
 
     return {
         "status": "ok",
         "symbol": symbol,
         "computed_at": run["finished_at"],
         "engine_version": run["engine_version"],
+        "needs_recompute": run["engine_version"] != ENGINE_VERSION,
+        "pending_action": json.loads(stats["pending_action_json"]) if stats.get("pending_action_json") else None,
         "params": json.loads(run["params_json"]),
         "stale": stale,
         "newest_price_date": newest,
@@ -309,7 +313,7 @@ def run_universe(conn: sqlite3.Connection, run_id: int, mode: str = "incremental
                 strategy_id, params, params_json = resolve(symbol)
                 result = engine.run(bars, params)
                 m = metrics.summarise(result.trades, result.daily, bars)
-                state = _board_state(bars, result.trades, result.overlays)
+                state = _board_state(bars, result.trades, result.overlays, result.pending_action)
                 conn.execute("BEGIN")
                 repo.wipe_symbol(conn, symbol)
                 repo.insert_events(conn, sig_run_id, symbol, result.trades)
@@ -341,6 +345,8 @@ def _board_entry(row: dict) -> dict:
         "unrealized_pct": row["unrealized_pct"],
         "current_stop": row["current_stop"],
         "vol_60d": row.get("vol_60d"),
+        "last_date": row.get("last_date"),
+        "pending_action": json.loads(row["pending_action_json"]) if row.get("pending_action_json") else None,
         "momentum": None,
         "sector": None,
     }
@@ -378,21 +384,25 @@ def _with_momentum(entry: dict, mom: dict[str, dict]) -> dict:
     return entry
 
 
-def _sector_map(conn: sqlite3.Connection) -> dict[str, str]:
-    """symbol -> GICS sector string from `assets`. Advisory grouping only: the
-    /sizing page uses it for sleeve budgets and the per-sector cap. A symbol
-    with no sector (ETFs, freshly synced names) is simply absent — the caller
-    buckets it as 'Other'. Not a signal input, never touches the engine."""
-    out: dict[str, str] = {}
+def _instrument_map(conn: sqlite3.Connection) -> dict[str, dict]:
+    """Sizing metadata: sector, whole equity shares and provider crypto increments."""
+    out: dict[str, dict] = {}
     for r in conn.execute(
         "SELECT symbol, sector FROM assets WHERE sector IS NOT NULL AND sector <> ''"
     ):
-        out[r["symbol"]] = r["sector"]
+        out[r["symbol"]] = {"sector": r["sector"], "quantity_increment": 1.0, "min_order_size": 1.0}
+    for r in conn.execute("SELECT symbol, min_trade_increment, min_order_size FROM crypto_assets"):
+        step = float(r["min_trade_increment"] or 1e-8)
+        minimum = float(r["min_order_size"] or step)
+        out[r["symbol"]] = {"sector": None, "quantity_increment": step if step > 0 else 1e-8,
+                              "min_order_size": max(0.0, minimum)}
     return out
 
 
-def _with_sector(entry: dict, sectors: dict[str, str]) -> dict:
-    entry["sector"] = sectors.get(entry["symbol"])
+def _with_instrument(entry: dict, instruments: dict[str, dict]) -> dict:
+    default_step = 1e-8 if "/" in entry["symbol"] else 1.0
+    entry.update(instruments.get(entry["symbol"]) or {
+        "sector": None, "quantity_increment": default_step, "min_order_size": default_step})
     return entry
 
 
@@ -418,13 +428,13 @@ def _vol_60d_for(conn: sqlite3.Connection, symbol: str) -> float | None:
 def get_board(conn: sqlite3.Connection, charts: bool = False) -> dict:
     run = repo.latest_universe_run(conn)
     mom = _momentum_map(conn)
-    sectors = _sector_map(conn)
+    instruments = _instrument_map(conn)
     watch = repo.stats_for_symbols(conn, [ohlc.normalize_symbol(s) for s in TREND_WATCHLIST])
     def _watch_row(s: str) -> dict:
         e = _board_entry(watch[s]) if s in watch else _empty_entry(s)
         if e["vol_60d"] is None:  # no stored run for this watchlist name — compute now
             e["vol_60d"] = _vol_60d_for(conn, s)
-        return _with_sector(_with_momentum(e, mom), sectors)
+        return _with_instrument(_with_momentum(e, mom), instruments)
 
     watchlist = [
         {
@@ -447,7 +457,7 @@ def get_board(conn: sqlite3.Connection, charts: bool = False) -> dict:
         return {"status": "not_computed", "watchlist": watchlist, "strategies": strategies,
                 "long": [], "short": [], "flat": []}
 
-    rows = [_with_sector(_with_momentum(_board_entry(r), mom), sectors)
+    rows = [_with_instrument(_with_momentum(_board_entry(r), mom), instruments)
             for r in repo.board_rows(conn, run["run_id"])]
     buckets: dict[str, list[dict]] = {"long": [], "short": [], "flat": []}
     for r in rows:
@@ -458,6 +468,8 @@ def get_board(conn: sqlite3.Connection, charts: bool = False) -> dict:
         "status": "ok",
         "computed_at": run["finished_at"],
         "engine_version": run["engine_version"],
+        "needs_recompute": run["engine_version"] != ENGINE_VERSION,
+        "pending": [r for r in rows if r.get("pending_action")],
         "counts": {k: len(v) for k, v in buckets.items()},
         "long": buckets["long"],
         "short": buckets["short"],

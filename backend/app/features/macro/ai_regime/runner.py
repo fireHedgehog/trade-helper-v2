@@ -24,7 +24,7 @@ class RegimeRunError(RuntimeError):
     pass
 
 
-_PERIOD_DAYS = {"Daily": 1, "Weekly": 7, "Monthly": 30, "Quarterly": 91}
+_PERIOD_DAYS = {"daily": 1, "weekly": 7, "monthly": 30, "quarterly": 91, "annual": 365}
 _STALE_GRACE = 12  # extra slack beyond one period + the series' own release lag
 
 
@@ -47,11 +47,12 @@ def _stale_series(conn: sqlite3.Connection) -> list[str]:
         if not r["last_date"]:
             out.append(r["series_id"])
             continue
-        period = _PERIOD_DAYS.get((r["frequency"] or "").strip(), 30)
+        period = _PERIOD_DAYS[naive._freq_key(r["frequency"])]
         # normal cadence: the latest obs sits ~(period + release-lag) behind
         # today. Only flag when it is a *further* full period past that — i.e.
         # a release we should already have has not landed.
-        limit = 2 * period + (r["typical_lag_days"] or 14) + _STALE_GRACE
+        lag = r["typical_lag_days"] if r["typical_lag_days"] is not None else 14
+        limit = 2 * period + lag + _STALE_GRACE
         try:
             if (today - date.fromisoformat(r["last_date"])).days > limit:
                 out.append(r["series_id"])

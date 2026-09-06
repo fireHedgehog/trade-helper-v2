@@ -8,6 +8,13 @@ export interface SizingBoardRow {
   state: "long" | "short" | "flat" | null;
   state_since: string | null;
   last_close: number | null;
+  quantity_increment?: number;
+  min_order_size?: number;
+  pending_action?: {
+    action: "enter" | "exit" | "reverse";
+    direction: "long" | "short";
+    signal_date: string;
+  } | null;
   vol_60d?: number | null;
   sector?: string | null;
   momentum?: { score: number; leader: boolean } | null;
@@ -16,6 +23,8 @@ export interface SizingBoardRow {
 export interface SizingBoard {
   status: "ok" | "not_computed";
   computed_at?: string;
+  needs_recompute?: boolean;
+  pending?: SizingBoardRow[];
   long: SizingBoardRow[];
   short: SizingBoardRow[];
   flat: SizingBoardRow[];
@@ -76,9 +85,10 @@ export interface SizingRow {
 export interface SleeveLoad {
   sleeve: Sleeve;
   deployedPct: number;
-  newPct: number;
+  newPct: number; // target less deployed, floored at zero
+  targetPct: number; // total target holdings
   capPct: number;
-  trimPct: number; // deployed above this sleeve's cap — how much to cut here
+  trimPct: number; // deployed above this sleeve's target — how much to cut here
   over: boolean;
 }
 

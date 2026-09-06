@@ -90,16 +90,17 @@ def finish_target(
     coverage_end: str | None = None,
     duration_ms: int | None = None,
     error: str | None = None,
+    note: str | None = None,
 ) -> None:
     conn.execute("BEGIN")
     conn.execute(
         """
         UPDATE fetch_run_items
            SET status = ?, rows_written = ?, requests_made = ?,
-               coverage_start = ?, coverage_end = ?, duration_ms = ?, error = ?
+               coverage_start = ?, coverage_end = ?, duration_ms = ?, error = ?, note = ?
          WHERE run_id = ? AND target = ?
         """,
-        (status, rows, requests, coverage_start, coverage_end, duration_ms, error, run_id, target),
+        (status, rows, requests, coverage_start, coverage_end, duration_ms, error, note, run_id, target),
     )
     failed_inc = 1 if status == "error" else 0
     conn.execute(
@@ -182,7 +183,7 @@ def list_run_items(conn: sqlite3.Connection, run_id: int) -> list[dict]:
     rows = conn.execute(
         """
         SELECT run_id, target, status, rows_written, requests_made,
-               coverage_start, coverage_end, duration_ms, error
+               coverage_start, coverage_end, duration_ms, error, note
           FROM fetch_run_items
          WHERE run_id = ?
          ORDER BY (status = 'error') DESC, target

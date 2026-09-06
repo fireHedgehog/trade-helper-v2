@@ -243,6 +243,35 @@ export function TrendPage() {
         </Alert>
       )}
 
+      {board?.needs_recompute && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Run trend backtest to calculate signals and performance with the current trading rules.
+        </Alert>
+      )}
+
+      {!!board?.pending?.length && (
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography variant="subtitle2">Pending next open ({board.pending.length})</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Confirmed at the signal date’s close. Entries have no fill price yet.
+          </Typography>
+          <Table size="small">
+            <TableHead><TableRow>
+              <TableCell>Symbol</TableCell><TableCell>Next-session action</TableCell>
+              <TableCell>Signal date</TableCell><TableCell>Simulated position</TableCell>
+            </TableRow></TableHead>
+            <TableBody>{board.pending.map((r) => (
+              <TableRow key={r.symbol}>
+                <TableCell><SymLink symbol={r.symbol} /></TableCell>
+                <TableCell>{r.pending_action?.action === "reverse" ? "Reverse to" : r.pending_action?.action === "exit" ? "Exit" : "Enter"} {r.pending_action?.direction}</TableCell>
+                <TableCell>{r.pending_action?.signal_date}</TableCell>
+                <TableCell>{r.state}</TableCell>
+              </TableRow>
+            ))}</TableBody>
+          </Table>
+        </Paper>
+      )}
+
       <Paper sx={{ p: 2, mb: 2 }}>
         <Stack
           direction="row"

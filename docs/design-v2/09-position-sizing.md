@@ -1,109 +1,101 @@
-# 09 — Position sizing (the Sizing sandbox)
+# Position sizing
 
-`/sizing`. A **real-time parameter sandbox**, not a decision engine. It takes
-the Trend board's on-signal names and answers two questions under a risk-ladder
-you drag: *how big should each position be*, and *what is holding each one
-back*. It places no order, persists nothing, adds no `params.model` branch, no
-`signal_runs`, no migration. Same character as the Vol 60d / Mom. columns — a
-derived view over data the app already has.
+`/sizing` is a client-side allocation sandbox over the saved Trend board.
+The operator supplies NAV, held exposure by sleeve and risk assumptions.
+The page computes total target holdings, compares them with deployed exposure,
+and explains the limiting constraints. It places no orders and saves no account
+or holdings ledger.
 
-Why a sandbox and not a live optimiser: sizing is **stateful** (needs NAV,
-current holdings, remaining cash, book-level vol) but the board is stateless.
-Rather than build a paper-trading ledger, the page lets you *feed* the state as
-parameters and watch the sizing surface move.
+## Inputs
 
-## Data it consumes
+- `GET /api/signals/board`: simulated positions, pending next-open actions,
+  last close, `vol_60d`, sector, momentum and quantity rules.
+- Macro: the last successful AI regime reading, falling back to the live
+  deterministic composite. Only the zone affects sizing. The overlay is off
+  by default; refreshing the page does not generate a new AI assessment.
+- Controls: NAV, target volatility, maximum gross, name/sector caps, optional
+  sleeve budgets, selected directions and held percentage of NAV per sleeve.
 
-- `GET /api/signals/board` — the existing board response, now with a per-row
-  **`sector`** field (`signals/service.py::_sector_map` → `assets.sector`,
-  joined in `get_board` alongside the momentum map). Advisory grouping only.
-- `GET /api/macro/ai-regime/latest`, falling back to `GET /api/macro/overview` —
-  one regime **zone** (risk-on / neutral / risk-off) for the macro overlay. The
-  score is shown for context; only the zone drives the maths.
+Pending entries and reversals use the intended direction and the last close
+for provisional quantities. Pending exits are omitted from the target book.
+Their next opening price remains unknown. New entries only filters the visible
+rows by age; the target calculation and book totals still include all names
+in the selected direction/watchlist scope.
 
-Everything else is client-side arithmetic in `features/sizing/engine.ts`.
+## Total target calculation
 
-## The per-name waterfall (`computeSizing`)
+Targets are independent of the deployed-by-sleeve inputs:
 
-Every step only ever **shrinks** a weight, so the table reads left to right:
+1. Inverse-volatility weights sum to `k_max × NAV`. Missing volatility uses a
+   disclosed 25% assumption.
+2. The per-name cap clips large weights and redistributes available excess
+   proportionally among names below the cap. Unallocated amounts remain cash.
+3. Each sleeve's total target is capped at `sector_cap × k_max × NAV`.
+   Optional Equities/Bonds/Crypto/Other budgets cap those groups on the same
+   reference gross. Deployed holdings are not subtracted from these caps.
+4. Estimated portfolio volatility uses name volatilities and a fixed 0.35
+   pairwise correlation, or the supplied override. All targets scale down by
+   `min(1, target_volatility / estimated_volatility)`.
+5. When enabled, macro scales targets by risk-on 1, neutral 0.65 or risk-off
+   0.35, with adjustable neutral/risk-off multipliers. Risk-off also removes
+   names with a known momentum rank below 50.
+6. Quantities round down to whole equity shares or the crypto catalog's
+   `min_trade_increment`, subject to `min_order_size`. Missing crypto metadata
+   uses 0.00000001 units as a research assumption. Final target dollars equal
+   rounded quantity times reference price. Unused dollars remain in cash.
 
-1. **Inverse-vol raw** — `w_i ∝ 1 / vol_60d_i`, scaled so the raw book sums to
-   `k_max × NAV`. Board rows written before migration 0015 carry no
-   `vol_60d`; they are sized off a placeholder **25%** σ and flagged (re-run the
-   Trend backtest for the real figure).
-2. **Per-name cap** — `min(w_i, per-name cap %)` (P3); the clipped weight is
-   **redistributed** to the still-under-cap names in proportion to their
-   weight, iterated until it settles (matches `momentum_m4_sizing.py`).
-3. **Per-sector cap + sleeve budget** — each sleeve's allowance is
-   `per-sector cap % × target gross`, minus what the *deployed-by-sleeve* table
-   already holds; the sleeve's new weights are scaled to fit the headroom (S4).
-   The optional coarse sleeve budget (Equities / Bonds / Crypto / Other) caps
-   each group the same way.
-4. **Whole-book vol target** — estimated book vol from the name vols with a flat
-   assumed pairwise correlation of **0.35** (blunt — a trend book's *realised*
-   pairwise correlation sits well below 0.5; `bookVolOverridePct` is the escape
-   hatch); scale the whole book by `min(1, vol target / est book vol)`.
-5. **Macro overlay** — **off by default**. When enabled, multiply gross by a zone
-   scalar (risk-on ×1, neutral ×`neutralScale` default 0.65, risk-off
-   ×`riskOffScale` default 0.35). Risk-off additionally zeroes names whose peer
-   rank is **known-weak** (`momentum < 50`); names with no rank are kept.
+The dollar/quantity output is the total desired holding. It is not the number
+of additional units to buy or sell. Eligibility, live borrow availability and
+actual fill prices require separate operator verification.
 
-Then `target $ = target % × NAV`, `shares = floor(target $ / last_close)`.
+## Comparing with existing holdings
 
-## Sleeves
+For each sleeve:
 
-11 GICS sectors + **Bonds** + **Crypto** + **Other**. `assets.sector` drives the
-GICS bucket; `constants.ts::BOND_ETFS` / `CRYPTO_SYMBOLS` (and a `/USD` suffix)
-override it for cross-asset names with no sector. Commodity ETFs fall to Other.
+- Target: sum of final target weights.
+- Room to target: `max(0, target − deployed)`.
+- Exposure to reduce: `max(0, deployed − target)`.
 
-## Deployed-by-sleeve — the crowding model
+The whole-book summary compares total target gross with total deployed gross.
+That is a net difference: a portfolio can need both an addition in one sleeve
+and a reduction in another. The sleeve view shows those differences explicitly.
+Entering the proposed portfolio as existing holdings leaves its target weights
+unchanged and shows no additional room or required reduction.
 
-A small editable table of held **% NAV per sleeve** (preset buttons: Flat,
-Balanced, Tech-heavy, All-in energy). It is the per-sector cap's "already held"
-term, so pushing Tech to its cap visibly blocks new semis breakouts. **Coarse
-by design**: it assumes your existing book was itself sized by these rules — the
-UI says so. Paste-your-holdings precision is a deferred add-on.
+Cash at target is `max(0, 100% − target_gross)`. It describes the allocation at
+the displayed reference prices after rebalancing, including quantity rounding;
+it is not a broker cash balance. The volatility readout describes the estimate
+before the volatility/macro scaling.
 
-## Verdicts
+## Sleeves and verdicts
 
-Per row, in precedence order. They are **narrow and per-name**: whole-book
-scaling (vol-target, a neutral / risk-off macro overlay) shrinks every target
-uniformly — that is normal operation, shown in the hero, and does **not** turn
-rows into WAIT.
+Sleeves are the 11 GICS sectors, Bonds, Crypto and Other. Equity sector metadata
+drives GICS assignment; configured bond ETFs and crypto symbols have dedicated
+sleeves. Untagged and commodity ETFs use Other. Related ETFs and individual
+stocks can overlap economically despite occupying different sleeves.
 
-- **TRIM** — your deployed-by-sleeve table has this name's sleeve **over** its
-  cap. A cut candidate, not an add — trim the weakest peer-ranked names in the
-  sleeve. Per-sleeve (the tool has no per-name holdings). Highest precedence.
-- **WAIT** — risk-off dropped this name outright (known-weak peer rank), or its
-  target is too small to ticket for some other reason.
-- **BLOCKED** — the per-sector cap squeezed this name to ~nothing: its sleeve is
-  at its cap from your deployed-by-sleeve table, no room here.
-- **LIGHT** — a cap (per-name or per-sector) trimmed this name below its
-  inverse-vol weight, but it still has a real target.
-- **ADD** — clean; there is head-room and only the uniform book scaling applied.
+Per-name verdicts are coarse sleeve-level review cues because actual per-name
+holdings are not supplied:
 
-The table has a verdict filter (five checkboxes, all on) with live counts, so
-"how many TRIM / BLOCKED / WAIT and why" is one glance.
+- TRIM: deployed sleeve exposure exceeds its total target by more than 0.5% NAV.
+- WAIT: macro excludes the name or its allocation cannot buy a minimum unit.
+- BLOCKED: its sleeve is at target, or the whole book must be reduced before adding.
+- LIGHT: there is room, but a cap reduces the name below its raw inverse-vol weight.
+- ADD: there is room toward the sleeve target and no such cap reduction.
 
-## Outputs
+A TRIM cue does not establish that the operator owns the named instrument.
+The actual holdings determine which positions to reduce.
 
-- **Hero** — one line + one number: head-room `$` to add across N names (green) /
-  **`$` to trim** when deployed is above the target book (red) / whole-book
-  throttle scalar (amber) / deployed ≈ target (grey).
-- **Gross bar** — deployed ┃ **red over-target trim band** ┃ can-add ┃
-  room-to-k_max ┃ macro-blocked, with a target tick; plus a one-line *binding
-  constraint*.
-- **Sleeve load** — an over-cap sleeve turns red and shows `▼ trim N%`.
-- **In-page guide** — a collapsed `<SizingGuide>` accordion: the parameter
-  reference table, the verdict legend, and the known blunt edges.
-- **Sleeve load** — deployed + proposed vs the sector cap, per sleeve.
-- **k_max sensitivity** — resulting target gross at k_max ∈ {0.5, 1, 1.5, 2}.
-- **Per-name table** — a tight 6 columns (symbol · sleeve · L/S · mom, Vol,
-  Target %, Target $, Shares, Verdict). The full step-by-step waterfall and the
-  per-row notes live in the verdict chip's hover, not as columns.
+## Page
 
-## What it deliberately is not
+Parameters and deployed-by-sleeve presets are on the left. Outputs include:
+net room/reduction, gross exposure, cash at target, cap/volatility explanation,
+sleeve target comparisons and k_max sensitivity. Grey represents held exposure
+within target, green is room to add, red is exposure above target, and the tick
+marks total sleeve target. The per-name table shows volatility, rounded target
+weight, target dollars, target units and verdict; hover shows the calculation.
 
-No order tickets, no "buy/sell X shares vs your actual position" (there is no
-per-name current holding — only the coarse per-sleeve deployed table), no
-persisted paper equity curve. Those would be a separate paper-trading feature.
+Targets are computed for all names in the selected scope before the recent-entry
+and verdict display filters. The scenario resets when the page unmounts.
+Refresh reloads cached signals and macro context; the operator fetches data,
+recomputes rankings, runs Trend and reruns the AI assessment separately.

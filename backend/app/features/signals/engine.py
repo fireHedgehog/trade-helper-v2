@@ -1,15 +1,8 @@
-"""Donchian-channel trend engine (docs/draft-design/04-trend-page.md §R2.1-§R4).
+"""Daily Donchian simulation: close signals, scheduled fills, and resting stops.
 
-Two-sided. Signal decided on the close of bar `t`, filled at `fill_at`
-(default next open). Stop stack, evaluated every bar while open, first hit
-wins: initial disaster stop (`entry ∓ atr_stop_mult × ATR_entry`) → monotonic
-trailing stop (`trail_mode`) → model exit (exit-channel breach) → end of data
-(still-open, no exit row).
-
-Deterministic: same `bars` + `params` + `ENGINE_VERSION` → identical output.
-Pure Python, no numpy — matches `multisectional/ranking.py`.
+A close-derived trailing stop becomes effective next session. Each trade uses
+fixed units at entry; its marked value, fill costs and daily equity reconcile.
 """
-
 from __future__ import annotations
 
 import math
@@ -23,9 +16,10 @@ _DIR_NAME = {1: "long", -1: "short"}
 
 @dataclass
 class EngineResult:
-    trades: list[dict] = field(default_factory=list)   # closed + one open (exit_* = None)
-    daily: list[dict] = field(default_factory=list)     # {date, state (-1/0/1), strat_ret}
-    overlays: dict = field(default_factory=dict)        # {dates, donchian_up, donchian_dn, stop_line}
+    trades: list[dict] = field(default_factory=list)
+    daily: list[dict] = field(default_factory=list)
+    overlays: dict = field(default_factory=dict)
+    pending_action: dict | None = None
 
 
 def run(bars: list[dict], params: SignalParams) -> EngineResult:
@@ -35,177 +29,162 @@ def run(bars: list[dict], params: SignalParams) -> EngineResult:
     h = [float(b["h"]) for b in bars]
     low = [float(b["l"]) for b in bars]
     c = [float(b["c"]) for b in bars]
-
-    overlays = {"dates": dates, "donchian_up": [None] * n, "donchian_dn": [None] * n,
-                "stop_line": [None] * n}
-    warmup = params.warmup()
-    if n <= warmup + 2:
-        return EngineResult(overlays=overlays)
-
+    if not n:
+        return EngineResult(overlays={"dates": [], "donchian_up": [], "donchian_dn": [], "stop_line": []})
     atr = ind.wilder_atr(h, low, c, params.atr_len)
     dc_up_e, dc_dn_e = ind.donchian(h, low, params.entry_len)
     dc_up_x, dc_dn_x = ind.donchian(h, low, params.exit_len)
     ma_reg = ind.sma(c, params.ma_regime) if params.use_ma_regime else [None] * n
-    overlays["donchian_up"] = dc_up_e
-    overlays["donchian_dn"] = dc_dn_e
-
-    exposure = [0] * n          # signed position held *during* bar t
-    stop_series: list[float | None] = [None] * n
+    stops: list[float | None] = [None] * n
+    overlays = {"dates": dates, "donchian_up": dc_up_e, "donchian_dn": dc_dn_e,
+                "stop_line": stops}
     trades: list[dict] = []
-
+    ledger: list[dict] = []
     pos: dict | None = None
+    pending: dict | None = None
 
-    def per_side_cost(price: float, a: float | None) -> float:
-        slip = (params.slippage_atr * a / price) if a and price else 0.0
-        return params.cost_bps / 1e4 + slip
+    def allowed(d: int) -> bool:
+        return params.allow_long if d == 1 else params.allow_short
 
-    def fill(t: int) -> tuple[int, float] | None:
-        """(index, raw price) of the fill for a signal on the close of t."""
-        if params.fill_at == "close":
-            return t, c[t]
-        return (t + 1, o[t + 1]) if t + 1 < n else None
+    def cost(price: float, a: float) -> float:
+        # Cost per unit: bps on the fill notional plus absolute ATR slippage.
+        return price * params.cost_bps / 1e4 + params.slippage_atr * a
 
-    def open_position(direction: int, sig_t: int) -> None:
+    def open_position(d: int, t: int, price: float, signal_i: int) -> None:
         nonlocal pos
-        f = fill(sig_t)
-        if f is None:
-            return
-        fi, fp = f
-        a = atr[sig_t] or 0.0
-        init_stop = fp - direction * params.atr_stop_mult * a
-        pos = {
-            "direction": direction, "sig_t": sig_t, "fill_i": fi, "entry_price": fp,
-            "entry_atr": a, "initial_stop": init_stop, "stop": init_stop,
-            "hh": h[fi], "ll": low[fi], "mae": 0.0, "mfe": 0.0,
-            "entry_cost": per_side_cost(fp, a),
-        }
+        a = atr[signal_i] or 0.0
+        stop = price - d * params.atr_stop_mult * a
+        pos = {"direction": d, "fill_i": t, "entry_price": price, "entry_atr": a,
+               "initial_stop": stop, "stop": stop, "hh": price, "ll": price,
+               "mae": 0.0, "mfe": 0.0, "entry_cost": cost(price, a) / price}
 
-    def close_position(exit_i: int, exit_price: float, reason: str | None) -> None:
+    def close_position(t: int, price: float, reason: str | None, known_atr: float) -> None:
         nonlocal pos
         assert pos is not None
-        d = pos["direction"]
-        a = pos["entry_atr"] or None
-        exit_cost = per_side_cost(exit_price, atr[min(exit_i, n - 1)]) if reason else 0.0
-        gross = d * (exit_price / pos["entry_price"] - 1.0)
-        ret_pct = gross - pos["entry_cost"] - exit_cost
-        risk_frac = abs(pos["entry_price"] - pos["initial_stop"]) / pos["entry_price"]
-        ret_r = ret_pct / risk_frac if risk_frac > 0 else None
+        d, entry = pos["direction"], pos["entry_price"]
+        exit_cost = cost(price, known_atr) / entry if reason else 0.0
+        ret = d * (price / entry - 1) - pos["entry_cost"] - exit_cost
+        risk = abs(entry - pos["initial_stop"]) / entry
+        a = pos["entry_atr"]
         trades.append({
-            "direction": _DIR_NAME[d],
-            "entry_date": dates[pos["fill_i"]], "entry_price": pos["entry_price"],
-            "exit_date": dates[exit_i] if reason else None,
-            "exit_price": exit_price if reason else None,
-            "exit_reason": reason,
-            "bars_held": (exit_i - pos["fill_i"]) if reason else (n - 1 - pos["fill_i"]),
-            "return_pct": ret_pct if reason else None,
-            "return_r": ret_r if reason else None,
+            "direction": _DIR_NAME[d], "entry_date": dates[pos["fill_i"]],
+            "entry_price": entry, "exit_date": dates[t] if reason else None,
+            "exit_price": price if reason else None, "exit_reason": reason,
+            "bars_held": t - pos["fill_i"], "return_pct": ret if reason else None,
+            "return_r": ret / risk if reason and risk > 0 else None,
             "mae_atr": abs(pos["mae"]) / a if a else None,
             "mfe_atr": pos["mfe"] / a if a else None,
             "initial_stop": pos["initial_stop"],
         })
+        ledger.append({**pos, "exit_i": t, "exit_price": price,
+                       "exit_cost": exit_cost})
         pos = None
 
-    for t in range(warmup, n):
-        if atr[t] is None or dc_up_e[t] is None:
+    for t in range(n):
+        prior_atr = (atr[t - 1] or 0.0) if t else 0.0
+        exited = False
+        # Orders confirmed at the previous close execute before this bar's range.
+        if pending is not None:
+            order, pending = pending, None
+            if order["action"] in ("exit", "reverse"):
+                close_position(t, o[t], "channel_reversal", prior_atr)
+                exited = True
+            if order["action"] in ("enter", "reverse"):
+                open_position(order["direction"], t, o[t], order["signal_i"])
+
+        if pos is not None:
+            d = pos["direction"]
+            active_stop = pos["stop"]
+            hit = low[t] <= active_stop if d == 1 else h[t] >= active_stop
+            if hit:
+                price = min(o[t], active_stop) if d == 1 else max(o[t], active_stop)
+                # Daily bars do not establish the favorable excursion before a stop.
+                excursion = d * (price - pos["entry_price"])
+                pos["mae"] = min(pos["mae"], excursion)
+                pos["mfe"] = max(pos["mfe"], excursion)
+                reason = "stop_initial" if active_stop == pos["initial_stop"] else "stop_trailing"
+                stops[t] = active_stop
+                close_position(t, price, reason, prior_atr)
+                exited = True
+            else:
+                pos["hh"] = max(pos["hh"], h[t])
+                pos["ll"] = min(pos["ll"], low[t])
+                adverse = low[t] - pos["entry_price"] if d == 1 else pos["entry_price"] - h[t]
+                favorable = h[t] - pos["entry_price"] if d == 1 else pos["entry_price"] - low[t]
+                pos["mae"] = min(pos["mae"], adverse)
+                pos["mfe"] = max(pos["mfe"], favorable)
+
+        if t < params.warmup() or atr[t] is None or dc_up_e[t] is None:
             continue
 
-        if pos is None:
-            long_sig = c[t] > dc_up_e[t]
-            short_sig = c[t] < dc_dn_e[t]
-            if params.use_ma_regime and ma_reg[t] is not None:
-                long_sig = long_sig and c[t] > ma_reg[t]
-                short_sig = short_sig and c[t] < ma_reg[t]
-            direction = 1 if long_sig else (-1 if short_sig else 0)
-            if direction == 1 and not params.allow_long:
-                direction = 0
-            elif direction == -1 and not params.allow_short:
-                direction = 0
-            if direction != 0:
-                open_position(direction, t)
-            continue
+        if pos is not None:
+            d = pos["direction"]
+            channel_exit = (d == 1 and dc_dn_x[t] is not None and c[t] < dc_dn_x[t]) or (
+                d == -1 and dc_up_x[t] is not None and c[t] > dc_up_x[t])
+            if channel_exit:
+                reverse = params.stop_and_reverse and allowed(-d)
+                if params.fill_at == "close":
+                    close_position(t, c[t], "channel_reversal", atr[t])
+                    if reverse:
+                        open_position(-d, t, c[t], t)
+                else:
+                    pending = {"action": "reverse" if reverse else "exit",
+                               "direction": -d if reverse else d, "signal_i": t,
+                               "reason": "channel_reversal"}
+        elif not exited:
+            d = 1 if c[t] > dc_up_e[t] else (-1 if c[t] < dc_dn_e[t] else 0)
+            if d and params.use_ma_regime and ma_reg[t] is not None:
+                if (d == 1 and c[t] <= ma_reg[t]) or (d == -1 and c[t] >= ma_reg[t]):
+                    d = 0
+            if d and allowed(d):
+                if params.fill_at == "close":
+                    open_position(d, t, c[t], t)
+                else:
+                    pending = {"action": "enter", "direction": d, "signal_i": t,
+                               "reason": "breakout"}
 
-        d = pos["direction"]
-        pos["hh"] = max(pos["hh"], h[t])
-        pos["ll"] = min(pos["ll"], low[t])
-        if d == 1:
-            pos["mae"] = min(pos["mae"], low[t] - pos["entry_price"])
-            pos["mfe"] = max(pos["mfe"], h[t] - pos["entry_price"])
-        else:
-            pos["mae"] = min(pos["mae"], pos["entry_price"] - h[t])
-            pos["mfe"] = max(pos["mfe"], pos["entry_price"] - low[t])
-
-        # trailing stop candidate for bar t
-        a = atr[t] or 0.0
-        if params.trail_mode == "chandelier":
-            trail = (pos["hh"] - params.chandelier_k * a) if d == 1 else (pos["ll"] + params.chandelier_k * a)
-        elif params.trail_mode == "atr_trail":
-            trail = (c[t] - params.atr_trail_k * a) if d == 1 else (c[t] + params.atr_trail_k * a)
-        else:  # exit_channel
-            trail = dc_dn_x[t] if d == 1 else dc_up_x[t]
-            trail = pos["stop"] if trail is None else trail
-        pos["stop"] = max(pos["stop"], trail) if d == 1 else min(pos["stop"], trail)
-        stop_series[t] = pos["stop"]
-
-        # exits in §R3 order
-        reason = exit_i = exit_price = None
-        if d == 1 and low[t] <= pos["stop"]:
-            reason = "stop_trailing" if pos["stop"] > pos["initial_stop"] else "stop_initial"
-            exit_i, exit_price = t, min(o[t], pos["stop"])
-        elif d == -1 and h[t] >= pos["stop"]:
-            reason = "stop_trailing" if pos["stop"] < pos["initial_stop"] else "stop_initial"
-            exit_i, exit_price = t, max(o[t], pos["stop"])
-        else:
-            chan = (d == 1 and dc_dn_x[t] is not None and c[t] < dc_dn_x[t]) or \
-                   (d == -1 and dc_up_x[t] is not None and c[t] > dc_up_x[t])
-            if chan:
-                f = fill(t)
-                if f is not None:
-                    reason, (exit_i, exit_price) = "channel_reversal", f
-
-        if reason:
-            rev_dir = -pos["direction"] if (params.stop_and_reverse and reason == "channel_reversal") else 0
-            if (rev_dir == 1 and not params.allow_long) or (rev_dir == -1 and not params.allow_short):
-                rev_dir = 0
-            close_position(exit_i, exit_price, reason)
-            if rev_dir:
-                a2 = atr[t] or 0.0
-                pos = {
-                    "direction": rev_dir, "sig_t": t, "fill_i": exit_i, "entry_price": exit_price,
-                    "entry_atr": a2, "initial_stop": exit_price - rev_dir * params.atr_stop_mult * a2,
-                    "stop": exit_price - rev_dir * params.atr_stop_mult * a2,
-                    "hh": h[t], "ll": low[t], "mae": 0.0, "mfe": 0.0,
-                    "entry_cost": per_side_cost(exit_price, a2),
-                }
+        if pos is not None:
+            # Revise after the close; never test this revised stop on today's range.
+            d, a = pos["direction"], atr[t]
+            if params.trail_mode == "chandelier":
+                trail = pos["hh"] - params.chandelier_k * a if d == 1 else pos["ll"] + params.chandelier_k * a
+            elif params.trail_mode == "atr_trail":
+                trail = c[t] - params.atr_trail_k * a if d == 1 else c[t] + params.atr_trail_k * a
+            else:
+                # Tomorrow's channel includes the just-completed bar.
+                trail = min(low[max(0, t - params.exit_len + 1):t + 1]) if d == 1 else max(h[max(0, t - params.exit_len + 1):t + 1])
+            pos["stop"] = max(pos["stop"], trail) if d == 1 else min(pos["stop"], trail)
+            stops[t] = pos["stop"]
 
     if pos is not None:
-        close_position(n - 1, c[n - 1], None)  # still-open row
+        close_position(n - 1, c[-1], None, 0.0)
 
-    # exposure during each bar + daily strategy return series
-    for tr in trades:
-        d = 1 if tr["direction"] == "long" else -1
-        # locate fill indices by date
-        ei = dates.index(tr["entry_date"])
-        xi = dates.index(tr["exit_date"]) if tr["exit_date"] else n
-        for t in range(ei, xi):
+    # Fixed entry units: mark each trade net of its fill costs. Ratios between
+    # successive marks telescope to the exact trade return, also for shorts.
+    side_factors = {1: [1.0] * n, -1: [1.0] * n}
+    exposure = [0] * n
+    for tr in ledger:
+        previous = 1.0
+        d, entry = tr["direction"], tr["entry_price"]
+        for t in range(tr["fill_i"], tr["exit_i"] + 1):
+            last = t == tr["exit_i"]
+            mark = tr["exit_price"] if last else c[t]
+            value = 1 + d * (mark / entry - 1) - tr["entry_cost"]
+            if last:
+                value -= tr["exit_cost"]
+            factor = value / previous if previous > 0 else 1.0
+            side_factors[d][t] *= factor
+            previous = value
             exposure[t] = d
-
-    daily: list[dict] = []
-    fill_bars = set()
-    for tr in trades:
-        fill_bars.add(dates.index(tr["entry_date"]))
-        if tr["exit_date"]:
-            fill_bars.add(dates.index(tr["exit_date"]))
-    for t in range(n):
-        if t == 0:
-            daily.append({"date": dates[t], "state": exposure[t], "strat_ret": 0.0})
-            continue
-        r = exposure[t] * (c[t] / c[t - 1] - 1.0)
-        if t in fill_bars:
-            r -= params.cost_bps / 1e4  # one side's cost booked on each fill bar
-        daily.append({"date": dates[t], "state": exposure[t], "strat_ret": r})
-
-    overlays["stop_line"] = stop_series
-    return EngineResult(trades=trades, daily=daily, overlays=overlays)
+    daily = [{"date": dates[t], "state": exposure[t],
+              "long_ret": side_factors[1][t] - 1,
+              "short_ret": side_factors[-1][t] - 1,
+              "strat_ret": side_factors[1][t] * side_factors[-1][t] - 1}
+             for t in range(n)]
+    action = ({"action": pending["action"], "direction": _DIR_NAME[pending["direction"]],
+               "signal_date": dates[pending["signal_i"]], "fill_at": "open_next",
+               "reason": pending["reason"]} if pending else None)
+    return EngineResult(trades=trades, daily=daily, overlays=overlays, pending_action=action)
 
 
 def buy_hold_daily(bars: list[dict]) -> list[float]:

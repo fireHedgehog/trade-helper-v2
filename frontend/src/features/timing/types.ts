@@ -42,6 +42,8 @@ export interface DailyPoint {
   date: string;
   state: -1 | 0 | 1; // signed exposure during that bar
   strat_ret: number; // that bar's contribution, costs included
+  long_ret?: number;
+  short_ret?: number;
 }
 
 export interface Bar {
@@ -121,6 +123,13 @@ export interface TimingResponse {
   run_scope?: "single" | "universe" | "preview";
   chart_cached?: boolean; // false after a Trend (universe) run — press Run for overlays/equity
   stale?: boolean;
+  needs_recompute?: boolean;
+  pending_action?: {
+    action: "enter" | "exit" | "reverse";
+    direction: Direction;
+    signal_date: string;
+    fill_at: "open_next";
+  } | null;
   newest_price_date?: string | null;
   run_through_date?: string | null;
   bars?: Bar[];

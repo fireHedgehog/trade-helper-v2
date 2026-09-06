@@ -102,11 +102,11 @@ export function SizingTable({ rows }: { rows: SizingRow[] }) {
             <Tooltip title="Annualised 60-day return volatility" arrow>
               <TableCell align="right">Vol</TableCell>
             </Tooltip>
-            <Tooltip title="Target weight after every step. Hover the verdict for the full waterfall." arrow>
+            <Tooltip title="Total target holdings after quantity rounding. Compare with your current holdings before trading. Hover the verdict for details." arrow>
               <TableCell align="right">Target</TableCell>
             </Tooltip>
             <TableCell align="right">Target&nbsp;$</TableCell>
-            <TableCell align="right">Shares</TableCell>
+            <TableCell align="right">Target units</TableCell>
             <TableCell>Verdict</TableCell>
           </TableRow>
         </TableHead>
@@ -149,7 +149,7 @@ export function SizingTable({ rows }: { rows: SizingRow[] }) {
                   {usd(r.targetUsd)}
                 </TableCell>
                 <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                  {r.shares.toLocaleString()}
+                  {r.shares.toLocaleString(undefined, { maximumFractionDigits: 8 })}
                 </TableCell>
                 <TableCell sx={{ py: 0.75 }}>
                   <Tooltip

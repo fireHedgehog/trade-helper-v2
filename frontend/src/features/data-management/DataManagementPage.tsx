@@ -16,6 +16,7 @@ import { dataApi } from "./api";
 import { ActiveRunsBanner } from "./components/ActiveRunsBanner";
 import { DetailDialog } from "./components/DetailDialog";
 import { FetchPanel } from "./components/FetchPanel";
+import { RefreshAllPanel } from "./components/RefreshAllPanel";
 import { ServerTable, type Column } from "./components/ServerTable";
 import { SimpleTable } from "./components/SimpleTable";
 import type {
@@ -130,7 +131,7 @@ function AssetsPanel({ tick, bump }: { tick: number; bump: () => void }) {
   return (
     <Section
       title="Asset price data"
-      description="Daily bars (raw + adjusted) for the active universe. Incremental by default — pulls only the missing tail. Click a row for its full history."
+      description="Daily bars (raw + adjusted). Incremental fetches check a 30-day overlap and refresh full history only for symbols whose adjusted prices changed. Repeat checks have a six-hour cooldown. Repairs appear in Run history. Click a row for its price history."
     >
       <FetchPanel kind="asset_prices" allowFullMode buttonLabel="Fetch asset prices" onDone={bump} />
       <TextField
@@ -485,6 +486,7 @@ function RunHistoryPanel({ tick }: { tick: number }) {
             { key: "coverage_start", label: "From" },
             { key: "coverage_end", label: "To" },
             { key: "duration_ms", label: "ms", align: "right" },
+            { key: "note", label: "Note" },
             { key: "error", label: "Error", render: (r) => <TextPeek value={(r as Record<string, unknown>).error} /> },
           ]}
           fetcher={(page, pageSize) =>
@@ -515,7 +517,7 @@ export function DataManagementPage() {
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 3 }}>
         The only place data enters this app. Fetches are paced (one request at a time, well under
-        each provider's rate limit) and run in the foreground with a live progress bar. First full
+        each provider's rate limit) and show a live progress bar. First full
         pull is slow; later runs are incremental.
       </Typography>
 
@@ -527,6 +529,7 @@ export function DataManagementPage() {
         page.
       </Alert>
 
+      <RefreshAllPanel onDone={bump} />
       <ActiveRunsBanner onSettled={bump} />
 
       <Section

@@ -1,9 +1,8 @@
 # Multisectional page
 
 `/multisectional` — across the whole active universe, which symbols look
-strongest by **price/volume alone**. A ranking, not an entry rule. A faithful
-port of the previous app's `cross_sectional_ranking.py` (hypothesis
-H-XSEC-S5-002). `features/multisectional/ranking.py`, pure Python. **SPY** is
+strongest by **price/volume alone**. A ranking, not an entry rule.
+`features/multisectional/ranking.py` uses pure Python. **SPY** is
 the benchmark.
 
 ## Eligibility

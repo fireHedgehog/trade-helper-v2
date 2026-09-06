@@ -352,9 +352,9 @@ def next_release_estimate(
         d = date.fromisoformat(last_obs)
     except ValueError:
         return None, None
-    period = {"Daily": 1, "Weekly": 7, "Monthly": 30, "Quarterly": 91}.get(
-        (frequency or "").strip(), 30
-    )
+    period = {"daily": 1, "weekly": 7, "monthly": 30, "quarterly": 91, "annual": 365}[
+        _freq_key(frequency)
+    ]
     est = d + timedelta(days=period + max(0, typical_lag_days))
     today = date.today()
     if est < today:

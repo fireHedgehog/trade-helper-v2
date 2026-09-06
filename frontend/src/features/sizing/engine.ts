@@ -1,7 +1,8 @@
 // Pure position-sizing math for the /sizing sandbox. No React, no I/O — given
 // the board rows in scope + the parameter set + the macro context, it returns
-// the whole output payload. Every step only ever *shrinks* a name's weight, so
-// the per-name table reads as a left-to-right waterfall:
+// the whole output payload. Targets describe total holdings; deployed exposure
+// is compared with those targets after sizing. The per-name table reads
+// as a left-to-right waterfall:
 //
 //   inverse-vol raw  →  per-name cap  →  per-sector cap / sleeve budget
 //                    →  whole-book vol target  →  macro overlay  →  target
@@ -56,6 +57,9 @@ interface Candidate {
   lastClose: number;
   momentum: number | null;
   daysSinceEntry: number | null;
+  quantityStep: number;
+  minimumUnits: number;
+  pending: boolean;
 }
 
 function gatherCandidates(board: SizingBoard, p: SizingParams): {
@@ -67,17 +71,22 @@ function gatherCandidates(board: SizingBoard, p: SizingParams): {
 
   const take = (rows: SizingBoardRow[], side: "long" | "short") => {
     for (const r of rows) {
-      if (r.state !== side) continue;
+      const next = r.pending_action;
+      const direction = next ? (next.action === "exit" ? "flat" : next.direction) : r.state;
+      if (direction !== side) continue;
       if (side === "short" && p.shortResearchOnly) {
         const sl = sleeveFor({ symbol: r.symbol, sector: r.sector });
         if (sl !== "Bonds" && sl !== "Crypto") continue; // research: short only pays for these
       }
-      if (!picked.has(r.symbol)) picked.set(r.symbol, r);
+      if (!picked.has(r.symbol)) picked.set(r.symbol, { ...r, state: direction,
+        state_since: next ? next.signal_date : r.state_since });
     }
   };
 
   if (p.scopeLong) take(board.long, "long");
   if (p.scopeShort) take(board.short, "short");
+  if (p.scopeLong) take(board.pending ?? [], "long");
+  if (p.scopeShort) take(board.pending ?? [], "short");
   if (p.scopeWatchlist) {
     const wl = board.watchlist.flatMap((s) => s.rows);
     if (p.scopeLong) take(wl, "long");
@@ -88,7 +97,6 @@ function gatherCandidates(board: SizingBoard, p: SizingParams): {
   const excluded: { symbol: string; reason: string }[] = [];
   for (const r of picked.values()) {
     const days = daysBetween(r.state_since, asOf);
-    if (p.mode === "new" && (days == null || days > p.newDays)) continue;
     if (r.last_close == null || r.last_close <= 0) {
       excluded.push({ symbol: r.symbol, reason: "no last price" });
       continue;
@@ -105,6 +113,9 @@ function gatherCandidates(board: SizingBoard, p: SizingParams): {
       lastClose: r.last_close,
       momentum: r.momentum ? r.momentum.score : null,
       daysSinceEntry: days,
+      quantityStep: r.quantity_increment && r.quantity_increment > 0 ? r.quantity_increment : r.symbol.includes("/") ? 1e-8 : 1,
+      minimumUnits: r.min_order_size ?? (r.symbol.includes("/") ? 1e-8 : 1),
+      pending: !!r.pending_action,
     });
   }
   return { candidates, excluded };
@@ -144,7 +155,12 @@ function applyPerNameCap(raw: number[], cap: number): number[] {
     if (usum <= 0) break;
     for (const i of under) w[i] += spill * (w[i] / usum);
   }
-  return w;
+  return w.map((weight) => Math.min(weight, cap));
+}
+
+function targetUnits(c: Candidate, dollars: number): number {
+  const units = Math.max(0, Math.floor(dollars / c.lastClose / c.quantityStep) * c.quantityStep);
+  return units < c.minimumUnits ? 0 : units;
 }
 
 // Steps 1–3 (inverse-vol → per-name cap → per-sector cap / sleeve budget) for a
@@ -162,20 +178,18 @@ function weightsAfterCaps(
   const afterName = applyPerNameCap(raw, p.perNameCapPct);
   const afterSector = afterName.slice();
 
-  // per-sector cap: allowance is a fraction of ref gross, minus what the
-  // deployed-by-sleeve table already holds.
+  // Cap the total target sleeve. Holdings only affect the later comparison.
   const bySleeve = new Map<Sleeve, number[]>();
   cands.forEach((c, i) => {
     const arr = bySleeve.get(c.sleeve) ?? [];
     arr.push(i);
     bySleeve.set(c.sleeve, arr);
   });
-  for (const [sleeve, idxs] of bySleeve) {
+  for (const idxs of bySleeve.values()) {
     const allowance = (p.perSectorCapPct / 100) * refGross;
-    const headroom = Math.max(0, allowance - (p.deployed[sleeve] ?? 0));
     const sum = idxs.reduce((a, i) => a + afterSector[i], 0);
-    if (sum > headroom && sum > 0) {
-      const k = headroom / sum;
+    if (sum > allowance && sum > 0) {
+      const k = allowance / sum;
       idxs.forEach((i) => (afterSector[i] *= k));
     }
   }
@@ -216,7 +230,9 @@ function grossForKmax(cands: Candidate[], p: SizingParams, macro: MacroContext, 
   let gross = 0;
   cands.forEach((c, i) => {
     if (dropWeak && c.momentum != null && c.momentum < 50) return; // known-weak only
-    gross += afterSector[i] * volScale * macroScale;
+    const pct = afterSector[i] * volScale * macroScale;
+    const units = targetUnits(c, (pct / 100) * p.nav);
+    gross += p.nav > 0 ? units * c.lastClose / p.nav * 100 : 0;
   });
   return gross;
 }
@@ -267,6 +283,7 @@ export function computeSizing(
 
   const rows: SizingRow[] = candidates.map((c, i) => {
     const notes: string[] = [];
+    if (c.pending) notes.push("pending next-open signal; quantity estimated at the last close");
     if (c.assumedVol) notes.push("assumed 25% vol — re-run Trend for the real σ");
     if (c.noSectorTag) notes.push("no sector tag — bucketed to Other");
     const rawPct = raw[i];
@@ -275,13 +292,7 @@ export function computeSizing(
     if (namePct < rawPct - 1e-6) notes.push(`per-name cap ${p.perNameCapPct}% (P3)`);
     else if (namePct > rawPct + 1e-6) notes.push("picked up spill from capped names");
     if (sectorPct < namePct - 1e-6) {
-      const allowance = (p.perSectorCapPct / 100) * p.kMax * 100;
-      const headroom = Math.max(0, allowance - (p.deployed[c.sleeve] ?? 0));
-      notes.push(
-        headroom <= 0.05
-          ? `${c.sleeve} sleeve already full (S4)`
-          : `${c.sleeve} near ${p.perSectorCapPct}% sector cap — trimmed (S4)`,
-      );
+      notes.push(`${c.sleeve} target limited by the sector cap or sleeve budget`);
     }
     const volPct = sectorPct * volScale;
     if (volScale < 0.995) {
@@ -298,33 +309,17 @@ export function computeSizing(
     } else if (p.macroEnabled && macroScale < 1) {
       notes.push(`macro ${macro.zone} ×${macroScale.toFixed(2)}`);
     }
-    const sleeveCapBit = sectorPct < namePct - 1e-6; // the per-sector cap trimmed this name
-    // Your deployed-by-sleeve table has this name's sleeve above its own cap —
-    // it is a candidate to cut, not to add. (Per-sleeve, since the tool has no
-    // per-name holdings — trim the weakest peer-ranked names in the sleeve.)
-    const sleeveCapPct = (p.perSectorCapPct / 100) * p.kMax * 100;
-    const sleeveTrimPct = Math.max(0, (p.deployed[c.sleeve] ?? 0) - sleeveCapPct);
-    if (sleeveTrimPct > 0.5) {
-      notes.push(`${c.sleeve} is ${sleeveTrimPct.toFixed(0)}% over its ${p.perSectorCapPct}% cap — trim this sleeve`);
-    }
-    if (namePct >= rawPct - 1e-6 && sectorPct >= namePct - 1e-6 && targetPct >= 0.05 && sleeveTrimPct <= 0.5) {
-      notes.push(`${rawPct.toFixed(1)}% → ${targetPct.toFixed(1)}% — room to add`);
-    }
+    const allocationUsd = (targetPct / 100) * p.nav;
+    // Equity targets use whole shares; crypto uses fractional units.
+    const shares = targetUnits(c, allocationUsd);
+    const targetUsd = shares * c.lastClose;
+    targetPct = p.nav > 0 ? (targetUsd / p.nav) * 100 : 0;
+    if (shares === 0 && allocationUsd > 0) notes.push("allocation is below one tradable unit");
+    else if (allocationUsd - targetUsd > 0.01) notes.push("quantity rounded down; remainder stays in cash");
 
-    const targetUsd = (targetPct / 100) * p.nav;
-    const shares = Math.max(0, Math.floor(targetUsd / c.lastClose));
-
-    // Verdicts are per-name and narrow. Whole-book scaling (vol-target, a
-    // neutral / risk-off macro overlay) shrinks every target uniformly — that
-    // is normal operation, surfaced in the hero, NOT a per-row WAIT.
     let verdict: Verdict;
-    if (sleeveTrimPct > 0.5)
-      verdict = "TRIM"; // your book is over-allocated to this sleeve — cut here
-    else if (dropped) verdict = "WAIT"; // risk-off dropped this name outright
-    else if (sleeveCapBit && sectorPct < namePct * 0.5)
-      verdict = "BLOCKED"; // the sector cap squeezed this name to ~nothing — no room in the sleeve
-    else if (sectorPct < rawPct - 1e-6) verdict = "LIGHT"; // a cap trimmed this name, still sized
-    else if (targetPct < 0.05) verdict = "WAIT"; // otherwise too small to ticket
+    if (dropped || shares === 0) verdict = "WAIT";
+    else if (sectorPct < rawPct - 1e-6) verdict = "LIGHT";
     else verdict = "ADD";
 
     return {
@@ -352,24 +347,46 @@ export function computeSizing(
   const targetGrossPct = rows.reduce((a, r) => a + r.targetPct, 0);
   const headroomPct = Math.max(0, targetGrossPct - deployedGrossPct);
   const overshootPct = Math.max(0, deployedGrossPct - targetGrossPct);
-  const addCount = rows.filter((r) => r.verdict === "ADD").length;
   const maxNamePct = rows.reduce((a, r) => Math.max(a, r.targetPct), 0);
   const loads = sleeveLoads(p, rows);
+  // Holdings are only known per sleeve; these cues require checking actual holdings.
+  for (const r of rows) {
+    const load = loads.find((l) => l.sleeve === r.sleeve);
+    if (!load) continue;
+    if (load.trimPct > 0.5) {
+      r.verdict = "TRIM";
+      r.notes.push(`${r.sleeve} held ${load.deployedPct.toFixed(1)}% vs target ${load.targetPct.toFixed(1)}% — review holdings to reduce`);
+    } else if (r.shares > 0 && load.newPct <= 0.05) {
+      r.verdict = "BLOCKED";
+      r.notes.push("sleeve is already at target; check individual holdings before adding");
+    } else if (r.shares > 0) {
+      r.notes.push(`${load.newPct.toFixed(1)}% sleeve room; displayed quantity is the total target, not an order to add`);
+      if (overshootPct > 0.05) {
+        r.verdict = "BLOCKED";
+        r.notes.push("reduce total book exposure before adding");
+      }
+    }
+  }
+  const visibleRows = p.mode === "new"
+    ? rows.filter((r) => r.daysSinceEntry != null && r.daysSinceEntry <= p.newDays)
+    : rows;
+  const addCount = visibleRows.filter((r) => r.verdict === "ADD").length;
 
-  // segmented gross bar (all % of NAV, clamped so the bar never exceeds 100).
+  // Segmented gross bar in % NAV, including configured gross above 100%.
   // held ┃ over (red, = deployed above target) ┃ can-add ┃ room-to-k_max ┃ macro-blocked
   const kmaxCeil = p.kMax * 100;
-  const barMax = Math.min(Math.max(kmaxCeil, deployedGrossPct), 100);
+  const barMax = Math.max(kmaxCeil, deployedGrossPct);
   const grossNoMacro = rows.reduce((a, r) => a + r.afterVolTargetPct, 0);
-  const macroBlocked = Math.max(0, grossNoMacro - targetGrossPct);
+  const macroBlocked = Math.max(0, grossNoMacro * (1 - macroScale));
   const held = Math.min(deployedGrossPct, targetGrossPct);
-  const over = Math.min(overshootPct, Math.max(0, 100 - held));
+  const over = overshootPct;
   const canAdd = headroomPct;
-  const roomToKmax = Math.max(0, barMax - held - over - canAdd - macroBlocked);
-  const bar = { held, over, canAdd, roomToKmax, macroBlocked };
+  const shownMacro = Math.min(macroBlocked, Math.max(0, barMax - held - over - canAdd));
+  const roomToKmax = Math.max(0, barMax - held - over - canAdd - shownMacro);
+  const bar = { held, over, canAdd, roomToKmax, macroBlocked: shownMacro };
 
   return {
-    rows,
+    rows: visibleRows,
     excluded,
     assumedVolCount,
     otherNoSectorCount,
@@ -380,7 +397,7 @@ export function computeSizing(
     overshootPct,
     overshootUsd: (overshootPct / 100) * p.nav,
     addCount,
-    cashAfterPct: Math.max(0, 100 - Math.max(deployedGrossPct, targetGrossPct)),
+    cashAfterPct: Math.max(0, 100 - targetGrossPct),
     maxNamePct,
     sleeveLoads: loads,
     estBookVolPct: estBookVol * 100,
@@ -393,7 +410,7 @@ export function computeSizing(
       grossCappedPct: rows.reduce((a, r) => a + r.afterSectorCapPct, 0),
       nNameCapped: rows.filter((r) => r.afterNameCapPct < r.invVolRawPct - 1e-6).length,
       anySectorTrim: rows.some((r) => r.afterSectorCapPct < r.afterNameCapPct - 1e-6),
-      worstSleeve: loads.slice().sort((a, b) => b.newPct + b.deployedPct - (a.newPct + a.deployedPct))[0]?.sleeve,
+      worstSleeve: loads.slice().sort((a, b) => b.targetPct - a.targetPct)[0]?.sleeve,
     }),
     kmaxSensitivity: KMAX_GRID.map((k) => ({
       k,
@@ -410,15 +427,17 @@ function sleeveLoads(p: SizingParams, rows: SizingRow[]) {
   const base = zeroDeployed();
   return SLEEVES.map((s) => {
     const deployedPct = p.deployed[s] ?? base[s];
-    const newPct = newBySleeve.get(s) ?? 0;
-    const trimPct = Math.max(0, deployedPct - capPct);
+    const targetPct = newBySleeve.get(s) ?? 0;
+    const newPct = Math.max(0, targetPct - deployedPct);
+    const trimPct = Math.max(0, deployedPct - targetPct);
     return {
       sleeve: s,
       deployedPct,
       newPct,
+      targetPct,
       capPct,
       trimPct,
-      over: deployedPct + newPct > capPct + 1e-6,
+      over: trimPct > 0.5,
     };
   }).filter((l) => l.deployedPct > 0 || l.newPct > 0);
 }

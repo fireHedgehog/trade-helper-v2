@@ -14,7 +14,7 @@ const HATCH = `repeating-linear-gradient(45deg, ${amber}, ${amber} 3px, transpar
 // which band is capping you in one glance.
 export function GrossBar({ result, kMaxPct }: { result: SizingResult; kMaxPct: number }) {
   const { bar, targetGrossPct } = result;
-  const scale = Math.max(100, kMaxPct);
+  const scale = Math.max(100, kMaxPct, result.deployedGrossPct);
   const seg = (v: number) => `${(v / scale) * 100}%`;
   const segs: { key: string; w: number; bg: string; label: string }[] = [
     { key: "held", w: bar.held, bg: grey, label: `Deployed ${bar.held.toFixed(0)}%` },
@@ -91,13 +91,12 @@ function Legend({ swatch, label, tick }: { swatch: string; label: string; tick?:
   );
 }
 
-// One row per sleeve that carries weight: deployed + proposed-new stacked on a
-// track, with a tick at the per-sector cap. A full / over-cap sleeve turns red.
+// Each sleeve compares deployed exposure with total target holdings.
 export function SectorBar({ result }: { result: SizingResult }) {
   const loads = result.sleeveLoads;
   if (!loads.length) return null;
   const scale = Math.max(
-    ...loads.map((l) => l.deployedPct + l.newPct),
+    ...loads.map((l) => Math.max(l.deployedPct, l.targetPct)),
     ...loads.map((l) => l.capPct),
     1,
   ) * 1.05;
@@ -111,28 +110,27 @@ export function SectorBar({ result }: { result: SizingResult }) {
               {SLEEVE_SHORT[l.sleeve]}
             </Typography>
             <Box sx={{ position: "relative", height: 16, bgcolor: "action.hover", borderRadius: 0.5, overflow: "hidden" }}>
-              <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: w(l.deployedPct), bgcolor: grey }} />
+              <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: w(Math.min(l.deployedPct, l.targetPct)), bgcolor: grey }} />
               <Box
                 sx={{
                   position: "absolute",
-                  left: w(l.deployedPct),
+                  left: w(Math.min(l.deployedPct, l.targetPct)),
                   top: 0,
                   bottom: 0,
-                  width: w(l.newPct),
+                  width: w(l.over ? l.trimPct : l.newPct),
                   bgcolor: l.over ? "error.main" : green,
                 }}
               />
-              <Box sx={{ position: "absolute", left: w(l.capPct), top: -2, bottom: -2, width: 2, bgcolor: "text.primary", opacity: 0.55 }} />
+              <Box sx={{ position: "absolute", left: w(l.targetPct), top: -2, bottom: -2, width: 2, bgcolor: "text.primary", opacity: 0.55 }} />
             </Box>
             <Typography variant="caption" sx={{ textAlign: "right", fontVariantNumeric: "tabular-nums", color: l.over ? "error.main" : "text.secondary" }}>
-              {l.trimPct > 0.5 ? `▼ trim ${l.trimPct.toFixed(0)}%` : `${(l.deployedPct + l.newPct).toFixed(0)}%`}
+              {l.trimPct > 0.5 ? `▼ trim ${l.trimPct.toFixed(0)}%` : `${l.targetPct.toFixed(0)}%`}
             </Typography>
           </Box>
         );
       })}
       <Typography variant="caption" color="text.secondary">
-        Grey = already deployed · green = proposed add · red / ▼ = deployed over the{" "}
-        {result.sleeveLoads[0]?.capPct.toFixed(0)}% sector cap (tick)
+        Grey = held within target · green = room to target · red / ▼ = held above target · tick = total target
       </Typography>
     </Stack>
   );

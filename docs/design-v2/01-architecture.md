@@ -22,7 +22,7 @@ frontend/src/
   app/{router,AppShell,theme}.tsx
   shared/{api/client.ts, components/}
   features/<name>/            page.tsx + api.ts + types.ts + components/
-schema/migrations/            NNNN_*.sql  (0001–0013)
+schema/migrations/            NNNN_*.sql  (0001–0017)
 database/                     runtime SQLite file only (git-ignored)
 docs/design-v2/               this set (the as-built reference; superseded whole, not archived)
 ```
@@ -57,6 +57,6 @@ Registered in `main.py`: `credentials`, `data_management` (`/api/data`),
 
 `database_path`, `schema_dir`, `cors_origins`, provider base URLs,
 `history_start_date = "2016-01-01"`, `alpaca_price_feed = "sip"`,
-`alpaca_sip_end_lag_days = 1`, `alpaca_min_interval_seconds = 0.40`,
+`alpaca_sip_end_lag_days = 0`, `alpaca_min_interval_seconds = 0.40`,
 `fred_min_interval_seconds = 0.70`, `fred_revision_lookback_days = 90`,
 `fetch_timeout_seconds = 30`, `fetch_max_retries = 4`.

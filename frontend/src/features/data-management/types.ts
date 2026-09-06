@@ -37,6 +37,7 @@ export interface RunItem {
   coverage_end: string | null;
   duration_ms: number | null;
   error: string | null;
+  note?: string | null;
 }
 
 export interface Page<T> {

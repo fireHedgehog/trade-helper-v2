@@ -123,15 +123,17 @@ export function SizingPage() {
 
       <Alert severity="info" icon={false} sx={{ mb: 2, maxWidth: 920 }}>
         The <b>deployed-by-sleeve</b> table is a coarse proxy for your real book — it assumes your
-        existing positions were themselves sized by these rules. If you are already concentrated,
-        &quot;room to add&quot; here reads optimistic. Precise paste-your-holdings mode is a later
-        add-on.
+        holdings can be compared by sleeve. Target units are total desired holdings, not additional
+        units to buy. Check your actual positions before acting on a sleeve’s add or trim cue.
       </Alert>
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
+      )}
+      {board?.needs_recompute && (
+        <Alert severity="warning" sx={{ mb: 2 }}>Run trend backtest to refresh the saved signals with the current trading rules.</Alert>
       )}
       {notComputed && (
         <Alert severity="warning" sx={{ mb: 2 }}>
@@ -207,10 +209,10 @@ export function SizingPage() {
                 <Stack direction="row" spacing={2} sx={{ mt: 1, flexWrap: "wrap" }}>
                   <Metric label="Deployed now" value={`${result.deployedGrossPct.toFixed(0)}%`} />
                   <Metric label="Target gross" value={`${result.targetGrossPct.toFixed(0)}%`} />
-                  <Metric label="Cash after" value={`${result.cashAfterPct.toFixed(0)}%`} />
+                  <Metric label="Cash at target" value={`${result.cashAfterPct.toFixed(0)}%`} />
                   <Metric label="Max name" value={`${result.maxNamePct.toFixed(1)}%`} sub={`cap ${params.perNameCapPct}%`} />
                   <Metric
-                    label="Est. book vol"
+                    label="Book vol before scaling"
                     value={`${result.estBookVolPct.toFixed(0)}%`}
                     sub={`target ${params.volTargetPct}%`}
                   />
@@ -220,7 +222,7 @@ export function SizingPage() {
               <Stack direction={{ xs: "column", lg: "row" }} spacing={2}>
                 <Paper sx={{ p: 2, flex: 2, minWidth: 0 }}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Sleeve load — deployed + proposed vs the {params.perSectorCapPct}% sector cap
+                    Sleeve load — deployed vs total target
                   </Typography>
                   {result.sleeveLoads.length ? (
                     <SectorBar result={result} />
@@ -351,7 +353,7 @@ function Hero({
   const scaled = result.macroScale < 1 || result.volScale < 0.995;
 
   let tone: "add" | "reduce" | "hold" | "empty";
-  if (!result.rows.length) tone = "empty";
+  if (!result.rows.length && result.targetGrossPct === 0) tone = "empty";
   else if (result.overshootPct >= 1) tone = "reduce";
   else if (result.headroomPct >= 1) tone = "add";
   else tone = "hold";
@@ -370,7 +372,7 @@ function Hero({
             : `×${combined.toFixed(2)}`;
   const line =
     tone === "add"
-      ? `Add across ${result.addCount} ADD name${result.addCount === 1 ? "" : "s"} · +${result.headroomPct.toFixed(0)}% of NAV`
+      ? `Net room to the target book · +${result.headroomPct.toFixed(0)}% of NAV · check sleeve room and actual holdings before adding`
       : tone === "reduce"
         ? `Deployed is ${result.overshootPct.toFixed(0)}% of NAV over the target book — trim, don't add`
         : tone === "empty"
@@ -397,7 +399,7 @@ function Hero({
             ? ` · ${macro.zone} regime ×${result.macroScale.toFixed(2)}`
             : ""}
           {result.volScale < 0.995 ? ` · vol-target ×${result.volScale.toFixed(2)}` : ""}. Every
-          target below is already scaled — this is normal, not a stop.
+          target below is total holdings after scaling and quantity rounding.
         </Typography>
       )}
       <Typography variant="caption" color="text.secondary">

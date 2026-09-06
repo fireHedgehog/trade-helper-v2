@@ -27,7 +27,7 @@ const PARAMS: Row[] = [
   {
     name: "Deployed by sleeve",
     def: "all 0%",
-    what: "What you already hold, as % of NAV, per sleeve. Drives 'remaining head-room', and — as the per-sector cap's already-held term — the crowding model. Presets: Flat / Balanced / Tech-heavy / All-in energy.",
+    what: "What you already hold, as % of NAV per sleeve. Compared with the total target to show room to add or exposure to reduce. Presets: Flat / Balanced / Tech-heavy / All-in energy.",
   },
   { group: "Risk ladder" },
   {
@@ -48,7 +48,7 @@ const PARAMS: Row[] = [
   {
     name: "Per-sector cap",
     def: "30%",
-    what: "No single sleeve bigger than this share of the gross book. The anti-crowding cap — it nets off what your Deployed table already holds in that sleeve.",
+    what: "Caps each sleeve’s total target as a share of k_max × NAV. Existing holdings are compared with the resulting target after sizing.",
   },
   {
     name: "Assumed book vol",
@@ -69,7 +69,7 @@ const PARAMS: Row[] = [
   {
     name: "Whole book / New entries only",
     def: "Whole book",
-    what: "'New entries only' sizes just the names that entered in the last N days — the 'signals piled up, I now have cash' workflow.",
+    what: "'New entries only' shows recent entries and pending signals. Sizing and book totals still use all names in the selected scope.",
   },
   { group: "Macro overlay" },
   {
@@ -85,22 +85,22 @@ const PARAMS: Row[] = [
 ];
 
 const VERDICTS: { v: string; color: "success" | "warning" | "default" | "error"; filled?: boolean; text: string }[] = [
-  { v: "ADD", color: "success", filled: true, text: "Clean — there is head-room and only the uniform whole-book scaling applied." },
+  { v: "ADD", color: "success", filled: true, text: "The sleeve has room toward its target. Target units describe total holdings; compare them with what you already own." },
   { v: "LIGHT", color: "warning", text: "A cap (per-name or per-sector) trimmed this below its inverse-vol weight, but it still has a real target." },
-  { v: "BLOCKED", color: "default", text: "The per-sector cap squeezed this to ~nothing — its sleeve is full from your Deployed table. No room here." },
-  { v: "TRIM", color: "error", filled: true, text: "Your Deployed table has this name's sleeve OVER its cap. It's a cut candidate, not an add — trim the weakest peer-ranked names in that sleeve. (Per-sleeve, since the tool has no per-name holdings.)" },
+  { v: "BLOCKED", color: "default", text: "The sleeve is already at target, or total deployed exposure must be reduced before adding." },
+  { v: "TRIM", color: "error", filled: true, text: "The sleeve is held above its total target. Review actual holdings in that sleeve; the app does not know which names you own." },
   { v: "WAIT", color: "error", text: "Risk-off dropped this name outright (known-weak peer rank), or its target is too small to ticket." },
 ];
 
 const OUTPUTS: [string, string][] = [
   ["Hero", "Green = head-room $ to add. Red 'Over budget' = deployed is above the target book, $ to trim. Amber = the whole book is throttled (vol-target / macro). Grey = deployed ≈ target."],
   ["Gross bar", "Deployed ┃ red over-target trim band ┃ can-add ┃ room-to-k_max ┃ macro-blocked, with a target tick and the one binding constraint spelled out."],
-  ["Sleeve load", "Deployed + proposed vs the sector cap, per sleeve. An over-cap sleeve turns red and shows '▼ trim N%'."],
+  ["Sleeve load", "Held exposure compared with total target per sleeve. Green is room toward target; red is exposure to reduce. The tick marks the target."],
   ["k_max sensitivity", "The resulting target gross at k_max ∈ {0.5, 1, 1.5, 2}, so you see the slope before you drag."],
 ];
 
 const CAVEATS = [
-  "Deployed-by-sleeve is coarse — it assumes your existing book was itself sized by these rules. If you are lopsided, 'room to add' reads optimistic. Paste-your-holdings precision is a later add-on.",
+  "Deployed-by-sleeve is coarse. Check actual per-name holdings and offsetting sleeve changes before placing orders. No per-name holdings are stored.",
   "Est. book vol is a blunt parametric guess (flat 0.35 correlation). If it looks too conservative, use the override.",
   "The macro zone comes from the AI regime gauge, or the naive composite if there is no run. Only the zone drives the maths; the score is context.",
   "Roughly a third of names have no GICS sector tag yet and fall into 'Other', so the per-sector cap is weaker for them.",

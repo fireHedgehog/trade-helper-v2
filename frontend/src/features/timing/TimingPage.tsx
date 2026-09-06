@@ -27,7 +27,7 @@ import { fmtTs } from "@/shared/format";
 
 import { EquityChart } from "./EquityChart";
 import { searchSymbols, timingApi, type SymbolOption } from "./api";
-import { compound, drawdownCurve, summariseView } from "./metrics";
+import { compound, drawdownCurve, filterDaily, filterState, summariseView } from "./metrics";
 import { TimingChart, type RangeKey, type Timeframe } from "./TimingChart";
 import type { BoardState, EquityCurve, Metrics, SignalParams, TimingResponse, Trade } from "./types";
 
@@ -57,7 +57,7 @@ const NUM_FIELDS: { key: keyof SignalParams; label: string; step?: number; help:
   {
     key: "exit_len",
     label: "Exit channel",
-    help: "Exit window, deliberately shorter than the entry channel. Leave when price closes back to an N-day extreme against you. Smaller = exits sooner, gives back less profit.",
+    help: "Exit window. Leave when price closes back to an N-day extreme against you. Smaller = exits sooner, gives back less profit.",
   },
   {
     key: "atr_len",
@@ -74,7 +74,7 @@ const NUM_FIELDS: { key: keyof SignalParams; label: string; step?: number; help:
     key: "chandelier_k",
     label: "Chandelier ×ATR",
     step: 0.1,
-    help: "Trailing stop: best price since entry ∓ this × ATR, ratchets one way only. Larger = looser trail, rides trends longer but hands back more at the turn.",
+    help: "Trailing stop: best price since entry ∓ this × ATR, ratchets one way only. Calculated after the close and active next session. Larger = looser trail.",
   },
   {
     key: "cost_bps",
@@ -230,11 +230,7 @@ export function TimingPage() {
     }
 
     // isolate one side's contribution
-    const filteredDaily = daily.map((d) =>
-      (d.state === 1 && !effLong) || (d.state === -1 && !effShort)
-        ? { ...d, state: 0 as const, strat_ret: 0 }
-        : d,
-    );
+    const filteredDaily = filterDaily(daily, effLong, effShort);
     const sv = summariseView(visibleTrades, filteredDaily);
     const metrics: Metrics = {
       label: `${data.metrics?.label ?? ""} · ${effLong ? "long" : "short"}-only view`,
@@ -250,29 +246,7 @@ export function TimingPage() {
       drawdown: drawdownCurve(stratEq),
     };
 
-    // board state from the visible trades
-    const open = visibleTrades.find((t) => t.exit_date === null);
-    const lastClose = data.state?.last_close ?? null;
-    const state: BoardState = open
-      ? {
-          state: open.direction,
-          state_since: open.entry_date,
-          entry_price: open.entry_price,
-          last_close: lastClose,
-          unrealized_pct:
-            lastClose != null
-              ? (open.direction === "long" ? 1 : -1) * (lastClose / open.entry_price - 1)
-              : null,
-          current_stop: open.initial_stop,
-        }
-      : {
-          state: "flat",
-          state_since: visibleTrades.at(-1)?.exit_date ?? null,
-          entry_price: null,
-          last_close: lastClose,
-          unrealized_pct: null,
-          current_stop: null,
-        };
+    const state = filterState(data.state, visibleTrades);
 
     return { trades: visibleTrades, markers: visibleMarkers, metrics, equity, state, filtered: true };
   }, [data, effLong, effShort, showBoth]);
@@ -523,6 +497,17 @@ export function TimingPage() {
         </Alert>
       )}
 
+      {data?.needs_recompute && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Run {symbol} to calculate this preview with the current trading rules, or rerun Trend for the saved board.
+        </Alert>
+      )}
+      {data?.pending_action && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Signal confirmed {data.pending_action.signal_date}: {data.pending_action.action === "reverse" ? "reverse to" : data.pending_action.action}{" "}
+          {data.pending_action.direction} at the next session’s open. Fill pending.
+        </Alert>
+      )}
       {data?.status === "ok" && data.chart_cached === false && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Computed by the last <b>Trend</b> run — trades, markers and combined metrics are shown, but

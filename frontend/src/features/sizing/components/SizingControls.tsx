@@ -162,8 +162,8 @@ export function SizingControls({
           Deployed total: {deployedTotal.toFixed(0)}% of NAV
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-          Assumes your current book was itself sized by these rules. Paste-your-holdings precision is a
-          later add-on.
+          Enter current exposure as % of NAV per sleeve. These totals are compared with the target;
+          individual holdings determine the actual trades.
         </Typography>
       </Section>
 

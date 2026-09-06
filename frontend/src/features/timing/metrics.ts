@@ -3,7 +3,26 @@
 // `signals/metrics.py`. The isolated-side view is an approximation — it is
 // that side's own contribution, not a fresh engine run.
 
-import type { DailyPoint, Trade } from "./types";
+import type { BoardState, DailyPoint, Trade } from "./types";
+
+export function filterDaily(daily: DailyPoint[], long: boolean, short: boolean): DailyPoint[] {
+  return daily.map((d) => {
+    const longRet = d.long_ret ?? (d.state === 1 ? d.strat_ret : 0);
+    const shortRet = d.short_ret ?? (d.state === -1 ? d.strat_ret : 0);
+    return { ...d,
+      state: ((d.state === 1 && !long) || (d.state === -1 && !short)) ? 0 : d.state,
+      strat_ret: (long ? 1 + longRet : 1) * (short ? 1 + shortRet : 1) - 1,
+    };
+  });
+}
+
+export function filterState(state: BoardState | undefined, visibleTrades: Trade[]): BoardState | undefined {
+  if (!state) return undefined;
+  const open = visibleTrades.find((t) => t.exit_date === null);
+  if (open && open.direction === state.state) return state;
+  return { state: "flat", state_since: visibleTrades.at(-1)?.exit_date ?? null,
+    entry_price: null, last_close: state.last_close, unrealized_pct: null, current_stop: null };
+}
 
 const TD = 252;
 

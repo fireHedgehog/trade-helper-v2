@@ -54,6 +54,15 @@ z-score of a raw trending level**; `z_short_hist` flags a thin-history series.
 The separate catalyst overlay may web-search dated current events and
 market-pricing confirmation.
 
+Frequency parsing uses the shared `composite._freq_key` for feature horizons,
+staleness and release estimates. Provider labels such as `Daily, Close` and
+`Weekly, As of Wednesday` retain their daily and weekly cadence. Approximate
+1/3/12-month changes use 21/63/252 daily observations, 4/13/52 weekly,
+1/3/12 monthly, or 1/1/4 quarterly observations. A sub-quarter horizon on
+quarterly data describes the latest quarter. Publication lag remains natural
+to each series; `as_of` identifies its observation period. These features are
+calculated locally and supplied as a compact snapshot, not full raw history.
+
 - **7 personas + a reconciler (medium/large).** `risk_on` / `risk_off` one-sided advocates;
   `inflation` / `credit_vol` / `growth_labor` / `rates_curve` neutral domain
   analysts; `macro_catalyst` is a separate web-searched event overlay, not a
@@ -78,8 +87,7 @@ market-pricing confirmation.
   snapshot. The snapshot is used only for the pre-event baseline level and the
   double-count check (`as_of` vs event date — only the move that post-dates the
   freshest relevant `as_of` is incremental). It runs on the reconciler token
-  budget with a one-shot retry on a truncated/invalid JSON body (a prior bug
-  silently dropped truncated catalyst answers as "no event"). It is excluded
+  budget with a one-shot retry on a truncated/invalid JSON body. It is excluded
   from structural tallies and weights, capped at ±5, then cut deterministically
   for conviction, `pricing_status` (`mostly_priced` → 0), and a 3-day
   half-life. Unsourced events and unavailable web search still degrade to

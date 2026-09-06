@@ -24,10 +24,10 @@ KEY_SERIES = [
 
 # Rough #observations for 1m/3m/6m/12m by frequency.
 _STEPS = {
-    "Daily": (21, 63, 126, 252),
-    "Weekly": (4, 13, 26, 52),
-    "Monthly": (1, 3, 6, 12),
-    "Quarterly": (1, 1, 2, 4),
+    "daily": (21, 63, 126, 252),
+    "weekly": (4, 13, 26, 52),
+    "monthly": (1, 3, 6, 12),
+    "quarterly": (1, 1, 2, 4),
 }
 
 
@@ -96,7 +96,7 @@ def _macro_features(conn: sqlite3.Connection) -> tuple[dict, str | None]:
         vals = [v for _, v in series]
         last_date = series[-1][0]
         as_of = max(as_of, last_date) if as_of else last_date
-        s1, s3, s6, s12 = _STEPS.get((r["frequency"] or "").strip(), (1, 3, 6, 12))
+        s1, s3, s6, s12 = _STEPS.get(_c._freq_key(r["frequency"]), (1, 3, 6, 12))
         # rates/spreads/indices: report absolute change; index levels: % change.
         use_abs = sid in KEY_SERIES or sid in ("FEDFUNDS", "UNRATE", "UMCSENT")
         chg = _abs_change if use_abs else _pct_change

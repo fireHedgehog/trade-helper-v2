@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 # Bump when the engine's output could change for the same params — it is part
 # of the determinism contract and is stored on every run.
-ENGINE_VERSION = "donchian-1"
+ENGINE_VERSION = "donchian-2"
 
 
 class SignalParams(BaseModel):
@@ -45,7 +45,7 @@ class SignalParams(BaseModel):
     warmup_buffer: int = Field(10, ge=0, le=100)
 
     # Directions the engine may open. A long-only preset sets allow_short=False;
-    # the Timing-page Run overrides both from its Long / Short checkboxes.
+    # the research pages compute both sides and filter the resulting view.
     allow_long: bool = True
     allow_short: bool = True
 

@@ -30,6 +30,13 @@ export interface BoardRow {
   last_close: number | null;
   unrealized_pct: number | null;
   current_stop: number | null;
+  last_date?: string | null;
+  pending_action?: {
+    action: "enter" | "exit" | "reverse";
+    direction: "long" | "short";
+    signal_date: string;
+    fill_at: "open_next";
+  } | null;
   vol_60d?: number | null; // annualised 60-day return vol — watchlist rows only
   momentum?: MomentumInfo | null; // advisory peer-strength context, not a signal
   chart?: { bars: MiniBar[]; events: MiniEvent[] } | null; // only with ?charts=1
@@ -53,6 +60,8 @@ export interface BoardResponse {
   status: "ok" | "not_computed";
   computed_at?: string;
   engine_version?: string;
+  needs_recompute?: boolean;
+  pending?: BoardRow[];
   counts?: { long: number; short: number; flat: number };
   long: BoardRow[];
   short: BoardRow[];

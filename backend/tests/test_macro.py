@@ -92,6 +92,49 @@ def test_next_release_rolls_forward_to_future():
     assert days is not None and days >= 0
 
 
+def test_qualified_fred_frequencies_preserve_monthly_horizons(client):
+    from datetime import date, timedelta
+    from app.db.connection import get_connection
+    from app.features.macro.ai_regime.snapshot import _macro_features
+
+    cases = [
+        ("BAMLH0A0HYM2", "Daily, Close", "Daily", [100.0] * 21 + [99.0, 99.1], 1),
+        ("WALCL", "Weekly, As of Wednesday", "Weekly", [100.0] * 3 + [99.0, 99.1], 7),
+        ("PCEPILFE", "Monthly", "Monthly", [100.0] * 12 + [101.0], 30),
+    ]
+    with get_connection() as conn:
+        for sid, qualified, plain, values, spacing in cases:
+            conn.execute("UPDATE macro_series_catalog SET frequency=? WHERE series_id=?", (qualified, sid))
+            conn.executemany("INSERT INTO macro_observations (series_id,date,value) VALUES (?,?,?)", [
+                (sid, (date(2020, 1, 1) + timedelta(days=i * spacing)).isoformat(), v)
+                for i, v in enumerate(values)])
+        qualified, _ = _macro_features(conn)
+        assert qualified["BAMLH0A0HYM2"]["d1m_abs"] == pytest.approx(-0.9)
+        assert qualified["WALCL"]["d1m_pct"] == pytest.approx(-0.9)
+        assert qualified["PCEPILFE"]["d1m_pct"] == pytest.approx(1.0)
+        for sid, _, plain, _, _ in cases:
+            conn.execute("UPDATE macro_series_catalog SET frequency=? WHERE series_id=?", (plain, sid))
+        normalized, _ = _macro_features(conn)
+        for sid, *_ in cases:
+            assert normalized[sid] == qualified[sid]
+
+
+def test_frequency_qualifiers_do_not_extend_staleness_or_release_period(client):
+    from datetime import date, timedelta
+    from app.db.connection import get_connection
+    from app.features.macro.ai_regime.runner import _stale_series
+
+    last = (date.today() - timedelta(days=20)).isoformat()
+    with get_connection() as conn:
+        conn.execute("UPDATE macro_series_catalog SET frequency='Daily, Close', typical_lag_days=1 WHERE series_id='VIXCLS'")
+        conn.execute("INSERT INTO macro_obs_stats (series_id,point_count,last_date) VALUES ('VIXCLS',100,?)", (last,))
+        assert 'VIXCLS' in _stale_series(conn)
+        conn.execute("UPDATE macro_series_catalog SET frequency='Daily' WHERE series_id='VIXCLS'")
+        assert 'VIXCLS' in _stale_series(conn)
+    for qualified, plain in [('Daily, Close', 'Daily'), ('Weekly, As of Wednesday', 'Weekly')]:
+        assert composite.next_release_estimate(qualified, last, 1) == composite.next_release_estimate(plain, last, 1)
+
+
 def _seed_macro(n_points: int = 30):
     from app.db.connection import get_connection
 

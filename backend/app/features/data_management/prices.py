@@ -2,8 +2,9 @@
 
 Two Alpaca passes per batch — `adjustment=raw` (as-traded OHLCV) and
 `adjustment=all` (the split/dividend-adjusted `adj_*` columns) — merged by
-date. Neither pass is a "is it fresh?" probe; both carry real bar data, so
-the handler avoids hitting the provider at all when it can:
+date. Incremental requests include a 30-calendar-day overlap before the last
+stored bar. Changed adjusted OHLC triggers a full-history fetch for that symbol
+before any rows are committed. Repair notes are shown in the run results.
 
 * the bars come from the **`sip` consolidated feed** (config
   `alpaca_price_feed`): history back to 2016 with real market-wide volume,
@@ -12,11 +13,9 @@ the handler avoids hitting the provider at all when it can:
   requests end at "yesterday in ET", rolled back over weekends — computed in
   ET, NOT the server's UTC date, so a run from a UTC+12/13 timezone doesn't
   trail the real US date by a day (`_data_end`).
-* incremental mode skips a symbol that is already current through that end,
-  or that was hit within `_RETRY_COOLDOWN` (6 h) and found nothing new — so a
-  weekend / holiday re-run doesn't spam the provider, but a re-run after the
-  next session clears the embargo does pick the new bar up. `mode="full"`
-  ignores both and re-pulls the whole history. The `(symbol, date)` upsert
+* incremental mode checks existing bars even when there is no new session.
+  `_RETRY_COOLDOWN` (6 h) limits repeated checks. `mode="full"` bypasses the
+  cooldown and re-pulls the whole history. The `(symbol, date)` upsert
   makes any repeat fetch idempotent — a day is never appended twice.
 * symbols that do need data are grouped by their incremental start date and
   fetched in multi-symbol batches (one raw + one adjusted request per
@@ -25,6 +24,7 @@ the handler avoids hitting the provider at all when it can:
 
 from __future__ import annotations
 
+import math
 import sqlite3
 import time
 from datetime import date, datetime, timedelta, timezone
@@ -36,10 +36,10 @@ from app.providers.clients.alpaca_client import AlpacaClient
 from app.providers.clients.http import FetchHTTPError
 
 _ET = ZoneInfo("America/New_York")
-# After a run that found nothing new for a symbol, don't re-hit the provider
-# for it again within this window — suppresses weekend / holiday spam without
-# blocking a pickup once a new session's bar clears the SIP embargo.
+# Limit repeated incremental fetches and adjustment checks.
 _RETRY_COOLDOWN = timedelta(hours=6)
+# Re-read the last stored month even when no new session is available.
+_ADJUSTMENT_OVERLAP_DAYS = 30
 # The free Alpaca plan refuses SIP data that is "too recent" with a 403; the
 # exact cut-over (ET midnight vs the next session's close) is fuzzy, so on that
 # error we retreat the request end one day at a time and, if it never clears,
@@ -129,10 +129,8 @@ def _plan(
 ) -> tuple[list[str], dict[str, list[str]]]:
     """Split targets into (skipped, {start_date: [symbols]}).
 
-    Incremental mode skips a symbol that is already current through `data_end`,
-    or that we hit within `_RETRY_COOLDOWN` and found nothing new for (weekend /
-    holiday spam guard); everything else is grouped by the date its fetch should
-    start from so same-start symbols batch into one request.
+    Incremental requests include 30 calendar days before the last stored bar.
+    A six-hour cooldown limits repeated checks; full mode bypasses it.
     """
     settings = get_settings()
     skipped: list[str] = []
@@ -144,7 +142,8 @@ def _plan(
         if mode == "full" or not (row and row["last_date"]):
             start = settings.history_start_date
         else:
-            start = (date.fromisoformat(row["last_date"]) + timedelta(days=1)).isoformat()
+            start = max(settings.history_start_date,
+                        (date.fromisoformat(row["last_date"]) - timedelta(days=_ADJUSTMENT_OVERLAP_DAYS)).isoformat())
         if date.fromisoformat(start) > data_end:
             skipped.append(symbol)  # already current through the readable end
             continue
@@ -173,6 +172,8 @@ def _merge(raw: list[dict], adj: list[dict], feed: str) -> list[tuple]:
 
     out: list[tuple] = []
     for d, r in sorted(by_date.items()):
+        if "adj_close" not in r:
+            raise ValueError(f"Missing adjusted bar for {d}; prices were not saved")
         out.append((
             d, r["open"], r["high"], r["low"], r["close"], r["volume"],
             r.get("adj_open"), r.get("adj_high"), r.get("adj_low"),
@@ -180,6 +181,45 @@ def _merge(raw: list[dict], adj: list[dict], feed: str) -> list[tuple]:
             feed,
         ))
     return out
+
+
+def _adjustments_changed(conn: sqlite3.Connection, symbol: str, rows: list[tuple]) -> bool:
+    if not rows:
+        return False
+    stored = {r["date"]: r for r in conn.execute(
+        "SELECT date, adj_open, adj_high, adj_low, adj_close FROM price_bars "
+        "WHERE symbol = ? AND date BETWEEN ? AND ?", (symbol, rows[0][0], rows[-1][0])
+    )}
+    for row in rows:
+        old = stored.get(row[0])
+        if old is None:
+            continue
+        for name, value in zip(("adj_open", "adj_high", "adj_low", "adj_close"), row[6:10]):
+            if old[name] is None or not math.isclose(old[name], value, rel_tol=1e-8, abs_tol=1e-6):
+                return True
+    return False
+
+
+def _check_coverage(conn: sqlite3.Connection, symbol: str, rows: list[tuple], start: str, end: str) -> None:
+    expected = {r[0] for r in conn.execute(
+        "SELECT date FROM price_bars WHERE symbol = ? AND date BETWEEN ? AND ?", (symbol, start, end)
+    )}
+    if expected - {r[0] for r in rows}:
+        raise ValueError("Price response is missing stored dates in the requested range; stored prices kept")
+
+
+async def _repair_history(conn: sqlite3.Connection, client: AlpacaClient, symbol: str,
+                          tail: list[tuple], end: str, feed: str) -> list[tuple]:
+    stored_dates = {r[0] for r in conn.execute("SELECT date FROM price_bars WHERE symbol = ?", (symbol,))}
+    start = min(get_settings().history_start_date, min(stored_dates))
+    raw, adj, _ = await _fetch_pair(client, [symbol], start, end, feed)
+    rows = _merge(raw.get(symbol, []), adj.get(symbol, []), feed)
+    # A truncated repair must not mix a new tail with an old adjustment basis.
+    required = stored_dates | {r[0] for r in tail}
+    missing = required - {r[0] for r in rows}
+    if missing:
+        raise ValueError(f"Adjusted-history repair incomplete ({len(missing)} dates missing); stored prices kept")
+    return rows
 
 
 def _write(conn: sqlite3.Connection, symbol: str, rows: list[tuple]) -> None:
@@ -304,18 +344,35 @@ async def run_asset_prices(
                     conn.execute("UPDATE fetch_runs SET current_target = ? WHERE id = ?",
                                  (f"{label} (SIP end → {end_used})", run_id))
                 for j, symbol in enumerate(batch):
-                    rows = _merge(raw.get(symbol, []), adj.get(symbol, []), feed)
-                    if rows:
-                        _write(conn, symbol, rows)
-                    else:
-                        _touch_fetched(conn, symbol)
-                    # 2 requests (raw + adjusted) cover the whole batch; charge
-                    # them to its first symbol. Undercounts if a long backfill
-                    # paginated, exact for incremental tails.
-                    runs.finish_target(
-                        conn, run_id, symbol, status="ok", rows=len(rows),
-                        requests=2 if j == 0 else 0,
-                        coverage_start=rows[0][0] if rows else None,
-                        coverage_end=rows[-1][0] if rows else None,
-                        duration_ms=per,
-                    )
+                    requests = 2 if j == 0 else 0  # raw + adjusted batch; pagination is not counted
+                    note = None
+                    repair_t0 = time.monotonic()
+                    try:
+                        runs.raise_if_cancelled(run_id)
+                        rows = _merge(raw.get(symbol, []), adj.get(symbol, []), feed)
+                        _check_coverage(conn, symbol, rows, start, end_used)
+                        if mode != "full" and _adjustments_changed(conn, symbol, rows):
+                            conn.execute("UPDATE fetch_runs SET current_target = ? WHERE id = ?",
+                                         (f"{symbol}: adjusted prices changed; refetching full history", run_id))
+                            requests += 2
+                            rows = await _repair_history(conn, client, symbol, rows, end_used, feed)
+                            note = "Adjusted prices changed; full history refreshed"
+                        runs.raise_if_cancelled(run_id)
+                        if rows:
+                            _write(conn, symbol, rows)
+                        else:
+                            _touch_fetched(conn, symbol)
+                        runs.finish_target(
+                            conn, run_id, symbol, status="ok", rows=len(rows), requests=requests,
+                            coverage_start=rows[0][0] if rows else None,
+                            coverage_end=rows[-1][0] if rows else None,
+                            duration_ms=per + int((time.monotonic() - repair_t0) * 1000), note=note,
+                        )
+                    except runs.RunCancelled:
+                        raise
+                    except Exception as exc:  # one failed repair must not overwrite that symbol's prices
+                        if conn.in_transaction:
+                            conn.execute("ROLLBACK")
+                        runs.finish_target(conn, run_id, symbol, status="error", requests=requests,
+                                           duration_ms=per + int((time.monotonic() - repair_t0) * 1000),
+                                           error=str(exc)[:300])
