@@ -1,410 +1,236 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
-import Alert from "@mui/material/Alert";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Checkbox from "@mui/material/Checkbox";
-import Chip from "@mui/material/Chip";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Paper from "@mui/material/Paper";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
+import { Alert, Box, Button, Checkbox, Chip, FormControlLabel, LinearProgress, MenuItem,
+  Paper, Stack, Tab, Tabs, Table, TableBody, TableCell, TableHead, TableRow,
+  TextField, Typography } from '@mui/material';
+import { BarChart } from '@mui/x-charts/BarChart';
+import { dataApi } from '@/features/data-management/api';
+import type { RunStatus } from '@/features/data-management/types';
+import { EquityChart } from '@/features/timing/EquityChart';
+import { sizingApi } from './api';
+import { computeAllocation } from './engine';
+import { BOOKS, DEFAULT_PARAMS, METHODS, type PortfolioResult, type SizingBoard, type SizingParams } from './types';
 
-import { ApiError } from "@/shared/api/client";
-import { TextPeek } from "@/shared/components/TextPeek";
+const money=(v:number)=>v.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+const pct=(v:number|null|undefined)=>v==null?'—':(v*100).toFixed(2)+'%';
+const units=(v:number)=>v.toLocaleString('en-US',{maximumFractionDigits:8});
 
-import { sizingApi } from "./api";
-import { computeSizing } from "./engine";
-import {
-  DEFAULT_SLEEVE_BUDGET,
-  amber,
-  green,
-  grey,
-  red,
-  zeroDeployed,
-} from "./constants";
-import { SizingControls } from "./components/SizingControls";
-import { SizingGuide } from "./components/SizingGuide";
-import { SizingTable } from "./components/SizingTable";
-import { GrossBar, KmaxSensitivity, SectorBar } from "./components/SizingViz";
-import type { MacroContext, SizingBoard, SizingParams, Verdict } from "./types";
-
-const VERDICTS: Verdict[] = ["ADD", "LIGHT", "BLOCKED", "TRIM", "WAIT"];
-
-const DEFAULT_PARAMS: SizingParams = {
-  nav: 1_000_000,
-  volTargetPct: 12,
-  kMax: 1.0,
-  perNameCapPct: 10,
-  perSectorCapPct: 30,
-  bookVolOverridePct: null,
-  enforceSleeveBudget: false,
-  sleeveBudget: { ...DEFAULT_SLEEVE_BUDGET },
-  scopeLong: true,
-  scopeShort: false,
-  shortResearchOnly: false,
-  scopeWatchlist: false,
-  mode: "full",
-  newDays: 10,
-  // Off by default: the baseline view is the pure risk ladder. Turning this on
-  // layers the macro-regime throttle over the top (the "institutional" view).
-  macroEnabled: false,
-  neutralScale: 0.65,
-  riskOffScale: 0.35,
-  deployed: zeroDeployed(),
-};
-
-const usd = (v: number) =>
-  v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `$${(v / 1e3).toFixed(0)}k` : `$${v.toFixed(0)}`;
-
-export function SizingPage() {
-  const [board, setBoard] = useState<SizingBoard | null>(null);
-  const [macro, setMacro] = useState<MacroContext | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [params, setParams] = useState<SizingParams>(DEFAULT_PARAMS);
-
-  const load = useCallback(() => {
-    setError(null);
-    void Promise.all([sizingApi.board(), sizingApi.macro()])
-      .then(([b, m]) => {
-        setBoard(b);
-        setMacro(m);
-      })
-      .catch((e) => setError(e instanceof ApiError ? e.message : String(e)));
-  }, []);
-  useEffect(load, [load]);
-
-  const patch = useCallback(
-    (p: Partial<SizingParams>) => setParams((prev) => ({ ...prev, ...p })),
-    [],
-  );
-
-  const [showVerdict, setShowVerdict] = useState<Record<Verdict, boolean>>({
-    ADD: true,
-    LIGHT: true,
-    BLOCKED: true,
-    TRIM: true,
-    WAIT: true,
-  });
-
-  const deferredParams = useDeferredValue(params);
-  const result = useMemo(() => {
-    if (!board || !macro) return null;
-    return computeSizing(board, deferredParams, macro);
-  }, [board, macro, deferredParams]);
-
-  const verdictCounts = useMemo(() => {
-    const c: Record<Verdict, number> = { ADD: 0, LIGHT: 0, BLOCKED: 0, TRIM: 0, WAIT: 0 };
-    result?.rows.forEach((r) => (c[r.verdict] += 1));
-    return c;
-  }, [result]);
-  const visibleRows = useMemo(
-    () => (result ? result.rows.filter((r) => showVerdict[r.verdict]) : []),
-    [result, showVerdict],
-  );
-
-  const notComputed = board?.status === "not_computed";
-  const momentumMissing =
-    !!board &&
-    board.status === "ok" &&
-    !board.long.some((r) => r.momentum) &&
-    !board.short.some((r) => r.momentum);
-
-  return (
-    <div>
-      <Typography variant="h5" gutterBottom>
-        Sizing
-      </Typography>
-      <Typography color="text.secondary" sx={{ mb: 2, maxWidth: 920 }}>
-        A real-time parameter sandbox for position sizing. It never places an order and adds no engine
-        — it takes the Donchian board&apos;s on-signal names and answers <i>how big</i> under a set of
-        risk-ladder assumptions you drag, and <i>what is holding each name back</i>. Drag a knob and
-        the whole table re-computes.
-      </Typography>
-
-      <Alert severity="info" icon={false} sx={{ mb: 2, maxWidth: 920 }}>
-        The <b>deployed-by-sleeve</b> table is a coarse proxy for your real book — it assumes your
-        holdings can be compared by sleeve. Target units are total desired holdings, not additional
-        units to buy. Check your actual positions before acting on a sleeve’s add or trim cue.
-      </Alert>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
-      {board?.needs_recompute && (
-        <Alert severity="warning" sx={{ mb: 2 }}>Run trend backtest to refresh the saved signals with the current trading rules.</Alert>
-      )}
-      {notComputed && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          The Trend universe run has not been computed — run it on the <b>Trend</b> page. The sandbox
-          works, but there are no board names to size yet.
-        </Alert>
-      )}
-      {momentumMissing && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          No cross-sectional momentum on the board yet — recompute the <b>Multisectional</b> ranking
-          once to light up the risk-off &quot;keep only the strongest&quot; filter and the mom.
-          column.
-        </Alert>
-      )}
-      {result && result.assumedVolCount > 0 && (
-        <Alert severity="warning" sx={{ mb: 2 }}>
-          {result.assumedVolCount} name{result.assumedVolCount === 1 ? " is" : "s are"} sized off a
-          placeholder 25% vol — the last Trend universe run predates the 60-day-vol column. Re-run{" "}
-          <b>Run trend backtest</b> on the Trend page for real inverse-vol weights.
-        </Alert>
-      )}
-      {result && result.otherNoSectorCount > 0 && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          {result.otherNoSectorCount} name{result.otherNoSectorCount === 1 ? " has" : "s have"} no
-          GICS sector tag and fall into the <b>Other</b> sleeve — the per-sector cap is looser for
-          them until the memberships sync fills the tag in.
-        </Alert>
-      )}
-
-      <SizingGuide sx={{ mb: 2 }} />
-
-      <Stack direction={{ xs: "column", md: "row" }} spacing={2} sx={{ alignItems: "flex-start" }}>
-        <Paper
-          sx={{
-            p: 2,
-            width: { xs: "100%", md: 360 },
-            flexShrink: 0,
-            position: { md: "sticky" },
-            top: 16,
-            maxHeight: { md: "calc(100vh - 32px)" },
-            overflowY: { md: "auto" },
-          }}
-        >
-          <Stack direction="row" sx={{ mb: 1, justifyContent: "space-between", alignItems: "center" }}>
-            <Typography variant="subtitle2">Parameters</Typography>
-            <Stack direction="row" spacing={1}>
-              <Button size="small" onClick={() => setParams(DEFAULT_PARAMS)}>
-                Reset
-              </Button>
-              <Button size="small" onClick={load}>
-                Refresh
-              </Button>
-            </Stack>
-          </Stack>
-          {macro && <SizingControls params={params} onChange={patch} macro={macro} />}
-        </Paper>
-
-        <Box sx={{ flex: 1, minWidth: 0, width: "100%" }}>
-          {!result || !macro ? (
-            <Typography color="text.secondary">Loading board…</Typography>
-          ) : (
-            <Stack spacing={2}>
-              <Hero result={result} params={params} macro={macro} />
-
-              <Paper sx={{ p: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Gross exposure
-                </Typography>
-                <GrossBar result={result} kMaxPct={params.kMax * 100} />
-                <Typography variant="body2" sx={{ mt: 1.5 }}>
-                  {result.bindingConstraint}
-                </Typography>
-                <Stack direction="row" spacing={2} sx={{ mt: 1, flexWrap: "wrap" }}>
-                  <Metric label="Deployed now" value={`${result.deployedGrossPct.toFixed(0)}%`} />
-                  <Metric label="Target gross" value={`${result.targetGrossPct.toFixed(0)}%`} />
-                  <Metric label="Cash at target" value={`${result.cashAfterPct.toFixed(0)}%`} />
-                  <Metric label="Max name" value={`${result.maxNamePct.toFixed(1)}%`} sub={`cap ${params.perNameCapPct}%`} />
-                  <Metric
-                    label="Book vol before scaling"
-                    value={`${result.estBookVolPct.toFixed(0)}%`}
-                    sub={`target ${params.volTargetPct}%`}
-                  />
-                </Stack>
-              </Paper>
-
-              <Stack direction={{ xs: "column", lg: "row" }} spacing={2}>
-                <Paper sx={{ p: 2, flex: 2, minWidth: 0 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Sleeve load — deployed vs total target
-                  </Typography>
-                  {result.sleeveLoads.length ? (
-                    <SectorBar result={result} />
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      Nothing deployed or proposed yet.
-                    </Typography>
-                  )}
-                </Paper>
-                <Paper sx={{ p: 2, flex: 1, minWidth: 200 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    k_max sensitivity
-                  </Typography>
-                  <KmaxSensitivity result={result} current={params.kMax} />
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                    Resulting target gross as k_max moves.
-                  </Typography>
-                </Paper>
-              </Stack>
-
-              <Paper sx={{ p: 2 }}>
-                <Stack direction="row" spacing={1} sx={{ mb: 0.5, flexWrap: "wrap", alignItems: "center" }}>
-                  <Typography variant="subtitle2">Per-name sizing</Typography>
-                  <Chip
-                    size="small"
-                    variant="outlined"
-                    label={`${result.rows.length} names · ${result.rows.filter((r) => r.state === "long").length}L / ${result.rows.filter((r) => r.state === "short").length}S`}
-                  />
-                  {result.excluded.length > 0 && (
-                    <Chip
-                      size="small"
-                      variant="outlined"
-                      label={`${result.excluded.length} excluded`}
-                    />
-                  )}
-                </Stack>
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ mb: 1, flexWrap: "wrap", alignItems: "center" }}
-                >
-                  <Typography variant="caption" color="text.secondary">
-                    show:
-                  </Typography>
-                  {VERDICTS.map((v) => (
-                    <FormControlLabel
-                      key={v}
-                      sx={{ mr: 0.5 }}
-                      control={
-                        <Checkbox
-                          size="small"
-                          checked={showVerdict[v]}
-                          onChange={(e) =>
-                            setShowVerdict((s) => ({ ...s, [v]: e.target.checked }))
-                          }
-                        />
-                      }
-                      label={
-                        <Typography variant="caption" sx={{ fontVariantNumeric: "tabular-nums" }}>
-                          {v} · {verdictCounts[v]}
-                        </Typography>
-                      }
-                    />
-                  ))}
-                </Stack>
-                {params.scopeShort &&
-                  params.shortResearchOnly &&
-                  result.rows.every((r) => r.state !== "short") && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-                      Short board is on but restricted to bond ETFs &amp; BTC — the board has none
-                      shorting right now. Untick that restriction on the left to size equity shorts.
-                    </Typography>
-                  )}
-                {result.rows.length > 0 && visibleRows.length === 0 ? (
-                  <Typography color="text.secondary" sx={{ p: 2 }}>
-                    All {result.rows.length} rows hidden by the verdict filter.
-                  </Typography>
-                ) : (
-                  <SizingTable rows={visibleRows} />
-                )}
-                {result.excluded.length > 0 && (
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                    <TextPeek
-                      value={`${result.excluded.length} excluded — ${result.excluded
-                        .map((e) => `${e.symbol} (${e.reason})`)
-                        .join(", ")}`}
-                      maxChars={44}
-                    />
-                  </Typography>
-                )}
-              </Paper>
-            </Stack>
-          )}
-        </Box>
+export function SizingPage(){
+  const [params,setParams]=useState<SizingParams>(DEFAULT_PARAMS);
+  const [board,setBoard]=useState<SizingBoard|null>(null);
+  const [result,setResult]=useState<PortfolioResult|null>(null);
+  const [tab,setTab]=useState('today');
+  const [runId,setRunId]=useState<number|null>(null);
+  const [run,setRun]=useState<RunStatus|null>(null);
+  const [starting,setStarting]=useState(false);
+  const [error,setError]=useState<string|null>(null);
+  const [query,setQuery]=useState('');
+  const [symbol,setSymbol]=useState('SPY');
+  const [showLong,setShowLong]=useState(true);
+  const [showShort,setShowShort]=useState(true);
+  const [page,setPage]=useState(0);
+  const load=useCallback(async()=>{
+    try{
+      const [b,r,active]=await Promise.all([sizingApi.board(),sizingApi.latest(),dataApi.activeRuns()]);
+      setBoard(b);setResult(r);
+      const pending=active.find(x=>x.kind==='portfolio_simulation');
+      if(pending){setRunId(pending.id);setRun(pending);}
+    }catch(e){setError(String(e));}
+  },[]);
+  useEffect(()=>{void load();},[load]);
+  useEffect(()=>{
+    if(runId==null)return;
+    let alive=true;
+    const poll=async()=>{
+      try{
+        const r=await dataApi.run(runId);if(!alive)return;setRun(r);
+        if(['succeeded','failed','cancelled'].includes(r.status)){
+          setRunId(null);
+          if(r.status==='succeeded')setResult(await sizingApi.latest());
+          else setError(r.error_summary??'Simulation '+r.status);
+        }
+      }catch(e){if(alive)setError(String(e));}
+    };
+    void poll();const timer=setInterval(()=>void poll(),1200);
+    return()=>{alive=false;clearInterval(timer);};
+  },[runId]);
+  const patch=(p:Partial<SizingParams>)=>setParams(v=>({...v,...p}));
+  const validCapital=Number.isFinite(params.capital)&&params.capital>=100&&params.capital<=1e10;
+  const allocation=useMemo(()=>board&&validCapital?computeAllocation(board,params):null,[board,params,validCapital]);
+  const start=async()=>{
+    setError(null);setStarting(true);setTab('history');
+    try{const r=await sizingApi.run(params);setRunId(r.run_id);}
+    catch(e){setError(String(e));}finally{setStarting(false);}
+  };
+  const dirty=!!result?.params&&JSON.stringify(params)!==JSON.stringify(result.params);
+  const stat=result?.stats;
+  const equity=useMemo(()=>{
+    if(!result?.curve?.length)return null;
+    let peak=result.params?.capital??100000;
+    const bh=new Map(result.benchmark?.curve??[]);
+    return {dates:result.curve.map(p=>p[0]),strat_equity:result.curve.map(p=>p[1]),
+      bh_equity:result.curve.map(p=>bh.get(p[0])??0),
+      drawdown:result.curve.map(p=>{peak=Math.max(peak,p[1]);return p[1]/peak-1;})};
+  },[result]);
+  const assets=(result?.assets??[]).filter(a=>a.symbol.includes(query.toUpperCase())).sort((a,b)=>b.net_pnl-a.net_pnl);
+  const trades=(result?.trades??[]).filter(t=>t.symbol===symbol&&(t.direction==='long'?showLong:showShort))
+    .sort((a,b)=>b.entry_date.localeCompare(a.entry_date));
+  const top=[...(result?.assets??[])].sort((a,b)=>Math.abs(b.net_pnl)-Math.abs(a.net_pnl)).slice(0,12);
+  const last=result?.curve?.at(-1);
+  const download=()=>{
+    const rows=result?.assets??[];if(!rows.length)return;
+    const keys=Object.keys(rows[0]) as (keyof typeof rows[number])[];
+    const quote=(x:unknown)=>'"'+String(x).replaceAll('"','""')+'"';
+    const csv=[keys.join(','),...rows.map(r=>keys.map(k=>quote(r[k])).join(','))].join('\r\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download='sizing-asset-contributions.csv';a.click();URL.revokeObjectURL(a.href);
+  };
+  return <Box>
+    <Typography variant="h5" gutterBottom>Sizing</Typography>
+    <Typography color="text.secondary" sx={{mb:2,maxWidth:1000}}>
+      Long 20/55 with an initial 3×ATR stop and no Chandelier. Short is the independent fixed
+      20/20 benchmark with initial 2×ATR and Chandelier 3×ATR. Equal capital is the default;
+      volatility sizing and concentration limits are alternatives.
+    </Typography>
+    {error&&<Alert severity="error" sx={{mb:2}}>{error}</Alert>}
+    <Paper sx={{p:2,mb:2}}>
+      <Stack direction="row" useFlexGap sx={{gap:2,flexWrap:'wrap',alignItems:'center'}}>
+        <TextField select label="Universe" size="small" value={params.scope} onChange={e=>patch({scope:e.target.value as SizingParams['scope']})}>
+          <MenuItem value="priority">Priority assets</MenuItem><MenuItem value="universe">Whole database</MenuItem>
+        </TextField>
+        <TextField select label="Allocation direction" size="small" value={params.book} onChange={e=>patch({book:e.target.value as SizingParams['book']})}>
+          {Object.entries(BOOKS).map(([k,v])=><MenuItem key={k} value={k}>{v}</MenuItem>)}
+        </TextField>
+        <TextField select label="Sizing method" size="small" value={params.method} onChange={e=>patch({method:e.target.value as SizingParams['method']})}>
+          {Object.entries(METHODS).map(([k,v])=><MenuItem key={k} value={k}>{v}</MenuItem>)}
+        </TextField>
+        <TextField label="Capital (USD)" type="number" size="small" value={params.capital} onChange={e=>patch({capital:Number(e.target.value)})} sx={{width:170}}/>
+        <TextField select label="Costs" size="small" value={params.cost} onChange={e=>patch({cost:e.target.value as SizingParams['cost']})}>
+          <MenuItem value="normal">Normal</MenuItem><MenuItem value="double">Doubled</MenuItem>
+        </TextField>
+        <TextField select label="History window" size="small" value={params.window} onChange={e=>patch({window:e.target.value as SizingParams['window']})}>
+          <MenuItem value="recent">2020 onward</MenuItem><MenuItem value="full">Full available history</MenuItem>
+        </TextField>
       </Stack>
-    </div>
-  );
-}
-
-function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <Box>
-      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-        {label}
-      </Typography>
-      <Typography variant="body1" sx={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-        {value}
-      </Typography>
-      {sub && (
-        <Typography variant="caption" color="text.secondary">
-          {sub}
-        </Typography>
-      )}
-    </Box>
-  );
-}
-
-function Hero({
-  result,
-  params,
-  macro,
-}: {
-  result: ReturnType<typeof computeSizing>;
-  params: SizingParams;
-  macro: MacroContext;
-}) {
-  const combined = result.macroScale * result.volScale;
-  const scaled = result.macroScale < 1 || result.volScale < 0.995;
-
-  let tone: "add" | "reduce" | "hold" | "empty";
-  if (!result.rows.length && result.targetGrossPct === 0) tone = "empty";
-  else if (result.overshootPct >= 1) tone = "reduce";
-  else if (result.headroomPct >= 1) tone = "add";
-  else tone = "hold";
-
-  const color =
-    tone === "add" ? green : tone === "reduce" ? red : scaled && tone === "hold" ? amber : grey;
-  const big =
-    tone === "add"
-      ? usd(result.headroomUsd)
-      : tone === "reduce"
-        ? usd(result.overshootUsd)
-        : tone === "empty"
-          ? "—"
-          : result.deployedGrossPct >= 1
-            ? `${result.deployedGrossPct.toFixed(0)}%`
-            : `×${combined.toFixed(2)}`;
-  const line =
-    tone === "add"
-      ? `Net room to the target book · +${result.headroomPct.toFixed(0)}% of NAV · check sleeve room and actual holdings before adding`
-      : tone === "reduce"
-        ? `Deployed is ${result.overshootPct.toFixed(0)}% of NAV over the target book — trim, don't add`
-        : tone === "empty"
-          ? "No on-signal names in scope"
-          : result.deployedGrossPct >= 1
-            ? "Deployed ≈ target — nothing to add right now"
-            : "The regime has the book near flat — hold";
-
-  return (
-    <Paper sx={{ p: 2.5, borderLeft: `4px solid ${color}` }}>
-      <Typography variant="overline" color="text.secondary">
-        {tone === "add" ? "Head-room" : tone === "reduce" ? "Over budget" : "Status"}
-      </Typography>
-      <Typography sx={{ fontSize: 40, fontWeight: 800, lineHeight: 1.1, color, fontVariantNumeric: "tabular-nums" }}>
-        {big}
-      </Typography>
-      <Typography variant="body1" sx={{ mt: 0.5 }}>
-        {line}
-      </Typography>
-      {scaled && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Whole book scaled ×{combined.toFixed(2)}
-          {params.macroEnabled && result.macroScale < 1
-            ? ` · ${macro.zone} regime ×${result.macroScale.toFixed(2)}`
-            : ""}
-          {result.volScale < 0.995 ? ` · vol-target ×${result.volScale.toFixed(2)}` : ""}. Every
-          target below is total holdings after scaling and quantity rounding.
-        </Typography>
-      )}
-      <Typography variant="caption" color="text.secondary">
-        NAV {usd(params.nav)} · k_max {params.kMax.toFixed(2)}× · {result.bindingConstraint}
+      <Stack direction="row" useFlexGap spacing={1} sx={{mt:2,flexWrap:'wrap'}}>
+        <Button variant="contained" onClick={()=>void start()} disabled={starting||runId!=null||!validCapital}>Run portfolio simulation</Button>
+        <Button onClick={()=>void load()}>Refresh saved data</Button>
+        {runId!=null&&<Button onClick={()=>void dataApi.cancelRun(runId)}>Cancel</Button>}
+      </Stack>
+      {runId!=null&&<Box sx={{mt:2}}><LinearProgress variant={run?.planned_targets?'determinate':'indeterminate'} value={run?.planned_targets?100*run.completed_targets/run.planned_targets:0}/>
+        <Typography variant="body2" sx={{mt:1}}>{run?.status??'queued'} · {run?.completed_targets??0}/{run?.planned_targets??'…'} · {run?.current_target??'Preparing simulation'}</Typography></Box>}
+      <Typography variant="caption" color="text.secondary" sx={{display:'block',mt:1}}>
+        Direction changes the allocation. Historical results change only when you run the simulation.
+        Combined starts 50/50 with no transfers; short-sale proceeds remain reserved. No macro AI calls.
       </Typography>
     </Paper>
-  );
+    <Tabs value={tab} onChange={(_,v)=>setTab(v)} variant="scrollable" scrollButtons="auto" sx={{mb:2}}><Tab value="today" label="Allocation today"/><Tab value="history" label="Historical simulation"/></Tabs>
+    {tab==='today'&&<>
+      {board?.needs_recompute&&<Alert severity="warning" sx={{mb:2}}>Refresh the Trend run to use the current long strategy and short benchmark.</Alert>}
+      {board?.status==='not_computed'&&<Alert severity="info">Run <RouterLink to="/trend">Trend</RouterLink> to prepare the current signals.</Alert>}
+      {allocation&&<Paper sx={{p:2}}>
+        <Typography variant="h6">Fresh allocation estimate</Typography>
+        <Typography color="text.secondary" variant="body2" sx={{mb:2}}>
+          Total holdings for a fresh allocation using the latest saved signals and closing prices.
+          Existing simulated positions keep their entry units until exit. Quantities here are rounded
+          to instrument increments; actual next-open prices will differ.
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{display:'block',mb:1}}>
+          Saved Trend run: {board?.computed_at ? new Date(board.computed_at).toLocaleString() : 'unavailable'}.
+          Fetch prices and rerun Trend to update this estimate.
+        </Typography>
+        <Stack direction="row" useFlexGap sx={{gap:2,flexWrap:'wrap',mb:2}}>
+          <Chip label={allocation.eligible+' eligible assets, including flat names'}/>
+          <Chip label={'Gross '+money(allocation.gross)}/>
+          <Chip label={'Unallocated capital '+money(allocation.free)}/>
+          <Chip label={'Estimated entry costs '+money(allocation.costs)}/>
+        </Stack>
+        <TextField size="small" label="Find asset" value={query} onChange={e=>setQuery(e.target.value)} sx={{mb:2}}/>
+        <ScrollTable headers={['Asset','Direction','Signal','Vol 60d','Signed units','Gross value','Weight']}>
+          {allocation.rows.filter(r=>r.symbol.includes(query.toUpperCase())).map(r=><TableRow key={r.symbol+r.direction}>
+            <TableCell><RouterLink to={'/timing/'+encodeURIComponent(r.symbol)}>{r.symbol}</RouterLink></TableCell>
+            <TableCell>{r.direction}</TableCell><TableCell>{r.pending?'Pending entry':'Holding'} · {r.signalDate}</TableCell>
+            <TableCell>{pct(r.vol)}</TableCell><TableCell>{units(r.units)}</TableCell><TableCell>{money(r.notional)}</TableCell><TableCell>{pct(r.weight)}</TableCell>
+          </TableRow>)}
+        </ScrollTable>
+        <Typography variant="caption" color="text.secondary">Flat allocations stay cash. Capped volatility uses 10% per symbol, 70% equities/other ETFs, 40% bonds and 10% crypto, with no redistribution. Short borrowing is additional over the holding period.</Typography>
+      </Paper>}
+    </>}
+    {tab==='history'&&<>
+      {(!stat||!result?.curve)&&<Alert severity="info">Run a portfolio simulation to see shared-capital returns, both direction contributions and funded trades.</Alert>}
+      {stat&&result?.params&&<>
+        {dirty&&<Alert severity="info" sx={{mb:2}}>Controls differ from the displayed result. Run the simulation to apply them.</Alert>}
+        {result.needs_recompute&&<Alert severity="warning" sx={{mb:2}}>This saved simulation uses an earlier engine. Run it again with the current rules.</Alert>}
+        <Typography variant="body2" color="text.secondary" sx={{mb:2}}>
+          Displayed: {BOOKS[result.params.book]} · {METHODS[result.params.method]} · {result.params.scope} · {result.params.cost} costs · {result.curve?.[0][0]} to {last?.[0]}.
+        </Typography>
+        <Stack direction="row" useFlexGap sx={{gap:2,flexWrap:'wrap',mb:2}}>
+          <Metric label="Portfolio CAGR" value={pct(stat.cagr)}/><Metric label="Maximum drawdown" value={pct(stat.drawdown)}/>
+          <Metric label="Ending equity" value={money(stat.ending)}/><Metric label="Average gross invested" value={pct(stat.average_gross)}/>
+          <Metric label="Fees + slippage + borrow" value={money(stat.fees+stat.slippage+stat.borrow)}/>
+        </Stack>
+        <Paper sx={{p:2,mb:2}}><Typography variant="h6">Portfolio equity · USD</Typography>
+          <Typography variant="caption" color="text.secondary">Blue: strategy. Grey: equal-capital buy and hold. Red: drawdown. Reference CAGR {pct(result.benchmark?.stats.cagr)}; drawdown {pct(result.benchmark?.stats.drawdown)}.</Typography>
+          {equity&&<EquityChart equity={equity}/>}
+        </Paper>
+        <Paper sx={{p:2,mb:2}}>
+          <Typography variant="h6">Capital and direction contributions</Typography>
+          <Stack direction="row" useFlexGap sx={{gap:2,flexWrap:'wrap',my:2}}>
+            <Metric label="Long price P&L" value={money(stat.long_contribution*result.params.capital)}/>
+            <Metric label="Short price P&L" value={money(stat.short_contribution*result.params.capital)}/>
+            <Metric label="Short borrowing costs" value={money(stat.borrow)}/>
+            <Metric label="Final free capital" value={money(last?.[6]??0)}/>
+          </Stack>
+          <Typography variant="body2">Long and short price P&amp;L, less fees, slippage and borrow, reconcile to {money(stat.ending-result.params.capital)} net profit. {result.audit?.unfunded??0} native entries received no funding.</Typography>
+          {(stat.stale_position_days>0||stat.funding_deficit_days>0)&&<Alert severity="warning" sx={{mt:1}}>Stale held-price days: {stat.stale_position_days}. Funding deficit days: {stat.funding_deficit_days}. Stale positions retain their last known mark; no exit is invented.</Alert>}
+        </Paper>
+        <Paper sx={{p:2,mb:2}}><Typography variant="h6">Calendar years</Typography>
+          <ScrollTable headers={['Year / coverage','Return','Drawdown']}>{stat.annual.map(a=><TableRow key={a.year}><TableCell>{a.start} → {a.end}</TableCell><TableCell>{pct(a.net)}</TableCell><TableCell>{pct(a.drawdown)}</TableCell></TableRow>)}</ScrollTable>
+        </Paper>
+        <Paper sx={{p:2,mb:2}}>
+          <Stack direction="row" sx={{justifyContent:'space-between',gap:2,flexWrap:'wrap'}}><Typography variant="h6">Every asset's contribution</Typography><Button onClick={download}>Download all assets CSV</Button></Stack>
+          <Typography variant="caption" color="text.secondary">Net dollars include open marked positions and all costs. All {result.assets?.length} assets remain available, including those without funded trades.</Typography>
+          <BarChart layout="horizontal" yAxis={[{scaleType:'band',data:top.map(a=>a.symbol)}]} series={[{data:top.map(a=>a.net_pnl),label:'Net P&L (USD)',color:'#2f6fed'}]} height={350}/>
+          <TextField size="small" label="Find asset" value={query} onChange={e=>setQuery(e.target.value)} sx={{mb:2}}/>
+          <ScrollTable headers={['Asset','Long price P&L','Short price P&L','Costs','Net contribution','Account pp','Entries']}>
+            {assets.slice(0,80).map(a=><TableRow key={a.symbol} hover onClick={()=>{setSymbol(a.symbol);setPage(0);}} sx={{cursor:'pointer'}}>
+              <TableCell>{a.symbol}</TableCell><TableCell>{money(a.long_pnl)}</TableCell><TableCell>{money(a.short_pnl)}</TableCell>
+              <TableCell>{money(a.fees+a.slippage+a.borrow)}</TableCell><TableCell>{money(a.net_pnl)}</TableCell><TableCell>{pct(a.contribution)}</TableCell><TableCell>{a.long_entries+a.short_entries}</TableCell>
+            </TableRow>)}
+          </ScrollTable>
+          <Typography variant="caption">Showing {Math.min(assets.length,80)} of {assets.length} matches. Search any symbol or download the complete table.</Typography>
+        </Paper>
+        <Paper sx={{p:2,mb:2}}>
+          <Typography variant="h6">Funded trade history</Typography>
+          <Stack direction="row" useFlexGap sx={{gap:2,alignItems:'center',flexWrap:'wrap',my:2}}>
+            <TextField select label="Asset ledger" size="small" value={(result.assets??[]).some(a=>a.symbol===symbol)?symbol:''} onChange={e=>{setSymbol(e.target.value);setPage(0);}} sx={{minWidth:160}}>
+              {(result.assets??[]).map(a=><MenuItem key={a.symbol} value={a.symbol}>{a.symbol}</MenuItem>)}
+            </TextField>
+            <FormControlLabel label="Show long trades" control={<Checkbox checked={showLong} onChange={e=>{setShowLong(e.target.checked);setPage(0);}}/>}/>
+            <FormControlLabel label="Show short trades" control={<Checkbox checked={showShort} onChange={e=>{setShowShort(e.target.checked);setPage(0);}}/>}/>
+            <Button disabled={page===0} onClick={()=>setPage(p=>p-1)}>Previous</Button><Button disabled={(page+1)*30>=trades.length} onClick={()=>setPage(p=>p+1)}>Next</Button>
+          </Stack>
+          <ScrollTable headers={['Direction','Entry','Price','Signed units','Exit / mark','Price P&L','Costs','Net P&L','Reason']}>
+            {trades.slice(page*30,page*30+30).map((t,i)=>{const cost=t.entry_fee+t.exit_fee+t.entry_slippage+t.exit_slippage+t.borrow;return <TableRow key={i}>
+              <TableCell>{t.direction}</TableCell><TableCell>{t.entry_date}</TableCell><TableCell>{units(t.entry_price)}</TableCell><TableCell>{units(t.units)}</TableCell>
+              <TableCell>{t.exit_date??t.mark_date+' (open)'}</TableCell><TableCell>{money(t.price_pnl)}</TableCell><TableCell>{money(cost)}</TableCell><TableCell>{money(t.price_pnl-cost)}</TableCell><TableCell>{t.reason}</TableCell>
+            </TableRow>;})}
+          </ScrollTable>
+          <Typography variant="caption">{trades.length} matching trades. These checkboxes only filter the ledger; account returns and allocations remain the saved result.</Typography>
+        </Paper>
+      </>}
+      <Alert severity="info" icon={false}>
+        Historical accounts use fractional fixed units, next-open entries and prior-bar volatility.
+        Normal costs are 5 bps + 0.05×ATR each side; short borrow assumes 2% annually (all doubled under stress).
+        Short results are a synthetic benchmark: borrowing availability and crypto funding are not verified.
+        Caps apply at entry and can drift with prices. The universe is today's stored database, not historical index membership.
+      </Alert>
+    </>}
+  </Box>;
+}
+function Metric({label,value}:{label:string;value:string}){
+  return <Paper variant="outlined" sx={{p:1.5,minWidth:160,flex:1}}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography variant="h6">{value}</Typography></Paper>;
+}
+function ScrollTable({headers,children}:{headers:string[];children:React.ReactNode}){
+  return <Box sx={{overflowX:'auto'}}><Table size="small" sx={{'& td, & th':{whiteSpace:'nowrap'}}}><TableHead><TableRow>{headers.map(h=><TableCell key={h}>{h}</TableCell>)}</TableRow></TableHead><TableBody>{children}</TableBody></Table></Box>;
 }

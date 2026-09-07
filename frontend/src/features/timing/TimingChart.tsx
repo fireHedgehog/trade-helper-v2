@@ -156,6 +156,11 @@ export function TimingChart({
       up.setData(pick(overlays.donchian_up));
       dn.setData(pick(overlays.donchian_dn));
       stop.setData(pick(overlays.stop_line));
+      if (overlays.short_stop_line) {
+        const shortStop = chart.addSeries(LineSeries, {color: '#a96dd0', lineWidth: 2,
+          lineStyle: LineStyle.SparseDotted, priceLineVisible: false, lastValueVisible: false});
+        shortStop.setData(pick(overlays.short_stop_line));
+      }
     }
 
     if (daily && markers.length) {

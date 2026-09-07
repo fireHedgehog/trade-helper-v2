@@ -209,10 +209,10 @@ export function TrendPage() {
         Trend
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
-        The same rule as the Timing page, run once over the whole database (every active symbol plus
-        gold / oil / BTC). Afterwards every symbol is in one of three states — holding long, holding
-        short, or flat — sorted so the freshest entries sit on top. A ranking only, not a
-        recommendation.
+        Run the long strategy and fixed short benchmark across the database. Each direction has
+        its own positions, exits and pending actions; one asset can appear in both lists.
+        Long uses 20/55 with an initial 3×ATR stop and no Chandelier. Short remains the
+        20/20 comparison benchmark with initial 2×ATR and Chandelier 3×ATR.
       </Typography>
 
       <Stack
@@ -261,7 +261,7 @@ export function TrendPage() {
               <TableCell>Signal date</TableCell><TableCell>Simulated position</TableCell>
             </TableRow></TableHead>
             <TableBody>{board.pending.map((r) => (
-              <TableRow key={r.symbol}>
+              <TableRow key={`${r.symbol}-${r.direction ?? r.pending_action?.direction ?? ''}`}>
                 <TableCell><SymLink symbol={r.symbol} /></TableCell>
                 <TableCell>{r.pending_action?.action === "reverse" ? "Reverse to" : r.pending_action?.action === "exit" ? "Exit" : "Enter"} {r.pending_action?.direction}</TableCell>
                 <TableCell>{r.pending_action?.signal_date}</TableCell>
@@ -377,7 +377,7 @@ export function TrendPage() {
 
           <Paper sx={{ p: 2, mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
-              Holding short ({board.counts?.short ?? board.short.length}){" "}
+              Holding short · fixed benchmark ({board.counts?.short ?? board.short.length}){" "}
               <Typography component="span" variant="caption" color="text.secondary">
                 — newest entry first
               </Typography>
@@ -527,27 +527,25 @@ function AllocationNote({ strategies }: { strategies: BoardStrategy[] }) {
       </Typography>
       <Box component="ul" sx={{ mt: 0.5, mb: 0, pl: 3 }}>
         <li>
-          Every symbol is always in one of three states: <b>long position</b>, <b>short position</b>,
-          or <b>no position</b>. Trade the entries and exits shown above; size them, don&apos;t just
-          equal-weight.
+          <b>Equal capital</b> is the default. The budget includes eligible flat names, so
+          inactive allocations stay in cash. Positions retain their entry units until exit.
         </li>
         <li>
-          <b>Size by volatility</b>: smaller position in a jumpy name, larger in a calm one, so each
-          risks about the same. Aim for a whole-book volatility near <b>~12% a year</b>; cap any one
-          name around <b>10%</b> of the account.
+          <b>Inverse volatility</b> is an alternative, using 60 daily returns and a 1% annual
+          volatility floor. It changes the asset mix as well as the risk.
         </li>
         <li>
-          <b>Spread across sleeves</b>, don&apos;t let equities dominate: roughly equities 50 / bonds
-          20 / commodities 15 / crypto 5 / other 10 of the risk budget.
+          <b>Capped volatility</b> also limits entry exposure to 10% per symbol, 70%
+          equities/other ETFs, 40% bonds and 10% crypto. Reductions stay cash; caps do not force exits.
         </li>
         <li>
-          <b>Direction</b>: default <b>long only</b>. The research says the short side earns its keep
-          only for <b>bond ETFs</b> and <b>BTC/USD</b> (it pays in their bear legs at little Sharpe
-          cost). The board still shows every short setup so you can watch them.
+          <b>Direction</b>: long-only by default. Short stays available as a fixed comparison;
+          no profitable-short claim is attached to bonds or crypto. Combined portfolios start
+          with half the capital per direction and reserve short proceeds.
         </li>
         <li>
-          Re-check sizing about <b>weekly</b>, not every day. These are reference numbers from the
-          frozen research, not a live optimiser — see the handoff doc.
+          Review fresh allocation estimates and historical funded trades on the <b>Sizing</b>
+          page. Independent signals do not imply two full account allocations to the same asset.
         </li>
       </Box>
       {strategies.length > 0 && (
@@ -596,6 +594,7 @@ function WatchRow({ r }: { r: BoardRow }) {
       </TableCell>
       <TableCell>
         <StateCell row={r} />
+        {r.directions?.long?.state === 'long' && r.directions?.short?.state === 'short' && <Chip size="small" label="+ short benchmark" sx={{ml:1}} />}
       </TableCell>
       <TableCell>{r.state_since ?? NA}</TableCell>
       <TableCell align="right">{flat ? NA : daysSince(r.state_since)}</TableCell>

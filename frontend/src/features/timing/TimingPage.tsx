@@ -118,7 +118,7 @@ export function TimingPage() {
 
   // Long / short is a VIEW filter — every Run stores both sides; this only
   // controls which markers / trades / metrics are rendered.
-  const savedView = (localStorage.getItem(LS_VIEW) ?? "long,short").split(",");
+  const savedView = (localStorage.getItem(LS_VIEW) ?? "long").split(",");
   const [dirLong, setDirLong] = useState(savedView.includes("long"));
   const [dirShort, setDirShort] = useState(savedView.includes("short"));
   const bothOff = !dirLong && !dirShort;
@@ -162,7 +162,7 @@ export function TimingPage() {
   );
 
   // Pre-fill the form from the symbol's assigned strategy. Re-resolve when the
-  // symbol changes so a bond ETF shows its slow-entry parameters.
+  // symbol changes so previews use that asset's current long preset.
   useEffect(() => {
     void timingApi.resolved(symbol).then((r) => {
       setParams(r.strategy.params);
@@ -217,6 +217,11 @@ export function TimingPage() {
 
     const visibleTrades = trades.filter((t) => keep(t.direction));
     const visibleMarkers = markers.filter((m) => keep(m.side));
+    const side = data?.directions?.[effLong ? 'long' : 'short'];
+    if (!showBoth && side?.metrics && side.equity) {
+      return { trades: visibleTrades, markers: visibleMarkers, metrics: side.metrics,
+        equity: side.equity, state: side.state, filtered: true };
+    }
 
     if (showBoth || !data || data.status !== "ok") {
       return {
@@ -246,12 +251,23 @@ export function TimingPage() {
       drawdown: drawdownCurve(stratEq),
     };
 
-    const state = filterState(data.state, visibleTrades);
+    const state = side?.state ?? filterState(data.state, visibleTrades);
 
     return { trades: visibleTrades, markers: visibleMarkers, metrics, equity, state, filtered: true };
   }, [data, effLong, effShort, showBoth]);
 
   const m = view.metrics;
+  const visibleSides = (['long', 'short'] as const).filter(side => side === 'long' ? effLong : effShort);
+  const pendingActions = data?.directions
+    ? visibleSides.map(side => data.directions?.[side]?.pending_action).filter(action => action != null)
+    : [data?.pending_action].filter(action => action != null).filter(action => visibleSides.includes(action.direction));
+  const keyLevels = data?.directions
+    ? [...(data.key_levels ?? []).filter(level => level.kind !== 'stop'),
+      ...visibleSides.flatMap(side => {
+        const stop = data.directions?.[side]?.state.current_stop;
+        return stop == null ? [] : [{price: stop, label: `${side} stop`, kind: 'stop'}];
+      })]
+    : data?.key_levels ?? [];
 
   return (
     <div>
@@ -259,11 +275,11 @@ export function TimingPage() {
         Timing
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
-        The trend rule ({strategyLabel || "Naive Donchian V1"}) drilled into one symbol: its long /
-        short entries and exits over the full price history, plus rule-only performance metrics. Run
-        recomputes live with the parameters below and is <b>not saved</b> — the Trend board always
-        uses the symbol&apos;s assigned strategy. Every run computes both directions; the Long /
-        Short toggles below only change what is shown.
+        Long uses {strategyLabel || 'the assigned preset'}; the default is 20/55 with an initial 3×ATR stop and no Chandelier.
+        Short: independent fixed 20/20 benchmark, initial 2×ATR and Chandelier 3×ATR.
+        Run previews both directions; the toggles change the view without changing exits.
+        Both together show two accounts starting with equal capital. Portfolio sizing and
+        short borrowing costs are handled on the Sizing page.
       </Typography>
 
       <Stack
@@ -343,18 +359,14 @@ export function TimingPage() {
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 900 }}>
                 <b>Donchian channel breakout</b> — the classic <i>Turtle</i> trend-following rule. It
-                assumes that once price clears its recent extreme, a trend has likely begun and tends
-                to continue. So it <b>enters long when the close makes a new {params.entry_len}-day
-                high</b> (and short on a new {params.entry_len}-day low), then rides the position with
-                a trailing stop and <b>exits</b> when price closes back to a shorter{" "}
-                {params.exit_len}-day extreme against it, or a volatility-based stop is hit. It never
-                forecasts — it only reacts to price. Slow to get in, quick to get out.
+                <b>enters long when the close exceeds the prior {params.entry_len}-bar high</b>.
+                A close below the prior {params.exit_len}-bar low schedules an exit at the next open.
+                The initial ATR stop is fixed at entry. Chandelier is off in the default long preset.
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 900 }}>
-                This is a <b>naive, unvalidated v1</b> and right now the <b>only model — a placeholder
-                to get the app working</b>. Later models (MA-ensemble à la Man / AHL; chart-formation
-                entries — base breakout, double top / bottom, right-side breakout-with-stop) will each
-                get their own long / short parameters and appear in the <b>Model</b> dropdown.
+                These controls preview the long preset only. The short benchmark stays fixed and
+                runs independently, so long changes cannot alter its comparison history.
+                Additional strategy families are parked.
               </Typography>
 
               <Button size="small" sx={{ mt: 1, px: 0 }} onClick={() => setShowGuide((s) => !s)}>
@@ -371,13 +383,12 @@ export function TimingPage() {
                     that is where sustained moves start. Mirrored on the low side for shorts.
                   </li>
                   <li>
-                    <b>Model exit</b> — a close back below the lowest low of the last (shorter)
-                    <i> exit channel</i> days: the trend has rolled over. Shorter than the entry
-                    window on purpose, so you give back less of the run.
+                    <b>Model exit</b> — a close below the prior exit-channel low. The default
+                    long exit uses 55 bars, allowing longer trends to develop.
                   </li>
                   <li>
-                    <b>Initial stop</b> — <code>entry ∓ (initial-stop ×ATR)</code>. A fixed,
-                    volatility-scaled cap on the loss if the breakout immediately fails.
+                    <b>Initial stop</b> — <code>entry − (initial-stop ×ATR)</code> for longs.
+                    It is fixed at entry; a gap through it fills at the opening price.
                   </li>
                   <li>
                     <b>Trailing stop (Chandelier)</b> — <code>best price since entry ∓ (chandelier
@@ -404,7 +415,7 @@ export function TimingPage() {
                 </Typography>
               </Typography>
               <Stack direction="row" useFlexGap sx={{ flexWrap: "wrap", gap: 2 }}>
-                {NUM_FIELDS.map((f) => (
+                {NUM_FIELDS.filter(f => f.key !== 'chandelier_k' || params.trailing_enabled !== false).map((f) => (
                   <TextField
                     key={f.key}
                     label={f.label}
@@ -420,6 +431,7 @@ export function TimingPage() {
                 <TextField
                   select
                   label="Trail mode"
+                  disabled={params.trailing_enabled === false}
                   size="small"
                   sx={{ width: 230 }}
                   helperText="How the trailing stop is computed: chandelier (best price ∓ k×ATR), exit_channel (the exit Donchian), or atr_trail (close ∓ k×ATR)."
@@ -448,6 +460,8 @@ export function TimingPage() {
                   ))}
                 </TextField>
                 <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                  <FormControlLabel control={<Switch checked={params.initial_enabled !== false} onChange={e => setParam('initial_enabled', e.target.checked)} />} label="Long initial stop" />
+                  <FormControlLabel control={<Switch checked={params.trailing_enabled !== false} onChange={e => setParam('trailing_enabled', e.target.checked)} />} label="Long trailing stop" />
                   <FormControlLabel
                     control={
                       <Switch
@@ -459,20 +473,6 @@ export function TimingPage() {
                   />
                   <Typography variant="caption" color="text.secondary" sx={{ ml: 1.5, maxWidth: 260 }}>
                     Only take longs above the regime MA, shorts below it — filters counter-trend trades.
-                  </Typography>
-                </Box>
-                <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={params.stop_and_reverse}
-                        onChange={(e) => setParam("stop_and_reverse", e.target.checked)}
-                      />
-                    }
-                    label="Stop & reverse"
-                  />
-                  <Typography variant="caption" color="text.secondary" sx={{ ml: 1.5, maxWidth: 260 }}>
-                    On an opposite breakout, flip straight into the reverse position instead of going flat.
                   </Typography>
                 </Box>
               </Stack>
@@ -502,12 +502,12 @@ export function TimingPage() {
           Run {symbol} to calculate this preview with the current trading rules, or rerun Trend for the saved board.
         </Alert>
       )}
-      {data?.pending_action && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Signal confirmed {data.pending_action.signal_date}: {data.pending_action.action === "reverse" ? "reverse to" : data.pending_action.action}{" "}
-          {data.pending_action.direction} at the next session’s open. Fill pending.
+      {pendingActions.map(action => (
+        <Alert key={action.direction} severity="info" sx={{ mb: 2 }}>
+          Signal confirmed {action.signal_date}: {action.action === "reverse" ? "reverse to" : action.action}{" "}
+          {action.direction} at the next session’s open. Fill pending.
         </Alert>
-      )}
+      ))}
       {data?.status === "ok" && data.chart_cached === false && (
         <Alert severity="info" sx={{ mb: 2 }}>
           Computed by the last <b>Trend</b> run — trades, markers and combined metrics are shown, but
@@ -524,7 +524,7 @@ export function TimingPage() {
             useFlexGap
             sx={{ mb: 1, alignItems: "center", flexWrap: "wrap" }}
           >
-            {view.state && <StateChip state={view.state} />}
+            {showBoth && data.directions ? Object.entries(data.directions).map(([side, d]) => d && <Box key={side}><Typography variant="caption">{side === 'long' ? 'Long strategy' : 'Short benchmark'}</Typography><StateChip state={d.state} /></Box>) : view.state && <StateChip state={view.state} />}
             <Box sx={{ display: "flex", alignItems: "center" }}>
               <Typography variant="body2" color="text.secondary" sx={{ mr: 0.5 }}>
                 Show
@@ -574,9 +574,9 @@ export function TimingPage() {
           <Paper sx={{ p: 1, mb: 2 }}>
             <TimingChart
               bars={data.bars ?? []}
-              overlays={data.overlays}
+              overlays={showBoth && data.directions?.long?.overlays ? {...data.directions.long.overlays, short_stop_line: data.directions.short?.overlays?.stop_line} : data.directions?.[effLong ? 'long' : 'short']?.overlays ?? data.overlays}
               markers={view.markers}
-              keyLevels={data.key_levels ?? []}
+              keyLevels={keyLevels}
               timeframe={timeframe}
               range={range}
               mas={mas}
@@ -596,8 +596,8 @@ export function TimingPage() {
               </Typography>
               {view.filtered && (
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-                  {effLong ? "Long" : "Short"}-only view: that side&apos;s isolated contribution, not a
-                  re-run — check both boxes for the real combined result.
+                  {effLong ? "Long strategy" : "Short benchmark"}: standalone account performance.
+                  Selecting both shows two independent accounts starting with equal capital.
                 </Typography>
               )}
               <Stack direction={{ xs: "column", md: "row" }} spacing={4}>

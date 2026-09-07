@@ -28,6 +28,9 @@ const PARAM_ORDER: (keyof SignalParams)[] = [
   "exit_len",
   "atr_len",
   "atr_stop_mult",
+  "initial_enabled",
+  "channel_enabled",
+  "trailing_enabled",
   "trail_mode",
   "chandelier_k",
   "atr_trail_k",
@@ -67,11 +70,11 @@ export function StrategiesPage() {
         Strategies
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2, maxWidth: 900 }}>
-        The parameter sets the <b>Trend</b> run uses. Every symbol resolves to exactly one strategy;
-        unassigned or newly-synced symbols fall back to the default. Editing a live strategy is
-        deliberately not offered — a genuinely different parameter set is a new strategy (V3, V4…).
-        Direction is <b>not</b> a strategy setting: the board computes long <i>and</i> short for every
-        symbol regardless, so a future short-capable strategy needs no re-fetch. Engine{" "}
+        Each asset has one assigned <b>long preset</b>. The default is 20-bar entry, 55-bar
+        channel exit and an initial 3×ATR stop, without Chandelier. Short runs independently
+        with the fixed 20/20, initial 2×ATR and Chandelier 3×ATR benchmark.
+        Assignments change the long preset; the short benchmark stays fixed.
+        Multiple strategy families are parked. Engine{" "}
         {engineVersion}.
       </Typography>
 

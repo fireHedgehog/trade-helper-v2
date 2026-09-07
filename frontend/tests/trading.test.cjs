@@ -11,91 +11,26 @@ require.extensions[".ts"] = (module, filename) => {
   });
   module._compile(outputText, filename);
 };
-const { computeSizing } = require("../src/features/sizing/engine.ts");
-const { zeroDeployed } = require("../src/features/sizing/constants.ts");
-const { filterDaily, filterState, compound } = require("../src/features/timing/metrics.ts");
+const { computeAllocation } = require("../src/features/sizing/engine.ts");
+const { DEFAULT_PARAMS } = require("../src/features/sizing/types.ts");
+const { filterDaily, filterState, compound, summariseView } = require("../src/features/timing/metrics.ts");
 const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-8, `${actual} != ${expected}`);
 const macro = { source: "none", score: null, zone: "neutral", label: "test" };
-const params = () => ({ nav: 1e6, volTargetPct: 12, kMax: 1, perNameCapPct: 10,
-  perSectorCapPct: 30, bookVolOverridePct: null, enforceSleeveBudget: false, sleeveBudget: {},
-  scopeLong: true, scopeShort: false, shortResearchOnly: false, scopeWatchlist: false,
-  mode: "full", newDays: 10, macroEnabled: false, neutralScale: .65, riskOffScale: .35,
-  deployed: zeroDeployed() });
-function board() {
-  const sectors = ["Information Technology", "Energy", "Financials", "Health Care", "Industrials"];
-  return { status: "ok", computed_at: "2026-09-05T12:00:00Z", short: [], flat: [], watchlist: [],
-    long: Array.from({ length: 10 }, (_, i) => ({ symbol: `TEST${i}`, state: "long",
-      state_since: "2026-09-01", last_close: 100, vol_60d: .10, sector: sectors[i % 5] })) };
-}
-
-test("entering the proposed holdings does not shrink the target or tell you to sell half", () => {
-  const b = board(), p = params();
-  const flat = computeSizing(b, p, macro);
-  close(flat.targetGrossPct, 100);
-  for (const l of flat.sleeveLoads) p.deployed[l.sleeve] = l.targetPct;
-  const held = computeSizing(b, p, macro);
-  close(held.targetGrossPct, 100);
-  close(held.headroomPct, 0);
-  close(held.overshootPct, 0);
-  assert.ok(held.rows.every(r => r.verdict === "BLOCKED"));
-  for (const l of held.sleeveLoads) { close(l.newPct, 0); close(l.trimPct, 0); }
+test("filtered-view CAGR uses calendar time for stocks and crypto, including cash periods", () => {
+  for (const observations of [4, 1009, 1462]) {
+    const growth = 1.1 ** 4;
+    const daily = Array.from({ length: observations }, (_, i) => ({
+      date: new Date(Date.UTC(2020, 0, 1) + Math.round(1461 * i / (observations - 1)) * 86400000).toISOString().slice(0, 10),
+      state: i === observations - 1 ? 1 : 0,
+      strat_ret: i === observations - 1 ? growth - 1 : 0,
+      long_ret: i === observations - 1 ? growth - 1 : 0,
+      short_ret: 0,
+    }));
+    const result = summariseView([], filterDaily(daily, true, false));
+    close(result.strategy.total_return, growth - 1);
+    close(result.strategy.cagr, .1);
+  }
 });
-
-test("crowded holdings change add/trim cues, not total target weights", () => {
-  const b = board(), p = params();
-  const flat = computeSizing(b, p, macro);
-  p.deployed.Energy = 40;
-  const held = computeSizing(b, p, macro);
-  assert.deepEqual(held.rows.map(r => r.targetUsd), flat.rows.map(r => r.targetUsd));
-  const energy = held.sleeveLoads.find(l => l.sleeve === "Energy");
-  close(energy.targetPct, 20); close(energy.trimPct, 20); close(energy.newPct, 0);
-  assert.ok(held.rows.filter(r => r.sleeve === "Energy").every(r => r.verdict === "TRIM"));
-});
-
-test("quantity rounding and cash agree; zero-unit targets never say ADD", () => {
-  const b = board(), p = params();
-  b.long[0].last_close = 200000;
-  const r = computeSizing(b, p, macro);
-  const zero = r.rows.find(r => r.symbol === "TEST0");
-  assert.equal(zero.shares, 0); assert.equal(zero.verdict, "WAIT"); close(zero.targetUsd, 0);
-  close(r.targetGrossPct, r.rows.reduce((a, r) => a + r.shares * r.lastClose / p.nav * 100, 0));
-  close(r.cashAfterPct, 100 - r.targetGrossPct);
-});
-
-test("crypto uses fractional provider increments and minimum size", () => {
-  const b = board(), p = params();
-  b.long[0] = { ...b.long[0], symbol: "BTC/USD", last_close: 123456,
-    quantity_increment: .0001, min_order_size: .001 };
-  const r = computeSizing(b, p, macro).rows.find(r => r.symbol === "BTC/USD");
-  assert.ok(r.shares > 0 && r.shares < 1);
-  close(r.shares / .0001, Math.round(r.shares / .0001));
-  close(r.targetUsd, r.shares * 123456);
-  b.long[0].min_order_size = 1;
-  const blocked = computeSizing(b, p, macro).rows.find(r => r.symbol === "BTC/USD");
-  assert.equal(blocked.shares, 0); assert.equal(blocked.verdict, "WAIT");
-});
-
-test("recent-entry view preserves full-book targets and comparisons", () => {
-  const b = board(), p = params();
-  b.long[0].state_since = "2020-01-01";
-  const all = computeSizing(b, p, macro);
-  p.mode = "new";
-  const recent = computeSizing(b, p, macro);
-  assert.equal(recent.rows.length, 9);
-  close(recent.targetGrossPct, all.targetGrossPct);
-  assert.deepEqual(recent.sleeveLoads, all.sleeveLoads);
-});
-
-test("pending entries can be sized and pending exits leave the target", () => {
-  const b = board(), p = params();
-  b.long[0].pending_action = { action: "exit", direction: "long", signal_date: "2026-09-05" };
-  b.pending = [{ ...b.long[1], symbol: "NEW", state: "flat", state_since: null,
-    pending_action: { action: "enter", direction: "long", signal_date: "2026-09-05" } }];
-  const r = computeSizing(b, p, macro);
-  assert.ok(!r.rows.some(r => r.symbol === "TEST0"));
-  assert.ok(r.rows.some(r => r.symbol === "NEW" && r.state === "long" && r.shares > 0));
-});
-
 test("hiding shorts preserves the current long trailing stop", () => {
   const state = { state: "long", state_since: "2026-08-04", entry_price: 760.63,
     last_close: 773.17, unrealized_pct: .016, current_stop: 759.36 };
@@ -113,4 +48,57 @@ test("direction filters retain exit-day costs and split a reversal day correctly
   close(compound(filterDaily(daily, false, true).map(d => d.strat_ret)).at(-1), 1.1);
   close(compound(filterDaily(daily, true, true).map(d => d.strat_ret)).at(-1), .99 * .8 * 1.1);
   close(compound(filterDaily(daily, false, false).map(d => d.strat_ret)).at(-1), 1);
+});
+
+
+function allocationBoard() {
+  return {status:'ok',computed_at:'2026-09-05T12:00:00Z',long:[],short:[],flat:[],watchlist:[],
+    universe:Array.from({length:10},(_,i)=>({symbol:'TEST'+i,priority:true,bars:420,
+      state:'long',state_since:'2026-08-01',last_date:'2026-09-05',last_close:100,
+      atr_20:2,vol_60d:.1,asset_class:'Equities and other ETFs',quantity_increment:1,min_order_size:1}))};
+}
+test('flat allocations remain cash instead of concentrating the active signals',()=>{
+  const b=allocationBoard();b.universe.slice(1).forEach(r=>r.state='flat');
+  const r=computeAllocation(b,{...DEFAULT_PARAMS});
+  assert.equal(r.eligible,10);assert.equal(r.rows.length,1);
+  assert.ok(r.gross<10000 && r.free>90000);
+  close(r.gross+r.costs+r.free,100000);
+});
+test('equal capital and inverse volatility use all eligible assets',()=>{
+  const b=allocationBoard();b.universe[0].vol_60d=.2;
+  const equal=computeAllocation(b,{...DEFAULT_PARAMS});
+  const vol=computeAllocation(b,{...DEFAULT_PARAMS,method:'inverse-vol'});
+  assert.equal(equal.rows[0].units,equal.rows[1].units);
+  assert.ok(Math.abs(vol.rows[0].units*2-vol.rows[1].units)<=1);
+});
+test('both direction budgets coexist and aggregate symbol caps use gross exposure',()=>{
+  const b=allocationBoard();b.universe=b.universe.slice(0,1);
+  const row=b.universe[0];row.directions={long:{...row,state:'long'},short:{...row,state:'short'}};
+  const r=computeAllocation(b,{...DEFAULT_PARAMS,book:'combined-initial',method:'capped-vol'});
+  assert.equal(r.rows.length,2);assert.ok(r.rows[0].units>0&&r.rows[1].units<0);
+  assert.ok(r.gross<=10000);close(r.gross+r.costs+r.free,100000);
+});
+test('pending exits are omitted and pending entries retain their side',()=>{
+  const b=allocationBoard();
+  b.universe[0].pending_action={action:'exit',direction:'long',signal_date:'2026-09-05'};
+  b.universe[1].state='flat';b.universe[1].pending_action={action:'enter',direction:'long',signal_date:'2026-09-05'};
+  const r=computeAllocation(b,{...DEFAULT_PARAMS});
+  assert.ok(!r.rows.some(r=>r.symbol==='TEST0'));assert.ok(r.rows.find(r=>r.symbol==='TEST1').pending);
+});
+test('crypto increments and minimum sizes reconcile with unallocated capital',()=>{
+  const b=allocationBoard();Object.assign(b.universe[0],{symbol:'BTC/USD',last_close:123456,quantity_increment:.0001,min_order_size:.001});
+  const p={...DEFAULT_PARAMS};let r=computeAllocation(b,p);
+  const btc=r.rows.find(r=>r.symbol==='BTC/USD');assert.ok(btc.units>0&&btc.units<1);
+  close(btc.units/.0001,Math.round(btc.units/.0001));close(r.gross+r.costs+r.free,p.capital);
+  b.universe[0].min_order_size=1;r=computeAllocation(b,p);assert.equal(r.rows.find(r=>r.symbol==='BTC/USD').units,0);
+});
+test('missing volatility and stale histories are excluded without an invented volatility',()=>{
+  const b=allocationBoard();b.universe[0].vol_60d=null;b.universe[1].last_date='2020-01-01';
+  const r=computeAllocation(b,{...DEFAULT_PARAMS});assert.equal(r.eligible,8);
+});
+test('independent direction views preserve the combined account return',()=>{
+  const d=[{date:'2026-01-01',state:2,long_active:true,short_active:true,long_ret:.2,short_ret:-.2,strat_ret:0}];
+  close(filterDaily(d,true,true)[0].strat_ret,0);
+  close(filterDaily(d,true,false)[0].strat_ret,.2);
+  close(filterDaily(d,false,true)[0].strat_ret,-.2);
 });

@@ -26,7 +26,7 @@ async def paced_get_json(
     *,
     params: dict | None = None,
     headers: dict | None = None,
-) -> dict:
+) -> dict | list:
     """GET returning parsed JSON, spaced by `limiter`, retrying 429/5xx."""
     settings = get_settings()
     attempt = 0

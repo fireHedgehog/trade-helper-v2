@@ -1,0 +1,9 @@
+{
+  "account_scenarios": 228396,
+  "closed_trades_across_cost_scenarios": 2767710,
+  "open_or_exhaustion_marks": 110278,
+  "saved_step3_anchor_bridges": 2034,
+  "past_only_selection_check": true,
+  "portable_json_and_csv_reconcile": true,
+  "all_files_under_100MiB": true
+}

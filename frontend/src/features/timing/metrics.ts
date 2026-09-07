@@ -9,9 +9,11 @@ export function filterDaily(daily: DailyPoint[], long: boolean, short: boolean):
   return daily.map((d) => {
     const longRet = d.long_ret ?? (d.state === 1 ? d.strat_ret : 0);
     const shortRet = d.short_ret ?? (d.state === -1 ? d.strat_ret : 0);
+    const activeLong = long && (d.long_active ?? d.state === 1);
+    const activeShort = short && (d.short_active ?? d.state === -1);
     return { ...d,
-      state: ((d.state === 1 && !long) || (d.state === -1 && !short)) ? 0 : d.state,
-      strat_ret: (long ? 1 + longRet : 1) * (short ? 1 + shortRet : 1) - 1,
+      state: activeLong && activeShort ? 2 : activeLong ? 1 : activeShort ? -1 : 0,
+      strat_ret: long && short ? d.strat_ret : long ? longRet : short ? shortRet : 0,
     };
   });
 }
@@ -74,7 +76,7 @@ function maxDdDays(dd: number[]): number {
   return best;
 }
 
-export function curveStats(rets: number[]): Record<string, number | null> {
+export function curveStats(rets: number[], dates: string[]): Record<string, number | null> {
   if (rets.length < 2) {
     return {
       total_return: null, cagr: null, vol_annual: null, sharpe: null,
@@ -83,7 +85,7 @@ export function curveStats(rets: number[]): Record<string, number | null> {
   }
   const equity = compound(rets);
   const last = equity[equity.length - 1];
-  const years = rets.length / TD;
+  const years = (Date.parse(dates[dates.length - 1]) - Date.parse(dates[0])) / (86400000 * 365.25);
   const cagr = last > 0 && years > 0 ? last ** (1 / years) - 1 : null;
   const m = mean(rets) as number;
   const s = pstd(rets);
@@ -137,6 +139,6 @@ export function summariseView(trades: Trade[], daily: DailyPoint[]) {
       avg_mfe_atr: mean(closed.map((t) => t.mfe_atr).filter((x): x is number => x != null)),
       exposure: daily.length ? daily.filter((d) => d.state !== 0).length / daily.length : null,
     } as Record<string, number | string | null>,
-    strategy: curveStats(daily.map((d) => d.strat_ret)),
+    strategy: curveStats(daily.map((d) => d.strat_ret), daily.map((d) => d.date)),
   };
 }

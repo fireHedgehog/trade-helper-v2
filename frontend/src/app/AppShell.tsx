@@ -122,7 +122,7 @@ export function AppShell() {
           </Stack>
           {open && (
             <Typography variant="caption" color="text.secondary" sx={{ mt: 0.25 }}>
-              Naive-v1 research. Nothing here is validated.
+              Local trading research. No broker orders.
             </Typography>
           )}
         </Box>

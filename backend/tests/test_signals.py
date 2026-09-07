@@ -73,6 +73,32 @@ def test_open_position_has_no_exit_and_metrics_are_sane():
     assert m["strategy"]["max_drawdown"] is None or m["strategy"]["max_drawdown"] <= 0.0
 
 
+@pytest.mark.parametrize("observations", [1009, 1462])
+def test_cagr_uses_calendar_years_for_sessions_and_daily_crypto(observations):
+    from app.features.signals.metrics import summarise
+
+    start = date(2020, 1, 1)
+    days = [(start + timedelta(days=round(1461 * i / (observations - 1)))).isoformat()
+            for i in range(observations)]
+    growth = 1.1 ** 4
+    prices = [100.0] * (observations - 1) + [100 * growth]
+    bars = [{"date": day, "c": price} for day, price in zip(days, prices)]
+    daily = [{"date": day, "state": 0, "strat_ret": growth - 1 if i == observations - 1 else 0}
+             for i, day in enumerate(days)]
+    result = summarise([], daily, bars)
+    for key in ("strategy", "buy_hold"):
+        assert result[key]["total_return"] == pytest.approx(growth - 1)
+        assert result[key]["cagr"] == pytest.approx(0.1)
+
+
+def test_cagr_includes_time_spent_in_cash():
+    from app.features.signals.metrics import _curve_stats
+
+    result = _curve_stats([0, 0, 0, 1.1 ** 4 - 1],
+                          ["2020-01-01", "2021-01-01", "2022-01-01", "2024-01-01"])
+    assert result["cagr"] == pytest.approx(0.1)
+
+
 # ---- API ----
 
 def _seed_bars(conn, symbol: str, n: int = 420) -> None:
@@ -117,7 +143,9 @@ def test_engine_respects_allow_short():
 def test_config_round_trip(client):
     got = client.get("/api/signals/config").json()
     assert got["params"]["entry_len"] == 20
-    assert got["engine_version"] == "donchian-2"
+    assert got["engine_version"] == "donchian-4"
+    assert got['params']['exit_len'] == 55
+    assert got['params']['trailing_enabled'] is False
 
     got["params"]["entry_len"] = 30
     put = client.put("/api/signals/config", json={"name": "tuned", "params": got["params"]})
@@ -137,7 +165,7 @@ def test_run_then_timing_and_stale_flag(client):
     assert "trade_stats" in ran["metrics"]
     # `daily` is returned so the frontend can recompute a long-only / short-only view
     assert len(ran["daily"]) == len(ran["bars"])
-    assert all(d["state"] in (-1, 0, 1) for d in ran["daily"])
+    assert all(d["state"] in (-1, 0, 1, 2) for d in ran["daily"])
     assert len(ran["markers"]) >= 2 * len([t for t in ran["trades"] if t["exit_date"]])
 
     cached = client.get("/api/signals/timing/TREND").json()
@@ -314,6 +342,42 @@ def test_close_fill_does_not_earn_the_signal_bar_move():
     assert r.daily[-1]["strat_ret"] == 0
     assert r.trades[0]["exit_date"] is None
     assert r.pending_action is None
+
+
+@pytest.mark.parametrize("short", [False, True])
+def test_stop_exit_close_can_confirm_a_next_session_entry(short):
+    """An intraday stop does not cancel a fresh signal at that day's close."""
+    from app.features.signals.engine import run
+    from app.features.signals.params import SignalParams
+
+    bars = _execution_bars((100, 104, 100, 103), (103, 130, 102, 129),
+                           (129, 134, 115, 133), (134, 136, 133, 135))
+    if short:
+        bars = [{**b, "o": 200-b["o"], "h": 200-b["l"],
+                 "l": 200-b["h"], "c": 200-b["c"]} for b in bars]
+    p = SignalParams(cost_bps=0, slippage_atr=0, fill_at="open_next")
+    at_close = run(bars[:-1], p)
+    assert at_close.trades[0]["exit_date"] == bars[-2]["date"]
+    assert at_close.pending_action is not None
+    assert at_close.pending_action["action"] == "enter"
+    assert at_close.pending_action["signal_date"] == bars[-2]["date"]
+    complete = run(bars, p)
+    assert len(complete.trades) == 2
+    assert complete.trades[1]["entry_date"] == bars[-1]["date"]
+    assert complete.trades[1]["entry_price"] == bars[-1]["o"]
+    assert complete.trades[1]["direction"] == ("short" if short else "long")
+
+
+def test_close_execution_does_not_reenter_on_stop_session():
+    from app.features.signals.engine import run
+    from app.features.signals.params import SignalParams
+
+    bars = _execution_bars((100, 104, 100, 103), (103, 130, 102, 129),
+                           (129, 134, 115, 133))
+    result = run(bars, SignalParams(fill_at="close", cost_bps=0, slippage_atr=0))
+    assert len(result.trades) == 1
+    assert result.trades[0]["exit_date"] == bars[-1]["date"]
+    assert result.pending_action is None
 
 
 def test_pending_channel_reversal_and_two_direction_accounting():

@@ -117,8 +117,8 @@ def resolve_symbol_params(conn: sqlite3.Connection) -> dict[str, dict]:
         or default_strategy(conn)
     out: dict[str, dict] = {}
     for row in conn.execute(
-        "SELECT symbol, strategy_id FROM assets WHERE active = 1 "
-        "UNION ALL SELECT symbol, strategy_id FROM crypto_assets WHERE active = 1"
+        "SELECT symbol, strategy_id FROM assets "
+        "UNION ALL SELECT symbol, strategy_id FROM crypto_assets"
     ):
         s = strategies.get(row["strategy_id"]) or default
         out[row["symbol"]] = {
@@ -178,7 +178,7 @@ def board_rows(conn: sqlite3.Connection, run_id: int) -> list[dict]:
     rows = conn.execute(
         """
         SELECT symbol, state, state_since, entry_price, last_close, last_date,
-               unrealized_pct, current_stop, vol_60d, pending_action_json
+               unrealized_pct, current_stop, vol_60d, pending_action_json, directions_json
           FROM signal_symbol_stats WHERE run_id = ?
         """,
         (run_id,),
@@ -264,7 +264,7 @@ def stats_for_symbols(conn: sqlite3.Connection, symbols: list[str]) -> dict[str,
     rows = conn.execute(
         f"""
         SELECT s.symbol, s.state, s.state_since, s.entry_price, s.last_close,
-               s.unrealized_pct, s.current_stop, s.vol_60d, s.last_date, s.pending_action_json
+               s.unrealized_pct, s.current_stop, s.vol_60d, s.last_date, s.pending_action_json, s.directions_json
           FROM signal_symbol_stats s
          WHERE s.symbol IN ({ph})
         """,
@@ -304,20 +304,21 @@ def upsert_symbol_stats(conn: sqlite3.Connection, run_id: int, symbol: str, para
         """
         INSERT INTO signal_symbol_stats (run_id, symbol, params_json, state, state_since,
             entry_price, last_close, last_date, unrealized_pct, current_stop, metrics_json,
-            updated_at, profile, strategy_id, vol_60d, pending_action_json)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            updated_at, profile, strategy_id, vol_60d, pending_action_json, directions_json)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(run_id, symbol) DO UPDATE SET
             params_json=excluded.params_json, state=excluded.state, state_since=excluded.state_since,
             entry_price=excluded.entry_price, last_close=excluded.last_close, last_date=excluded.last_date,
             unrealized_pct=excluded.unrealized_pct, current_stop=excluded.current_stop,
             metrics_json=excluded.metrics_json, updated_at=excluded.updated_at, profile=excluded.profile,
             strategy_id=excluded.strategy_id, vol_60d=excluded.vol_60d,
-            pending_action_json=excluded.pending_action_json
+            pending_action_json=excluded.pending_action_json, directions_json=excluded.directions_json
         """,
         (run_id, symbol, params_json, state["state"], state["state_since"],
          state["entry_price"], state["last_close"], state["last_date"],
          state["unrealized_pct"], state["current_stop"], json.dumps(metrics), _now(), profile,
-         strategy_id, vol_60d, json.dumps(state["pending_action"]) if state.get("pending_action") else None),
+         strategy_id, vol_60d, json.dumps(state["pending_action"]) if state.get("pending_action") else None,
+         json.dumps(state.get('directions', {}))),
     )
 
 

@@ -20,9 +20,10 @@ class EngineResult:
     daily: list[dict] = field(default_factory=list)
     overlays: dict = field(default_factory=dict)
     pending_action: dict | None = None
+    directions: dict[str, EngineResult] = field(default_factory=dict)
 
 
-def run(bars: list[dict], params: SignalParams) -> EngineResult:
+def run(bars: list[dict], params: SignalParams, *, start: int = 0) -> EngineResult:
     n = len(bars)
     dates = [b["date"] for b in bars]
     o = [float(b["o"]) for b in bars]
@@ -37,7 +38,7 @@ def run(bars: list[dict], params: SignalParams) -> EngineResult:
     ma_reg = ind.sma(c, params.ma_regime) if params.use_ma_regime else [None] * n
     stops: list[float | None] = [None] * n
     overlays = {"dates": dates, "donchian_up": dc_up_e, "donchian_dn": dc_dn_e,
-                "stop_line": stops}
+                "stop_line": stops, "atr": atr}
     trades: list[dict] = []
     ledger: list[dict] = []
     pos: dict | None = None
@@ -53,7 +54,7 @@ def run(bars: list[dict], params: SignalParams) -> EngineResult:
     def open_position(d: int, t: int, price: float, signal_i: int) -> None:
         nonlocal pos
         a = atr[signal_i] or 0.0
-        stop = price - d * params.atr_stop_mult * a
+        stop = price - d * params.atr_stop_mult * a if params.initial_enabled else None
         pos = {"direction": d, "fill_i": t, "entry_price": price, "entry_atr": a,
                "initial_stop": stop, "stop": stop, "hh": price, "ll": price,
                "mae": 0.0, "mfe": 0.0, "entry_cost": cost(price, a) / price}
@@ -64,7 +65,7 @@ def run(bars: list[dict], params: SignalParams) -> EngineResult:
         d, entry = pos["direction"], pos["entry_price"]
         exit_cost = cost(price, known_atr) / entry if reason else 0.0
         ret = d * (price / entry - 1) - pos["entry_cost"] - exit_cost
-        risk = abs(entry - pos["initial_stop"]) / entry
+        risk = abs(entry - pos["initial_stop"]) / entry if pos["initial_stop"] is not None else 0.0
         a = pos["entry_atr"]
         trades.append({
             "direction": _DIR_NAME[d], "entry_date": dates[pos["fill_i"]],
@@ -95,7 +96,7 @@ def run(bars: list[dict], params: SignalParams) -> EngineResult:
         if pos is not None:
             d = pos["direction"]
             active_stop = pos["stop"]
-            hit = low[t] <= active_stop if d == 1 else h[t] >= active_stop
+            hit = active_stop is not None and (low[t] <= active_stop if d == 1 else h[t] >= active_stop)
             if hit:
                 price = min(o[t], active_stop) if d == 1 else max(o[t], active_stop)
                 # Daily bars do not establish the favorable excursion before a stop.
@@ -114,14 +115,14 @@ def run(bars: list[dict], params: SignalParams) -> EngineResult:
                 pos["mae"] = min(pos["mae"], adverse)
                 pos["mfe"] = max(pos["mfe"], favorable)
 
-        if t < params.warmup() or atr[t] is None or dc_up_e[t] is None:
+        if t < max(start, params.warmup()) or atr[t] is None or dc_up_e[t] is None:
             continue
 
         if pos is not None:
             d = pos["direction"]
             channel_exit = (d == 1 and dc_dn_x[t] is not None and c[t] < dc_dn_x[t]) or (
                 d == -1 and dc_up_x[t] is not None and c[t] > dc_up_x[t])
-            if channel_exit:
+            if params.channel_enabled and channel_exit:
                 reverse = params.stop_and_reverse and allowed(-d)
                 if params.fill_at == "close":
                     close_position(t, c[t], "channel_reversal", atr[t])
@@ -131,7 +132,9 @@ def run(bars: list[dict], params: SignalParams) -> EngineResult:
                     pending = {"action": "reverse" if reverse else "exit",
                                "direction": -d if reverse else d, "signal_i": t,
                                "reason": "channel_reversal"}
-        elif not exited:
+        elif not exited or params.fill_at == "open_next":
+            # A stop prevents another fill today, but today's closing breakout
+            # can still confirm an order for the following session.
             d = 1 if c[t] > dc_up_e[t] else (-1 if c[t] < dc_dn_e[t] else 0)
             if d and params.use_ma_regime and ma_reg[t] is not None:
                 if (d == 1 and c[t] <= ma_reg[t]) or (d == -1 and c[t] >= ma_reg[t]):
@@ -143,7 +146,7 @@ def run(bars: list[dict], params: SignalParams) -> EngineResult:
                     pending = {"action": "enter", "direction": d, "signal_i": t,
                                "reason": "breakout"}
 
-        if pos is not None:
+        if pos is not None and params.trailing_enabled:
             # Revise after the close; never test this revised stop on today's range.
             d, a = pos["direction"], atr[t]
             if params.trail_mode == "chandelier":
@@ -153,7 +156,8 @@ def run(bars: list[dict], params: SignalParams) -> EngineResult:
             else:
                 # Tomorrow's channel includes the just-completed bar.
                 trail = min(low[max(0, t - params.exit_len + 1):t + 1]) if d == 1 else max(h[max(0, t - params.exit_len + 1):t + 1])
-            pos["stop"] = max(pos["stop"], trail) if d == 1 else min(pos["stop"], trail)
+            pos["stop"] = trail if pos["stop"] is None else max(pos["stop"], trail) if d == 1 else min(pos["stop"], trail)
+        if pos is not None:
             stops[t] = pos["stop"]
 
     if pos is not None:
@@ -185,6 +189,30 @@ def run(bars: list[dict], params: SignalParams) -> EngineResult:
                "signal_date": dates[pending["signal_i"]], "fill_at": "open_next",
                "reason": pending["reason"]} if pending else None)
     return EngineResult(trades=trades, daily=daily, overlays=overlays, pending_action=action)
+
+
+def run_pair(bars: list[dict], long_params: SignalParams) -> EngineResult:
+    """Independent long strategy and fixed short benchmark; equal initial books."""
+    from app.features.signals.params import SHORT_PARAMS
+
+    start = max(65, long_params.warmup(), SHORT_PARAMS.warmup())
+    long = run(bars, long_params.model_copy(update={"allow_long": True, "allow_short": False}), start=start)
+    short = run(bars, SHORT_PARAMS, start=start)
+    long_equity = short_equity = previous = 1.0
+    daily = []
+    for l, s in zip(long.daily, short.daily):
+        long_equity *= 1 + l["strat_ret"]
+        short_equity *= 1 + s["strat_ret"]
+        combined = (long_equity + short_equity) / 2
+        daily.append({"date": l["date"], "state": 2 if l["state"] and s["state"] else l["state"] or s["state"],
+                      "long_active": bool(l["state"]), "short_active": bool(s["state"]),
+                      "long_ret": l["strat_ret"], "short_ret": s["strat_ret"],
+                      "strat_ret": combined / previous - 1 if previous > 0 else 0.0})
+        previous = combined
+    trades = sorted(long.trades + short.trades, key=lambda t: (t["entry_date"], t["direction"]))
+    return EngineResult(trades=trades, daily=daily, overlays=long.overlays,
+                        pending_action=long.pending_action or short.pending_action,
+                        directions={"long": long, "short": short})
 
 
 def buy_hold_daily(bars: list[dict]) -> list[float]:

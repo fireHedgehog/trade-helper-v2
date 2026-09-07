@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import math
 import statistics as st
+from datetime import date
 
 from app.features.signals.engine import buy_hold_daily, compound, drawdown_curve
 
@@ -39,13 +40,13 @@ def _max_dd_days(dd: list[float]) -> int:
     return best
 
 
-def _curve_stats(rets: list[float]) -> dict:
+def _curve_stats(rets: list[float], dates: list[str]) -> dict:
     if len(rets) < 2:
         return {k: None for k in ("total_return", "cagr", "vol_annual", "sharpe",
                                   "sortino", "max_drawdown", "max_dd_days", "calmar")}
     equity = compound(rets)
     total = equity[-1] - 1.0
-    years = len(rets) / _TRADING_DAYS
+    years = (date.fromisoformat(dates[-1]) - date.fromisoformat(dates[0])).days / 365.25
     cagr = (equity[-1] ** (1 / years) - 1.0) if equity[-1] > 0 and years > 0 else None
     mean = st.mean(rets)
     std = st.pstdev(rets)
@@ -81,7 +82,7 @@ def summarise(trades: list[dict], daily: list[dict], bars: list[dict]) -> dict:
         "trades": len(closed),
         "wins": len(wins),
         "losses": len(losses),
-        "open_position": open_trade["direction"] if open_trade else None,
+        "open_position": '+'.join(sorted({t['direction'] for t in trades if t['exit_date'] is None})) or None,
         "win_rate": (len(wins) / len(closed)) if closed else None,
         "avg_win_pct": avg_win,
         "avg_loss_pct": avg_loss,
@@ -99,8 +100,8 @@ def summarise(trades: list[dict], daily: list[dict], bars: list[dict]) -> dict:
     }
 
     strat_rets = [d["strat_ret"] for d in daily]
-    strat = _curve_stats(strat_rets)
-    bh = _curve_stats(buy_hold_daily(bars))
+    strat = _curve_stats(strat_rets, [d["date"] for d in daily])
+    bh = _curve_stats(buy_hold_daily(bars), [b["date"] for b in bars])
 
     return {
         "label": LABEL,

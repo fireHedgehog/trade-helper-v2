@@ -287,7 +287,7 @@ function CryptoPanel({ tick, bump }: { tick: number; bump: () => void }) {
   ];
 
   return (
-    <Section title="Crypto" description="BTC/USD and ETH/USD daily bars (Alpaca crypto, 24/7).">
+    <Section title="Crypto" description="BTC/USD and ETH/USD daily trade candles from Coinbase Exchange. Completed UTC days, 24/7; no API key needed.">
       <FetchPanel kind="crypto_bars" allowFullMode buttonLabel="Fetch crypto bars" onDone={bump} />
       <Box sx={{ mt: 2 }}>
         <SimpleTable columns={columns} rows={rows} rowKey={(r) => r.symbol} onRowClick={setSelected} />

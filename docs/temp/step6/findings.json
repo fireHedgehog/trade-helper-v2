@@ -1,0 +1,3405 @@
+{
+  "priority_comparison": [
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "long-channel",
+      "method": "equal",
+      "cost": "normal",
+      "stats": {
+        "ending": 329399.16545350413,
+        "net": 2.2939916545350414,
+        "cagr": 0.11821169227883455,
+        "drawdown": -0.20922449432639822,
+        "average_gross": 0.829093878574704,
+        "maximum_gross": 1.0,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 2847.58688412461,
+        "slippage": 5842.306263146323,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.10706197879499356,
+        "largest_group_fraction": 0.7953504369338226,
+        "annual": [
+          {
+            "year": "2016",
+            "net": 0.04948238568030994,
+            "drawdown": -0.03502881701422289,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.2168774044496613,
+            "drawdown": -0.028123739114292223,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": 0.017953070568381246,
+            "drawdown": -0.08702897084577932,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.17536393410701367,
+            "drawdown": -0.05055077453849033,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.24140623277047157,
+            "drawdown": -0.13679661462954318,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.21721743805698113,
+            "drawdown": -0.04650555111965371,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.18159244312475642,
+            "drawdown": -0.20249697013101087,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.23331575683006323,
+            "drawdown": -0.052238688677286094,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.2852053409242157,
+            "drawdown": -0.08150269297838575,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.07477677391406923,
+            "drawdown": -0.09390138269350745,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.023254361186809236,
+            "drawdown": -0.041550239306490266,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 884,
+        "closed_trades": 836,
+        "assets_funded": 60,
+        "long_contribution": 2.3808905860077494,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 3.4924596548080444e-10,
+        "max_entry_budget_error": 4.547473508864641e-13,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 60,
+        "unfunded": 21,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__full__long-channel__equal__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "long-channel",
+      "method": "inverse-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 158102.9007783612,
+        "net": 0.581029007783612,
+        "cagr": 0.04386857576342207,
+        "drawdown": -0.07922147880042307,
+        "average_gross": 0.7829976321024052,
+        "maximum_gross": 1.0,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1290.1697334560438,
+        "slippage": 1242.7444187711146,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.1924420700530503,
+        "largest_group_fraction": 0.8109640449246973,
+        "annual": [
+          {
+            "year": "2016",
+            "net": 0.012403569426476357,
+            "drawdown": -0.013191291291240304,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.07750092742460035,
+            "drawdown": -0.009861082734084148,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": 0.013965959472913347,
+            "drawdown": -0.031137313512518694,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.08318093409968763,
+            "drawdown": -0.007112530176035303,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.05128779464436084,
+            "drawdown": -0.04139881360001707,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.04639334645280124,
+            "drawdown": -0.014513184037964866,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.0651285554182921,
+            "drawdown": -0.07807264243680623,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.0925210311839546,
+            "drawdown": -0.022156768459511977,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.10714046322190085,
+            "drawdown": -0.02275224021509481,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.0449506781316944,
+            "drawdown": -0.03042157619374508,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.015189991766549227,
+            "drawdown": -0.017608436995088406,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 886,
+        "closed_trades": 838,
+        "assets_funded": 60,
+        "long_contribution": 0.6063581493058834,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 8.731149137020111e-11,
+        "max_entry_budget_error": 1.1368683772161603e-13,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 47,
+        "unfunded": 19,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__full__long-channel__inverse-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "long-channel",
+      "method": "capped-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 148438.21403879515,
+        "net": 0.4843821403879516,
+        "cagr": 0.037715453953965916,
+        "drawdown": -0.07613324609299887,
+        "average_gross": 0.5375640274467556,
+        "maximum_gross": 0.7368766023597859,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1044.851148071541,
+        "slippage": 1174.51369347586,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.10583917881565398,
+        "largest_group_fraction": 0.42096921907556045,
+        "annual": [
+          {
+            "year": "2016",
+            "net": 0.011321817995425754,
+            "drawdown": -0.011844395540950958,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.07600470908409696,
+            "drawdown": -0.009799987040457703,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": 0.012031117685024073,
+            "drawdown": -0.03135690537817393,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.06346232193550705,
+            "drawdown": -0.006897619187937742,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.05068480117022389,
+            "drawdown": -0.03930168481477847,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.046945760466519104,
+            "drawdown": -0.014433750247251687,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.06445472452284362,
+            "drawdown": -0.07498013240094392,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.07631318587719016,
+            "drawdown": -0.02149303346302034,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.09757407910227278,
+            "drawdown": -0.027537408616246206,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.029629004014010585,
+            "drawdown": -0.036190595226895605,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.01253835820779936,
+            "drawdown": -0.01614464925683956,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 885,
+        "closed_trades": 838,
+        "assets_funded": 60,
+        "long_contribution": 0.5065757888034242,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 2.0372681319713593e-10,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 122,
+        "scaled_funding_requests": 11,
+        "unfunded": 20,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__full__long-channel__capped-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "long-initial",
+      "method": "equal",
+      "cost": "normal",
+      "stats": {
+        "ending": 322412.57679780526,
+        "net": 2.2241257679780526,
+        "cagr": 0.11596710123665854,
+        "drawdown": -0.1826841664024783,
+        "average_gross": 0.8033130891134627,
+        "maximum_gross": 1.0,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 3331.5391337173296,
+        "slippage": 6618.177084482118,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.10944877279657804,
+        "largest_group_fraction": 0.7960408486732147,
+        "annual": [
+          {
+            "year": "2016",
+            "net": 0.03003447603924836,
+            "drawdown": -0.035408959660828576,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.22452371008784788,
+            "drawdown": -0.028107717149389977,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": 0.020842437228234978,
+            "drawdown": -0.08320331944362824,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.16028928231911155,
+            "drawdown": -0.05049645005142789,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.23128911652713535,
+            "drawdown": -0.1418404537839172,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.2161110338228227,
+            "drawdown": -0.046324252163174706,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.15591343675163538,
+            "drawdown": -0.1756182247555823,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.2185184703971621,
+            "drawdown": -0.05447545124294639,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.2675855262671709,
+            "drawdown": -0.08601009943586635,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.0800375932561812,
+            "drawdown": -0.09330352032943201,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.023527465982855933,
+            "drawdown": -0.037705563396371544,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 1047,
+        "closed_trades": 1003,
+        "assets_funded": 60,
+        "long_contribution": 2.323622930160045,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 5.238689482212067e-10,
+        "max_entry_budget_error": 9.094947017729282e-13,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 70,
+        "unfunded": 19,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__full__long-initial__equal__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "long-initial",
+      "method": "inverse-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 156347.1570073674,
+        "net": 0.5634715700736741,
+        "cagr": 0.042776576487142615,
+        "drawdown": -0.06483395703805028,
+        "average_gross": 0.7625478779419884,
+        "maximum_gross": 1.0,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1485.6729079536603,
+        "slippage": 1403.2420149270347,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.19176803981581192,
+        "largest_group_fraction": 0.8081527893980204,
+        "annual": [
+          {
+            "year": "2016",
+            "net": 0.006516459841291011,
+            "drawdown": -0.014033928548466523,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.07465346930204353,
+            "drawdown": -0.009615823905173237,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": 0.012334070292725263,
+            "drawdown": -0.02965630901315086,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.07907127230761879,
+            "drawdown": -0.007315076302858103,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.04660043548440829,
+            "drawdown": -0.0439576182726642,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.046631174210406634,
+            "drawdown": -0.014495445419086317,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.05127303605818667,
+            "drawdown": -0.06350269876522896,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.08854577421601872,
+            "drawdown": -0.02251486573775574,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.10152232464226385,
+            "drawdown": -0.02337030570008347,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.04623053717876102,
+            "drawdown": -0.029488695978030277,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.014947235987444296,
+            "drawdown": -0.01653902008041197,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 1046,
+        "closed_trades": 1002,
+        "assets_funded": 60,
+        "long_contribution": 0.5923607193024815,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 1.6007106751203537e-10,
+        "max_entry_budget_error": 3.637978807091713e-12,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 61,
+        "unfunded": 20,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__full__long-initial__inverse-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "long-initial",
+      "method": "capped-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 147337.30244499553,
+        "net": 0.4733730244499552,
+        "cagr": 0.03699167020289407,
+        "drawdown": -0.06346639784206998,
+        "average_gross": 0.5322307048826855,
+        "maximum_gross": 0.7377093858501956,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1166.9481953917941,
+        "slippage": 1313.629919833615,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.10500303550410556,
+        "largest_group_fraction": 0.4142853935070516,
+        "annual": [
+          {
+            "year": "2016",
+            "net": 0.005215169991809265,
+            "drawdown": -0.011226705151820005,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.07480374972829784,
+            "drawdown": -0.00967555732731995,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": 0.013644262705277743,
+            "drawdown": -0.030163371109188097,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.05320431886552135,
+            "drawdown": -0.007217376233208617,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.052468100541250395,
+            "drawdown": -0.0344515745101196,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.047685081976602595,
+            "drawdown": -0.014391681685420044,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.05235107272507522,
+            "drawdown": -0.06213280512130803,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.07195259539022603,
+            "drawdown": -0.021914560820145312,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.09074007364315229,
+            "drawdown": -0.027407780079025224,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.032515250846241406,
+            "drawdown": -0.032803646379972795,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.012618384194232446,
+            "drawdown": -0.015311056316724914,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 1036,
+        "closed_trades": 993,
+        "assets_funded": 60,
+        "long_contribution": 0.4981788056022089,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 1.7462298274040222e-10,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 150,
+        "scaled_funding_requests": 20,
+        "unfunded": 30,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__full__long-initial__capped-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "short-reference",
+      "method": "equal",
+      "cost": "normal",
+      "stats": {
+        "ending": 53005.904331417274,
+        "net": -0.46994095668582725,
+        "cagr": -0.05775892988659603,
+        "drawdown": -0.4714495423759576,
+        "average_gross": 0.1756842214805891,
+        "maximum_gross": 0.8377850818982732,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 3173.0492609927855,
+        "slippage": 5733.1958818554085,
+        "borrow": 2772.235231295239,
+        "largest_symbol_fraction": 0.02088755816067825,
+        "largest_group_fraction": 0.6552335827435191,
+        "annual": [
+          {
+            "year": "2016",
+            "net": -0.046321946340681874,
+            "drawdown": -0.04835908941974376,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": -0.04979194294405764,
+            "drawdown": -0.050669670726368965,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": -0.06300715115566258,
+            "drawdown": -0.07091448152422153,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": -0.051579581523468865,
+            "drawdown": -0.061038239475891265,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": -0.04787283543456311,
+            "drawdown": -0.14376519613262984,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": -0.08870409180741368,
+            "drawdown": -0.09445119342681307,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": 0.0013711942255461018,
+            "drawdown": -0.06863479579436105,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": -0.10085185703789779,
+            "drawdown": -0.10271925930208081,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": -0.06611864752019914,
+            "drawdown": -0.07234024809875872,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": -0.05284255384200354,
+            "drawdown": -0.07541173153979375,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": -0.0474846656198048,
+            "drawdown": -0.0698935305572066,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 2486,
+        "closed_trades": 2468,
+        "assets_funded": 60,
+        "long_contribution": 0.0,
+        "short_contribution": -0.3531561529444325
+      },
+      "audit": {
+        "max_identity_error": 4.132743924856186e-09,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 0,
+        "unfunded": 0,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 61
+      },
+      "id": "priority__full__short-reference__equal__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "short-reference",
+      "method": "inverse-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 79090.66869122766,
+        "net": -0.2090933130877234,
+        "cagr": -0.021745864013453575,
+        "drawdown": -0.20919427457150963,
+        "average_gross": 0.14276882207091296,
+        "maximum_gross": 0.7981612900843934,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 2705.9108844464126,
+        "slippage": 2436.213657438725,
+        "borrow": 2751.4652694101014,
+        "largest_symbol_fraction": 0.16148775466745013,
+        "largest_group_fraction": 0.6725184930082062,
+        "annual": [
+          {
+            "year": "2016",
+            "net": -0.01485333211341644,
+            "drawdown": -0.01635533931448996,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": -0.022870934679348087,
+            "drawdown": -0.02326481672694025,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": -0.017306814845994722,
+            "drawdown": -0.02151574707718984,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": -0.019950733321845715,
+            "drawdown": -0.021861493235189045,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": -0.015561804724682604,
+            "drawdown": -0.044811193122710424,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": -0.028204193730344218,
+            "drawdown": -0.03193232874239249,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": 0.006333365743180552,
+            "drawdown": -0.024696745563652645,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": -0.041600578256914655,
+            "drawdown": -0.041600578256914655,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": -0.029396762198769077,
+            "drawdown": -0.031117025952358435,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": -0.027431457118157976,
+            "drawdown": -0.031714769814700894,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": -0.02052642254111947,
+            "drawdown": -0.02845944846135362,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 2486,
+        "closed_trades": 2468,
+        "assets_funded": 60,
+        "long_contribution": 0.0,
+        "short_contribution": -0.1301574149747569
+      },
+      "audit": {
+        "max_identity_error": 1.7316779121756554e-09,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 0,
+        "unfunded": 0,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 61
+      },
+      "id": "priority__full__short-reference__inverse-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "short-reference",
+      "method": "capped-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 79346.34571371916,
+        "net": -0.20653654286280843,
+        "cagr": -0.021449897468277745,
+        "drawdown": -0.20663783131756353,
+        "average_gross": 0.13325096422692898,
+        "maximum_gross": 0.5638033006220616,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 2533.0723578246634,
+        "slippage": 2400.453341915397,
+        "borrow": 2568.6220474058305,
+        "largest_symbol_fraction": 0.10117831489158896,
+        "largest_group_fraction": 0.4030470203608549,
+        "annual": [
+          {
+            "year": "2016",
+            "net": -0.01401778253681596,
+            "drawdown": -0.016350605987986322,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": -0.022493455508792337,
+            "drawdown": -0.022887607089743356,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": -0.017249500338605173,
+            "drawdown": -0.02119582084100602,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": -0.019950738868638407,
+            "drawdown": -0.021861457387739258,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": -0.015442945265637942,
+            "drawdown": -0.0446382669636014,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": -0.026428051293922006,
+            "drawdown": -0.029263029798782147,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": 0.005871276933338887,
+            "drawdown": -0.02323396423452173,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": -0.04160057825691754,
+            "drawdown": -0.04160057825691754,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": -0.029317221538096128,
+            "drawdown": -0.031037626266812945,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": -0.02743145711815731,
+            "drawdown": -0.031714769814702004,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": -0.020168128950399877,
+            "drawdown": -0.027348707977366882,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 2481,
+        "closed_trades": 2463,
+        "assets_funded": 60,
+        "long_contribution": 0.0,
+        "short_contribution": -0.13151506539134628
+      },
+      "audit": {
+        "max_identity_error": 1.8917489796876907e-09,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 120,
+        "scaled_funding_requests": 5,
+        "unfunded": 5,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 61
+      },
+      "id": "priority__full__short-reference__capped-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "combined-channel",
+      "method": "equal",
+      "cost": "normal",
+      "stats": {
+        "ending": 191202.5348924607,
+        "net": 0.9120253489246071,
+        "cagr": 0.06263289877556266,
+        "drawdown": -0.15768833535009752,
+        "average_gross": 0.6328943523984836,
+        "maximum_gross": 0.9397768679177965,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 3010.318072558698,
+        "slippage": 5787.751072500865,
+        "borrow": 1386.1176156476195,
+        "largest_symbol_fraction": 0.08936930337797573,
+        "largest_group_fraction": 0.6542735047310612,
+        "annual": [
+          {
+            "year": "2016",
+            "net": 0.0015802196698140314,
+            "drawdown": -0.018193277757187487,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.08991967345688967,
+            "drawdown": -0.015445854251236901,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": -0.01565023178239011,
+            "drawdown": -0.05608648171356223,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.08570060039863092,
+            "drawdown": -0.02317394218890101,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.14156615034141184,
+            "drawdown": -0.08228098161543318,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.1291547705080216,
+            "drawdown": -0.03489033888189608,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.13908621913848718,
+            "drawdown": -0.1487443850284733,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.14301580203499276,
+            "drawdown": -0.03890884047523857,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.21052436288089815,
+            "drawdown": -0.06476117096679945,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.05384833599088523,
+            "drawdown": -0.07727277497587703,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.012828222294891667,
+            "drawdown": -0.03647021574235232,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 3370,
+        "closed_trades": 3304,
+        "assets_funded": 60,
+        "long_contribution": 1.1904452930038747,
+        "short_contribution": -0.17657807647221624
+      },
+      "audit": {
+        "max_identity_error": 2.066371962428093e-09,
+        "max_entry_budget_error": 2.2737367544323206e-13,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 60,
+        "unfunded": 21,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 61
+      },
+      "id": "priority__full__combined-channel__equal__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "combined-channel",
+      "method": "inverse-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 118596.78473479443,
+        "net": 0.18596784734794425,
+        "cagr": 0.016114277748513706,
+        "drawdown": -0.04472960766424494,
+        "average_gross": 0.5148031282520881,
+        "maximum_gross": 0.7748210444045266,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1998.0403089512283,
+        "slippage": 1839.4790381049197,
+        "borrow": 1375.7326347050507,
+        "largest_symbol_fraction": 0.1642476200481543,
+        "largest_group_fraction": 0.632423571086887,
+        "annual": [
+          {
+            "year": "2016",
+            "net": -0.0012248813434700967,
+            "drawdown": -0.008465899129331045,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.02799979165627886,
+            "drawdown": -0.004994110888888903,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": -0.000693855815966371,
+            "drawdown": -0.01876356217518449,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.03563936476122542,
+            "drawdown": -0.004822371534804359,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.02212563779867671,
+            "drawdown": -0.017972110841729116,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.01505114386490436,
+            "drawdown": -0.008049440217302362,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.03638325912795892,
+            "drawdown": -0.04095990154455442,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.03617953261126505,
+            "drawdown": -0.012366968443856097,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.05408962568530651,
+            "drawdown": -0.013711620391519741,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.01905443531427431,
+            "drawdown": -0.01833947598427277,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.002994591606154451,
+            "drawdown": -0.01158723064539835,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 3372,
+        "closed_trades": 3306,
+        "assets_funded": 60,
+        "long_contribution": 0.3031790746529417,
+        "short_contribution": -0.06507870748737846
+      },
+      "audit": {
+        "max_identity_error": 8.658389560878277e-10,
+        "max_entry_budget_error": 5.684341886080802e-14,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 47,
+        "unfunded": 19,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 61
+      },
+      "id": "priority__full__combined-channel__inverse-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "combined-channel",
+      "method": "capped-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 119286.59108502354,
+        "net": 0.1928659108502353,
+        "cagr": 0.016666755407014122,
+        "drawdown": -0.04634327525822868,
+        "average_gross": 0.4792181421534993,
+        "maximum_gross": 0.6445634494022587,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1573.3669607854276,
+        "slippage": 1710.8111570457602,
+        "borrow": 1016.0180590600634,
+        "largest_symbol_fraction": 0.10734009301380165,
+        "largest_group_fraction": 0.41342251653930684,
+        "annual": [
+          {
+            "year": "2016",
+            "net": -0.0007348493199004213,
+            "drawdown": -0.007843046461754266,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.030181977159287277,
+            "drawdown": -0.00507568465587549,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": -0.0010044674633238326,
+            "drawdown": -0.0192239573011469,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.03696097196090253,
+            "drawdown": -0.004361352361498927,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.020659165355677134,
+            "drawdown": -0.01918836746289121,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.01487178264382849,
+            "drawdown": -0.008062993071756952,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.038143890469440445,
+            "drawdown": -0.04256153655528028,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.03668231184584769,
+            "drawdown": -0.01317836373794834,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.057086300767991816,
+            "drawdown": -0.015568275155306788,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.01729329178194794,
+            "drawdown": -0.019922294204171354,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.007086192859393936,
+            "drawdown": -0.008910236205158517,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 3243,
+        "closed_trades": 3183,
+        "assets_funded": 60,
+        "long_contribution": 0.29683630684215334,
+        "short_contribution": -0.06096843422301776
+      },
+      "audit": {
+        "max_identity_error": 1.5934347175061703e-09,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 456,
+        "scaled_funding_requests": 65,
+        "unfunded": 148,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 59
+      },
+      "id": "priority__full__combined-channel__capped-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "combined-initial",
+      "method": "equal",
+      "cost": "normal",
+      "stats": {
+        "ending": 187709.24056461127,
+        "net": 0.8770924056461127,
+        "cagr": 0.06079802062594708,
+        "drawdown": -0.13818572210339908,
+        "average_gross": 0.6122899124136632,
+        "maximum_gross": 0.8727929833508578,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 3252.294197355058,
+        "slippage": 6175.6864831687635,
+        "borrow": 1386.1176156476195,
+        "largest_symbol_fraction": 0.09094176789896734,
+        "largest_group_fraction": 0.6430288142753198,
+        "annual": [
+          {
+            "year": "2016",
+            "net": -0.008143735150716869,
+            "drawdown": -0.02112936454489356,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.09264531835761813,
+            "drawdown": -0.015334587577160441,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": -0.014213653684107652,
+            "drawdown": -0.05366323059036815,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.0760948899726166,
+            "drawdown": -0.0229090973160887,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.13351529687117947,
+            "drawdown": -0.084759624342015,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.12643622904059648,
+            "drawdown": -0.03447763946272364,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.11847885165944005,
+            "drawdown": -0.12890026100507068,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.13217218517070584,
+            "drawdown": -0.04168086879786348,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.19593333050128225,
+            "drawdown": -0.06845792444432797,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.0577577208575506,
+            "drawdown": -0.07628811791432599,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.012865896979642688,
+            "drawdown": -0.03305493619152211,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 3533,
+        "closed_trades": 3471,
+        "assets_funded": 60,
+        "long_contribution": 1.1618114650800224,
+        "short_contribution": -0.17657807647221624
+      },
+      "audit": {
+        "max_identity_error": 2.066371962428093e-09,
+        "max_entry_budget_error": 4.547473508864641e-13,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 70,
+        "unfunded": 19,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 61
+      },
+      "id": "priority__full__combined-initial__equal__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "combined-initial",
+      "method": "inverse-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 117718.91284929754,
+        "net": 0.1771891284929754,
+        "cagr": 0.015406948311024404,
+        "drawdown": -0.036968306692147124,
+        "average_gross": 0.5013392078048956,
+        "maximum_gross": 0.7627086787422842,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 2095.7918962000367,
+        "slippage": 1919.7278361828799,
+        "borrow": 1375.7326347050507,
+        "largest_symbol_fraction": 0.1236002856086782,
+        "largest_group_fraction": 0.5827419859586628,
+        "annual": [
+          {
+            "year": "2016",
+            "net": -0.004168436136062659,
+            "drawdown": -0.008909905104723004,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.026414467292954713,
+            "drawdown": -0.004850526665512667,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": -0.0016233560626591759,
+            "drawdown": -0.017876208911624447,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.03317584404079099,
+            "drawdown": -0.005857202066724687,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.019270536284075712,
+            "drawdown": -0.019762401874739544,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.014853855031439656,
+            "drawdown": -0.007970770525690396,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.027849491134377846,
+            "drawdown": -0.033161586212553495,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.03376574771269447,
+            "drawdown": -0.013319965805958733,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.05043447662551981,
+            "drawdown": -0.014036230187512322,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.019670365208113827,
+            "drawdown": -0.01794682772359546,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.0027474050556519636,
+            "drawdown": -0.010813718734417055,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 3532,
+        "closed_trades": 3470,
+        "assets_funded": 60,
+        "long_contribution": 0.29618035965124073,
+        "short_contribution": -0.06507870748737846
+      },
+      "audit": {
+        "max_identity_error": 8.658389560878277e-10,
+        "max_entry_budget_error": 1.8189894035458565e-12,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 61,
+        "unfunded": 20,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 61
+      },
+      "id": "priority__full__combined-initial__inverse-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "combined-initial",
+      "method": "capped-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 118484.86915323997,
+        "net": 0.1848486915323997,
+        "cagr": 0.01602436820484443,
+        "drawdown": -0.03887832752668241,
+        "average_gross": 0.4729822952382,
+        "maximum_gross": 0.6420630168867077,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1718.4078583260803,
+        "slippage": 1809.7185477035987,
+        "borrow": 1070.2325249726186,
+        "largest_symbol_fraction": 0.10765288018460635,
+        "largest_group_fraction": 0.41300712464994616,
+        "annual": [
+          {
+            "year": "2016",
+            "net": -0.003568714722916533,
+            "drawdown": -0.008240961513935052,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.028393519267985168,
+            "drawdown": -0.004919035749958112,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": -0.002117048485501871,
+            "drawdown": -0.01824385831830244,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.033294829417795935,
+            "drawdown": -0.005032175384480864,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.02042261190668304,
+            "drawdown": -0.018365587540008277,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.014617203126334077,
+            "drawdown": -0.007948591078408618,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.029909730276315605,
+            "drawdown": -0.035068502374962285,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.03416841984699803,
+            "drawdown": -0.013414373201684038,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.05192726286093308,
+            "drawdown": -0.015473325868231913,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.01960431498948445,
+            "drawdown": -0.017982273619317146,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.006582225068144654,
+            "drawdown": -0.008410071445046019,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 3404,
+        "closed_trades": 3342,
+        "assets_funded": 60,
+        "long_contribution": 0.2912859543034447,
+        "short_contribution": -0.060453673461029055
+      },
+      "audit": {
+        "max_identity_error": 7.639755494892597e-10,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 427,
+        "scaled_funding_requests": 75,
+        "unfunded": 148,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 56
+      },
+      "id": "priority__full__combined-initial__capped-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "full",
+      "book": "buy-hold",
+      "method": "equal",
+      "cost": "normal",
+      "stats": {
+        "ending": 919754.0276260171,
+        "net": 8.19754027626017,
+        "cagr": 0.23117854498139057,
+        "drawdown": -0.3271461231535052,
+        "average_gross": 0.9574581711752178,
+        "maximum_gross": 1.0,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 49.93441066086437,
+        "slippage": 81.24426761034093,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.4771017098651654,
+        "largest_group_fraction": 0.9580015864056457,
+        "annual": [
+          {
+            "year": "2016",
+            "net": 0.09392982642853953,
+            "drawdown": -0.0332410414029789,
+            "start": "2016-01-04",
+            "end": "2016-12-31"
+          },
+          {
+            "year": "2017",
+            "net": 0.2320246412004192,
+            "drawdown": -0.024231631138198817,
+            "start": "2017-01-01",
+            "end": "2017-12-31"
+          },
+          {
+            "year": "2018",
+            "net": -0.019339469858090097,
+            "drawdown": -0.17920173731999534,
+            "start": "2018-01-01",
+            "end": "2018-12-31"
+          },
+          {
+            "year": "2019",
+            "net": 0.2934203781243483,
+            "drawdown": -0.07040466883064578,
+            "start": "2019-01-01",
+            "end": "2019-12-31"
+          },
+          {
+            "year": "2020",
+            "net": 0.39134863852354984,
+            "drawdown": -0.2638056628194604,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.3816482374852288,
+            "drawdown": -0.08590537657702546,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.279109538557305,
+            "drawdown": -0.3271461231535052,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.6060428557545894,
+            "drawdown": -0.10068410436661723,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.659977016657102,
+            "drawdown": -0.1722925523073776,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.2708572400322571,
+            "drawdown": -0.2609258341287807,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.14589741373522913,
+            "drawdown": -0.12451317741958823,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 60,
+        "closed_trades": 0,
+        "assets_funded": 60,
+        "long_contribution": 8.198852063042883,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 1.1641532182693481e-10,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 0,
+        "unfunded": 0,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__full__buy-hold__equal__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "long-channel",
+      "method": "equal",
+      "cost": "normal",
+      "stats": {
+        "ending": 214092.00011679556,
+        "net": 1.1409200011679554,
+        "cagr": 0.12074997384872499,
+        "drawdown": -0.20906797613405304,
+        "average_gross": 0.8337778006294536,
+        "maximum_gross": 1.0,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1517.9682499675425,
+        "slippage": 3249.8283664863097,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.1070622096446535,
+        "largest_group_fraction": 0.7935465594292431,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.23353287113345078,
+            "drawdown": -0.11530695519207546,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.21660037327101112,
+            "drawdown": -0.04658290045815672,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.18162192170736913,
+            "drawdown": -0.20252684556641776,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.23331605340444028,
+            "drawdown": -0.05223992361448715,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.2852039065672183,
+            "drawdown": -0.08150195663239179,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.07477542902733991,
+            "drawdown": -0.09390290470916929,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.023254418931725196,
+            "drawdown": -0.04155023986800599,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 636,
+        "closed_trades": 588,
+        "assets_funded": 60,
+        "long_contribution": 1.1885979673324913,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 3.4924596548080444e-10,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 40,
+        "unfunded": 18,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__recent__long-channel__equal__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "long-channel",
+      "method": "inverse-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 130538.42122112503,
+        "net": 0.3053842122112502,
+        "cagr": 0.040716119796394334,
+        "drawdown": -0.07922151099539865,
+        "average_gross": 0.7583260947834733,
+        "maximum_gross": 1.0,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 801.5476624393873,
+        "slippage": 832.8812833217962,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.19244207006740285,
+        "largest_group_fraction": 0.7660382092606279,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.03993653562661237,
+            "drawdown": -0.046024474345980115,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.046415164607664705,
+            "drawdown": -0.014513187048646903,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.06512866138646234,
+            "drawdown": -0.07807274667502395,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.09252103142814794,
+            "drawdown": -0.022156768427506024,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.10714046278346268,
+            "drawdown": -0.022752239291189857,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.044950678714615,
+            "drawdown": -0.030421575687286317,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.015189991897858413,
+            "drawdown": -0.017608436981777276,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 643,
+        "closed_trades": 595,
+        "assets_funded": 60,
+        "long_contribution": 0.32172850166886396,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 2.1827872842550278e-10,
+        "max_entry_budget_error": 1.8189894035458565e-12,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 33,
+        "unfunded": 11,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__recent__long-channel__inverse-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "long-channel",
+      "method": "capped-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 125530.82336319302,
+        "net": 0.2553082336319301,
+        "cagr": 0.034637615768986496,
+        "drawdown": -0.07601456934788586,
+        "average_gross": 0.5475352370165362,
+        "maximum_gross": 0.7368762239379044,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 651.7119744366559,
+        "slippage": 793.3910154515561,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.10583909143907026,
+        "largest_group_fraction": 0.4129226049471648,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.039464348406394345,
+            "drawdown": -0.04379498514106117,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.04801072999143252,
+            "drawdown": -0.014038113889151771,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.06435693887878602,
+            "drawdown": -0.07488222054163951,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.07631356992316052,
+            "drawdown": -0.021492834772699698,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.09757392828705402,
+            "drawdown": -0.02753733073813336,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.029629004209463128,
+            "drawdown": -0.03619059569274785,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.01253835333463904,
+            "drawdown": -0.01614465028946377,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 647,
+        "closed_trades": 600,
+        "assets_funded": 60,
+        "long_contribution": 0.2697592635308131,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 1.3096723705530167e-10,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 97,
+        "scaled_funding_requests": 3,
+        "unfunded": 7,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__recent__long-channel__capped-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "long-initial",
+      "method": "equal",
+      "cost": "normal",
+      "stats": {
+        "ending": 220728.0853967113,
+        "net": 1.207280853967113,
+        "cagr": 0.1258850427453444,
+        "drawdown": -0.18265327896832984,
+        "average_gross": 0.803185924624824,
+        "maximum_gross": 1.0,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1843.3893460021147,
+        "slippage": 3807.0585551002728,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.10944869905096516,
+        "largest_group_fraction": 0.7957871896521491,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.25949366053157874,
+            "drawdown": -0.09228709681607106,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.2159601471543544,
+            "drawdown": -0.04629756007255459,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.15589928558718613,
+            "drawdown": -0.17560631852608422,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.21851918001327353,
+            "drawdown": -0.0544755799401937,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.26758552510726097,
+            "drawdown": -0.08600989816777282,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.08003755947984015,
+            "drawdown": -0.09330358065477795,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.023527466829887045,
+            "drawdown": -0.03770556282889803,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 736,
+        "closed_trades": 692,
+        "assets_funded": 60,
+        "long_contribution": 1.2637853329781352,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 2.0372681319713593e-10,
+        "max_entry_budget_error": 4.547473508864641e-13,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 48,
+        "unfunded": 16,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__recent__long-initial__equal__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "long-initial",
+      "method": "inverse-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 133223.0255347577,
+        "net": 0.3322302553475771,
+        "cagr": 0.043893629001287904,
+        "drawdown": -0.06483395409018389,
+        "average_gross": 0.7341519183004843,
+        "maximum_gross": 1.0,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 934.7089637789727,
+        "slippage": 942.0263131851132,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.19176803983027432,
+        "largest_group_fraction": 0.730965532069245,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.05371650754728874,
+            "drawdown": -0.02932411230003129,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.04665472461369391,
+            "drawdown": -0.014495416574446862,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.051273103660287256,
+            "drawdown": -0.0635027649738894,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.08854577481263792,
+            "drawdown": -0.022514865699677533,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.10152232509697967,
+            "drawdown": -0.02337030524554684,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.04623053758229445,
+            "drawdown": -0.029488695585392577,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.014947236094005723,
+            "drawdown": -0.016539020058227494,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 739,
+        "closed_trades": 695,
+        "assets_funded": 60,
+        "long_contribution": 0.35099760811721686,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 1.7462298274040222e-10,
+        "max_entry_budget_error": 2.2737367544323206e-13,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 42,
+        "unfunded": 13,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__recent__long-initial__inverse-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "long-initial",
+      "method": "capped-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 127530.46181905971,
+        "net": 0.27530461819059715,
+        "cagr": 0.03708919265215238,
+        "drawdown": -0.06335707607106156,
+        "average_gross": 0.5344422249833164,
+        "maximum_gross": 0.737709051351032,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 753.7015609463456,
+        "slippage": 896.7707201695165,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.10500308732457182,
+        "largest_group_fraction": 0.41285636855131636,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.05049847557169862,
+            "drawdown": -0.02970431544930552,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.04783079102369969,
+            "drawdown": -0.014123625846218846,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.05226229257913051,
+            "drawdown": -0.062062422613468615,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.07195284463110596,
+            "drawdown": -0.021914340328679005,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.09073996081571423,
+            "drawdown": -0.027407713161250125,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.03251524955103613,
+            "drawdown": -0.0328036471681018,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.0126183877899817,
+            "drawdown": -0.015311054894187603,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 741,
+        "closed_trades": 698,
+        "assets_funded": 60,
+        "long_contribution": 0.29180934100175576,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 8.731149137020111e-11,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 111,
+        "scaled_funding_requests": 6,
+        "unfunded": 11,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__recent__long-initial__capped-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "short-reference",
+      "method": "equal",
+      "cost": "normal",
+      "stats": {
+        "ending": 65912.20557134607,
+        "net": -0.3408779442865393,
+        "cagr": -0.060515949578234474,
+        "drawdown": -0.4084991269171321,
+        "average_gross": 0.1949452820986267,
+        "maximum_gross": 0.837785081898275,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 2415.651494695311,
+        "slippage": 4903.719007354581,
+        "borrow": 2161.1497111085578,
+        "largest_symbol_fraction": 0.020542439536012445,
+        "largest_group_fraction": 0.599927506215921,
+        "annual": [
+          {
+            "year": "2020",
+            "net": -0.04655812801930359,
+            "drawdown": -0.14376519613284933,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": -0.08870409180742855,
+            "drawdown": -0.09445119342682251,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": 0.001371194225537442,
+            "drawdown": -0.0686347957943747,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": -0.10085185703789035,
+            "drawdown": -0.10271925930207249,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": -0.06611864752020147,
+            "drawdown": -0.07234024809875983,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": -0.052842553842016415,
+            "drawdown": -0.0754117315398064,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": -0.04748466561982023,
+            "drawdown": -0.06989353055721714,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 1722,
+        "closed_trades": 1704,
+        "assets_funded": 60,
+        "long_contribution": 0.0,
+        "short_contribution": -0.2460727421549484
+      },
+      "audit": {
+        "max_identity_error": 1.367880031466484e-09,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 0,
+        "unfunded": 0,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 34
+      },
+      "id": "priority__recent__short-reference__equal__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "short-reference",
+      "method": "inverse-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 85357.96107076299,
+        "net": -0.1464203892923701,
+        "cagr": -0.023429684510051896,
+        "drawdown": -0.1723115800902486,
+        "average_gross": 0.1606086358124161,
+        "maximum_gross": 0.7981612900843952,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1933.9250631300147,
+        "slippage": 1910.671700156429,
+        "borrow": 2028.850082902586,
+        "largest_symbol_fraction": 0.16148775466745036,
+        "largest_group_fraction": 0.6725184930082081,
+        "annual": [
+          {
+            "year": "2020",
+            "net": -0.015023389576357182,
+            "drawdown": -0.04481119312271209,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": -0.028204193730344662,
+            "drawdown": -0.03193232874239538,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": 0.006333365743180108,
+            "drawdown": -0.024696745563648315,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": -0.04160057825690899,
+            "drawdown": -0.04160057825690899,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": -0.029396762198760196,
+            "drawdown": -0.031117025952350663,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": -0.027431457118153757,
+            "drawdown": -0.031714769814698895,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": -0.020526422541128908,
+            "drawdown": -0.028459448461355397,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 1722,
+        "closed_trades": 1704,
+        "assets_funded": 60,
+        "long_contribution": 0.0,
+        "short_contribution": -0.08768592083046987
+      },
+      "audit": {
+        "max_identity_error": 1.7025740817189217e-09,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 0,
+        "unfunded": 0,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 34
+      },
+      "id": "priority__recent__short-reference__inverse-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "short-reference",
+      "method": "capped-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 85523.30140840166,
+        "net": -0.14476698591598336,
+        "cagr": -0.023146636972662282,
+        "drawdown": -0.17065832862135566,
+        "average_gross": 0.15074477022436494,
+        "maximum_gross": 0.5638033006220612,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1791.2940185701161,
+        "slippage": 1875.6873497782422,
+        "borrow": 1903.8612285679494,
+        "largest_symbol_fraction": 0.10117831489158897,
+        "largest_group_fraction": 0.4030470203608551,
+        "annual": [
+          {
+            "year": "2020",
+            "net": -0.014904465109955911,
+            "drawdown": -0.04463826696361195,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": -0.026428051293926003,
+            "drawdown": -0.029263029798783036,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": 0.00587127693335554,
+            "drawdown": -0.023233964234503746,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": -0.041600578256909215,
+            "drawdown": -0.041600578256909215,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": -0.02931722153809424,
+            "drawdown": -0.03103762626681239,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": -0.02743145711815409,
+            "drawdown": -0.03171476981469956,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": -0.020168128950396436,
+            "drawdown": -0.02734870797736333,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 1717,
+        "closed_trades": 1699,
+        "assets_funded": 60,
+        "long_contribution": 0.0,
+        "short_contribution": -0.08905855994682679
+      },
+      "audit": {
+        "max_identity_error": 1.3533281162381172e-09,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 95,
+        "scaled_funding_requests": 5,
+        "unfunded": 5,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 34
+      },
+      "id": "priority__recent__short-reference__capped-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "combined-channel",
+      "method": "equal",
+      "cost": "normal",
+      "stats": {
+        "ending": 140002.10284407082,
+        "net": 0.4000210284407082,
+        "cagr": 0.051681500009525205,
+        "drawdown": -0.13079652466328473,
+        "average_gross": 0.6076320624744734,
+        "maximum_gross": 0.9154847318269398,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1966.809872331427,
+        "slippage": 4076.7736869204455,
+        "borrow": 1080.5748555542789,
+        "largest_symbol_fraction": 0.07765087096440464,
+        "largest_group_fraction": 0.6301585260901172,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.09348737155707365,
+            "drawdown": -0.04650744026989462,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.08349867119375975,
+            "drawdown": -0.02839266809359131,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.1145228915924954,
+            "drawdown": -0.12063444794669065,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.09474772130926445,
+            "drawdown": -0.03481813153440361,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.16555121301468834,
+            "drawdown": -0.054040416199133356,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.03995062613069922,
+            "drawdown": -0.06654263176498254,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.005673333531358793,
+            "drawdown": -0.03300801499308059,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 2358,
+        "closed_trades": 2292,
+        "assets_funded": 60,
+        "long_contribution": 0.5942989836662457,
+        "short_contribution": -0.1230363710774742
+      },
+      "audit": {
+        "max_identity_error": 6.83940015733242e-10,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 40,
+        "unfunded": 18,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 34
+      },
+      "id": "priority__recent__combined-channel__equal__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "combined-channel",
+      "method": "inverse-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 107948.191145944,
+        "net": 0.07948191145944006,
+        "cagr": 0.011519208538408154,
+        "drawdown": -0.03952263492407804,
+        "average_gross": 0.49025317855460804,
+        "maximum_gross": 0.747405351947075,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1367.736362784701,
+        "slippage": 1371.7764917391128,
+        "borrow": 1014.425041451293,
+        "largest_symbol_fraction": 0.16386450115761267,
+        "largest_group_fraction": 0.6143402733340939,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.012456573025127593,
+            "drawdown": -0.017857942324724818,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.010118139823602323,
+            "drawdown": -0.007416120249028713,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.03168624117667551,
+            "drawdown": -0.03534400065573606,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.0272911041085262,
+            "drawdown": -0.012421412636386853,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.045188905873175145,
+            "drawdown": -0.012129207657119334,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.014452107671877323,
+            "drawdown": -0.016422611984106994,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.000762042147330666,
+            "drawdown": -0.011599545161286695,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 2365,
+        "closed_trades": 2299,
+        "assets_funded": 60,
+        "long_contribution": 0.16086425083443198,
+        "short_contribution": -0.04384296041523494
+      },
+      "audit": {
+        "max_identity_error": 8.512870408594608e-10,
+        "max_entry_budget_error": 9.094947017729282e-13,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 33,
+        "unfunded": 11,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 34
+      },
+      "id": "priority__recent__combined-channel__inverse-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "combined-channel",
+      "method": "capped-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 108934.18786550086,
+        "net": 0.08934187865500864,
+        "cagr": 0.012897472682740885,
+        "drawdown": -0.04064704339916758,
+        "average_gross": 0.4684915878600389,
+        "maximum_gross": 0.6349947646718845,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1118.0728014829615,
+        "slippage": 1283.989972694928,
+        "borrow": 796.8263273796471,
+        "largest_symbol_fraction": 0.10535122770800044,
+        "largest_group_fraction": 0.4057352101871232,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.012533818824820075,
+            "drawdown": -0.017857942324724818,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.010120725605417213,
+            "drawdown": -0.007292843575682051,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.03285270716264077,
+            "drawdown": -0.036592641287189864,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.02890647780925404,
+            "drawdown": -0.012575385706026343,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.048223913401631124,
+            "drawdown": -0.011935859090039913,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.016413243776716824,
+            "drawdown": -0.015978312046491805,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.004589142234548538,
+            "drawdown": -0.009048172034771707,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 2327,
+        "closed_trades": 2261,
+        "assets_funded": 60,
+        "long_contribution": 0.16107267334814074,
+        "short_contribution": -0.03974190367753951
+      },
+      "audit": {
+        "max_identity_error": 1.760781742632389e-09,
+        "max_entry_budget_error": 5.684341886080802e-14,
+        "scaled_cap_requests": 259,
+        "scaled_funding_requests": 46,
+        "unfunded": 49,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 32
+      },
+      "id": "priority__recent__combined-channel__capped-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "combined-initial",
+      "method": "equal",
+      "cost": "normal",
+      "stats": {
+        "ending": 143320.14548402868,
+        "net": 0.4332014548402867,
+        "cagr": 0.05537702136346412,
+        "drawdown": -0.11728923205954278,
+        "average_gross": 0.5919283429255381,
+        "maximum_gross": 0.8324472706183381,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 2129.520420348713,
+        "slippage": 4355.388781227427,
+        "borrow": 1080.5748555542789,
+        "largest_symbol_fraction": 0.07991106825473179,
+        "largest_group_fraction": 0.5932530737338243,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.10646776625613752,
+            "drawdown": -0.047697195869184195,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.08469575284480846,
+            "drawdown": -0.02844660025261636,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.09897151831873141,
+            "drawdown": -0.10681060058199199,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.09004109861236187,
+            "drawdown": -0.03770800120358497,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.1568508769719439,
+            "drawdown": -0.05829715173752004,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.04444196862943239,
+            "drawdown": -0.06650548146379198,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.0062767703501240835,
+            "drawdown": -0.03013936401615025,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 2458,
+        "closed_trades": 2396,
+        "assets_funded": 60,
+        "long_contribution": 0.6318926664890676,
+        "short_contribution": -0.1230363710774742
+      },
+      "audit": {
+        "max_identity_error": 6.83940015733242e-10,
+        "max_entry_budget_error": 2.2737367544323206e-13,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 48,
+        "unfunded": 16,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 34
+      },
+      "id": "priority__recent__combined-initial__equal__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "combined-initial",
+      "method": "inverse-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 109290.49330276035,
+        "net": 0.0929049330276035,
+        "cagr": 0.013392921811881786,
+        "drawdown": -0.03310390511347805,
+        "average_gross": 0.47986520584395664,
+        "maximum_gross": 0.7259849776459404,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1434.3170134544937,
+        "slippage": 1426.3490066707711,
+        "borrow": 1014.425041451293,
+        "largest_symbol_fraction": 0.12304620668297077,
+        "largest_group_fraction": 0.5711404836873942,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.019346558985465778,
+            "drawdown": -0.012469512938747429,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.010487298040008586,
+            "drawdown": -0.007476016741308489,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.024506733381549073,
+            "drawdown": -0.028934864265263704,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.02616254991037814,
+            "drawdown": -0.013276311540550867,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.042912669415888116,
+            "drawdown": -0.012605987117842221,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.015540072595671583,
+            "drawdown": -0.01624655933556296,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.0007929122019669776,
+            "drawdown": -0.010857871762466331,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 2461,
+        "closed_trades": 2399,
+        "assets_funded": 60,
+        "long_contribution": 0.17549880405860843,
+        "short_contribution": -0.04384296041523494
+      },
+      "audit": {
+        "max_identity_error": 8.512870408594608e-10,
+        "max_entry_budget_error": 1.1368683772161603e-13,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 42,
+        "unfunded": 13,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 34
+      },
+      "id": "priority__recent__combined-initial__inverse-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "combined-initial",
+      "method": "capped-vol",
+      "cost": "normal",
+      "stats": {
+        "ending": 109943.17528662253,
+        "net": 0.09943175286622519,
+        "cagr": 0.014296936696703622,
+        "drawdown": -0.03447281801564328,
+        "average_gross": 0.46146533077620827,
+        "maximum_gross": 0.6373017174498785,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 1243.2186324209697,
+        "slippage": 1360.2086042238338,
+        "borrow": 839.5392490765722,
+        "largest_symbol_fraction": 0.10693311296643525,
+        "largest_group_fraction": 0.40335506603498444,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.019421535044267024,
+            "drawdown": -0.012469512938747429,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.010427923831380914,
+            "drawdown": -0.007475946216848994,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.025781177128663346,
+            "drawdown": -0.030309692155993218,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.027808305723164617,
+            "drawdown": -0.013430031290666555,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.04556150862061048,
+            "drawdown": -0.012934798333871345,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.015743936300399053,
+            "drawdown": -0.016776571378688154,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.0037063412805584672,
+            "drawdown": -0.008588527986048922,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 2441,
+        "closed_trades": 2379,
+        "assets_funded": 60,
+        "long_contribution": 0.1752790825071718,
+        "short_contribution": -0.04141766478373553
+      },
+      "audit": {
+        "max_identity_error": 6.621121428906918e-10,
+        "max_entry_budget_error": 1.1368683772161603e-13,
+        "scaled_cap_requests": 228,
+        "scaled_funding_requests": 43,
+        "unfunded": 33,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 32
+      },
+      "id": "priority__recent__combined-initial__capped-vol__normal"
+    },
+    {
+      "scope": "priority",
+      "window": "recent",
+      "book": "buy-hold",
+      "method": "equal",
+      "cost": "normal",
+      "stats": {
+        "ending": 326430.39887609973,
+        "net": 2.2643039887609975,
+        "cagr": 0.19382919577269786,
+        "drawdown": -0.2695874556981107,
+        "average_gross": 0.9938213307542052,
+        "maximum_gross": 1.0,
+        "funding_deficit_days": 0,
+        "stale_position_days": 0,
+        "maximum_stale_gross": 0.0,
+        "fees": 49.94539926703661,
+        "slippage": 59.256066659663006,
+        "borrow": 0.0,
+        "largest_symbol_fraction": 0.20096014760883124,
+        "largest_group_fraction": 0.894786304228121,
+        "annual": [
+          {
+            "year": "2020",
+            "net": 0.2863126527539295,
+            "drawdown": -0.23529136328139066,
+            "start": "2020-01-01",
+            "end": "2020-12-31"
+          },
+          {
+            "year": "2021",
+            "net": 0.28752147881397305,
+            "drawdown": -0.06733359066949363,
+            "start": "2021-01-01",
+            "end": "2021-12-31"
+          },
+          {
+            "year": "2022",
+            "net": -0.23337952154595165,
+            "drawdown": -0.2695874556981107,
+            "start": "2022-01-01",
+            "end": "2022-12-31"
+          },
+          {
+            "year": "2023",
+            "net": 0.3847566849360522,
+            "drawdown": -0.0811746194701739,
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          {
+            "year": "2024",
+            "net": 0.4069167198081616,
+            "drawdown": -0.11858909416941099,
+            "start": "2024-01-01",
+            "end": "2024-12-31"
+          },
+          {
+            "year": "2025",
+            "net": 0.2110714073559965,
+            "drawdown": -0.21320600091903452,
+            "start": "2025-01-01",
+            "end": "2025-12-31"
+          },
+          {
+            "year": "2026",
+            "net": 0.08967639478373535,
+            "drawdown": -0.10041025795840952,
+            "start": "2026-01-01",
+            "end": "2026-09-05"
+          }
+        ],
+        "entries": 60,
+        "closed_trades": 0,
+        "assets_funded": 60,
+        "long_contribution": 2.265396003420265,
+        "short_contribution": 0.0
+      },
+      "audit": {
+        "max_identity_error": 1.7462298274040222e-10,
+        "max_entry_budget_error": 0.0,
+        "scaled_cap_requests": 0,
+        "scaled_funding_requests": 0,
+        "unfunded": 0,
+        "sleeve_deficit_days": 0,
+        "same_day_round_trips": 0
+      },
+      "id": "priority__recent__buy-hold__equal__normal"
+    }
+  ],
+  "priority_exposure": [
+    {
+      "id": "priority__full__long-channel__equal__normal",
+      "average_exposure_by_class": {
+        "Equities and other ETFs": 0.6092192181504623,
+        "Bonds": 0.20585527964927175,
+        "Crypto": 0.014019380774969897
+      }
+    },
+    {
+      "id": "priority__full__long-channel__inverse-vol__normal",
+      "average_exposure_by_class": {
+        "Equities and other ETFs": 0.20198464288967727,
+        "Bonds": 0.5787843542307819,
+        "Crypto": 0.0022286349819461504
+      }
+    },
+    {
+      "id": "priority__full__long-channel__capped-vol__normal",
+      "average_exposure_by_class": {
+        "Equities and other ETFs": 0.20805297107908557,
+        "Bonds": 0.32727100967601697,
+        "Crypto": 0.0022400466916526656
+      }
+    },
+    {
+      "id": "priority__full__long-initial__equal__normal",
+      "average_exposure_by_class": {
+        "Equities and other ETFs": 0.5912774567068574,
+        "Bonds": 0.19767831074018014,
+        "Crypto": 0.014357321666425385
+      }
+    },
+    {
+      "id": "priority__full__long-initial__inverse-vol__normal",
+      "average_exposure_by_class": {
+        "Equities and other ETFs": 0.19498842866833646,
+        "Bonds": 0.5654910510057704,
+        "Crypto": 0.002068398267881777
+      }
+    },
+    {
+      "id": "priority__full__long-initial__capped-vol__normal",
+      "average_exposure_by_class": {
+        "Equities and other ETFs": 0.20008255843974543,
+        "Bonds": 0.33006919935806345,
+        "Crypto": 0.00207894708487644
+      }
+    },
+    {
+      "id": "priority__recent__long-channel__equal__normal",
+      "average_exposure_by_class": {
+        "Equities and other ETFs": 0.6095349314645883,
+        "Bonds": 0.20184475822478523,
+        "Crypto": 0.02239811094007976
+      }
+    },
+    {
+      "id": "priority__recent__long-channel__inverse-vol__normal",
+      "average_exposure_by_class": {
+        "Equities and other ETFs": 0.2065532876154366,
+        "Bonds": 0.5482124720951245,
+        "Crypto": 0.0035603350729127743
+      }
+    },
+    {
+      "id": "priority__recent__long-channel__capped-vol__normal",
+      "average_exposure_by_class": {
+        "Equities and other ETFs": 0.21256745780364458,
+        "Bonds": 0.33138921107720765,
+        "Crypto": 0.0035785681356841877
+      }
+    },
+    {
+      "id": "priority__recent__long-initial__equal__normal",
+      "average_exposure_by_class": {
+        "Equities and other ETFs": 0.588301371305067,
+        "Bonds": 0.19194795101483933,
+        "Crypto": 0.022936602304918067
+      }
+    },
+    {
+      "id": "priority__recent__long-initial__inverse-vol__normal",
+      "average_exposure_by_class": {
+        "Equities and other ETFs": 0.19950655919880744,
+        "Bonds": 0.5313410092291861,
+        "Crypto": 0.0033043498724908025
+      }
+    },
+    {
+      "id": "priority__recent__long-initial__capped-vol__normal",
+      "average_exposure_by_class": {
+        "Equities and other ETFs": 0.20374580431684672,
+        "Bonds": 0.3273752013975402,
+        "Crypto": 0.0033212192689292016
+      }
+    }
+  ],
+  "review_position": "Equal capital with 20/55 + initial 3 ATR is a reasonable balanced candidate for review. Channel-only remains a close comparison; no production rule is changed.",
+  "interpretation": [
+    "Inverse volatility materially changes asset mix as well as drawdown; unspent cap allocations remain cash.",
+    "Short benchmark is retained with full sizing and ledger support; its losses do not justify optimising it during this long-focused stage.",
+    "Full-history and fresh-2020 portfolios share capital and dates within each window; these numbers are not directly comparable to Step 5 median instrument CAGRs or its asset-specific validation starts.",
+    "The fixed cap levels and initial 50/50 reference are demonstration choices, not optimised allocation recommendations."
+  ]
+}

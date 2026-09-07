@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 # Bump when the engine's output could change for the same params — it is part
 # of the determinism contract and is stored on every run.
-ENGINE_VERSION = "donchian-2"
+ENGINE_VERSION = "donchian-4"
 
 
 class SignalParams(BaseModel):
@@ -31,6 +31,9 @@ class SignalParams(BaseModel):
     trail_mode: Literal["chandelier", "exit_channel", "atr_trail"] = "chandelier"
     chandelier_k: float = Field(3.0, ge=1.0, le=6.0)
     atr_trail_k: float = Field(3.0, ge=1.0, le=6.0)
+    initial_enabled: bool = True
+    channel_enabled: bool = True
+    trailing_enabled: bool = True
 
     # Execution / accounting.
     fill_at: Literal["close", "open_next"] = "open_next"
@@ -59,4 +62,8 @@ class SignalParams(BaseModel):
         return self.max_lookback() + self.warmup_buffer
 
 
-DEFAULT_PARAMS = SignalParams()
+LONG_PARAMS = SignalParams(entry_len=20, exit_len=55, atr_stop_mult=3.0,
+                           trailing_enabled=False, allow_short=False)
+SHORT_PARAMS = SignalParams(entry_len=20, exit_len=20, atr_stop_mult=2.0,
+                            chandelier_k=3.0, allow_long=False)
+DEFAULT_PARAMS = LONG_PARAMS

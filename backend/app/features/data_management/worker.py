@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 VALID_KINDS = {
     "asset_catalog", "asset_prices", "crypto_bars", "commodity_prices", "macro",
-    "memberships", "option_snapshots", "signal_universe",
+    "memberships", "option_snapshots", "signal_universe", "portfolio_simulation",
 }
 
 
@@ -140,6 +140,9 @@ async def _run_job(job: Job) -> None:
                 await asyncio.to_thread(
                     signal_service.run_universe, conn, job.run_id, job.mode
                 )
+            elif job.kind == "portfolio_simulation":
+                from app.features.sizing import service as sizing_service
+                await asyncio.to_thread(sizing_service.run, conn, job.run_id, job.scope_arg)
             else:  # pragma: no cover - guarded by submit()
                 raise ValueError(job.kind)
 

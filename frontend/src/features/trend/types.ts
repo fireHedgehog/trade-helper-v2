@@ -23,6 +23,9 @@ export interface MiniEvent {
 }
 
 export interface BoardRow {
+  direction?: 'long' | 'short';
+  atr_20?: number | null;
+  directions?: Partial<Record<'long' | 'short', Omit<BoardRow, 'directions'>>>;
   symbol: string;
   state: "long" | "short" | "flat" | null;
   state_since: string | null;

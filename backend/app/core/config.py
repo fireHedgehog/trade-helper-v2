@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     # OpenAI, by the Macro AI regime feature).
     alpaca_api_base: str = "https://paper-api.alpaca.markets"  # trading API (assets)
     alpaca_data_base: str = "https://data.alpaca.markets"      # market data API (bars)
+    coinbase_api_base: str = "https://api.exchange.coinbase.com"  # public crypto candles
     fred_api_base: str = "https://api.stlouisfed.org"
     openai_api_base: str = "https://api.openai.com"
     openai_model: str = "gpt-4o-mini"  # cheap model for the Macro AI regime estimate
@@ -42,6 +43,7 @@ class Settings(BaseSettings):
     # ---- Fetch / pacing (docs/draft-design/09-…-audit.md §3) ----
     # Minimum seconds between requests to each provider host (1 in-flight ever).
     alpaca_min_interval_seconds: float = 0.40   # ~150 req/min, under the 200 cap
+    coinbase_min_interval_seconds: float = 0.20  # 5 req/s, under the public 10 req/s cap
     fred_min_interval_seconds: float = 0.70     # ~85 req/min, under the 120 cap
     fetch_timeout_seconds: float = 30.0
     fetch_max_retries: int = 4
@@ -49,6 +51,10 @@ class Settings(BaseSettings):
     # Earliest bar/observation date on a first (full) pull — aligns every
     # family to the Alpaca equity history start.
     history_start_date: str = "2016-01-01"
+
+    # Keep the crypto research window consistent across providers. Coinbase's
+    # earliest ETH history has missing days; the 2021+ window is continuous.
+    crypto_history_start_date: str = "2021-01-01"
 
     # Equity bar feed. The free plan's `iex` feed only archives ~mid-2020 and
     # carries just IEX's ~3% of volume; `sip` (consolidated tape) goes back to

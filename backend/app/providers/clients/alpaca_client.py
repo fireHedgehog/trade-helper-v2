@@ -1,4 +1,4 @@
-"""Alpaca clients — trading API (assets) + market data API (stock/crypto bars).
+"""Alpaca clients — trading API (assets) + market data API (stocks/options).
 
 Pacing/backoff via app.pacing + app.providers.clients.http. Secrets resolved
 from the keychain, never logged.
@@ -74,27 +74,6 @@ class AlpacaClient:
                 "timeframe": timeframe,
                 "adjustment": adjustment,
                 "feed": feed,
-                "limit": 10000,
-                "sort": "asc",
-            },
-        )
-
-    async def get_crypto_bars(
-        self,
-        symbols: list[str],
-        start: str,
-        end: str,
-        timeframe: str = "1Day",
-    ) -> dict[str, list[dict]]:
-        # Crypto symbols contain "/", keep them readable in the query string.
-        joined = ",".join(symbols)
-        return await self._bars(
-            f"{self._data_base}/v1beta3/crypto/us/bars",
-            {
-                "symbols": joined,
-                "start": start,
-                "end": end,
-                "timeframe": timeframe,
                 "limit": 10000,
                 "sort": "asc",
             },

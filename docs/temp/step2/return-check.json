@@ -1,0 +1,162 @@
+[
+  {
+    "symbol": "BTC/USD",
+    "years": 5.675564681724846,
+    "net_return": 0.2162918033325103,
+    "ending_10000": 12162.918033325102,
+    "calendar_cagr": 0.03510198151977084,
+    "incorrect_252_bar_cagr": 0.024076639143979284,
+    "gross_from_actual_fills": 0.7117226355498771,
+    "old_chart_formula_gross_same_fills": 18.362127176222533,
+    "trade_examples": [
+      {
+        "entry_date": "2025-10-02",
+        "entry_price": 118662.72,
+        "exit_date": "2025-10-10",
+        "exit_price": 118220.03405324428,
+        "prior_close": 118659.97,
+        "last_held_close": 121714.51,
+        "old_chart_gross": 0.02574195830320858,
+        "actual_fill_gross": -0.0037306236259856407
+      },
+      {
+        "entry_date": "2026-01-05",
+        "entry_price": 91489.03,
+        "exit_date": "2026-01-20",
+        "exit_price": 90544.17820288427,
+        "prior_close": 91494.0,
+        "last_held_close": 92559.66,
+        "old_chart_gross": 0.011647321135812572,
+        "actual_fill_gross": -0.010327487318596895
+      }
+    ]
+  },
+  {
+    "symbol": "ETH/USD",
+    "years": 5.675564681724846,
+    "net_return": -0.4858547888003403,
+    "ending_10000": 5141.4521119965975,
+    "calendar_cagr": -0.11060420222537304,
+    "incorrect_252_bar_cagr": -0.07765017356057269,
+    "gross_from_actual_fills": -0.1830198058140471,
+    "old_chart_formula_gross_same_fills": 26.840895186100088,
+    "trade_examples": [
+      {
+        "entry_date": "2024-11-28",
+        "entry_price": 3657.2,
+        "exit_date": "2024-12-09",
+        "exit_price": 3567.1940314228686,
+        "prior_close": 3657.63,
+        "last_held_close": 4006.75,
+        "old_chart_gross": 0.0954497857902521,
+        "actual_fill_gross": -0.02461062249183288
+      },
+      {
+        "entry_date": "2022-10-26",
+        "entry_price": 1460.34,
+        "exit_date": "2022-11-08",
+        "exit_price": 1446.963501819786,
+        "prior_close": 1460.34,
+        "last_held_close": 1568.34,
+        "old_chart_gross": 0.07395538025391368,
+        "actual_fill_gross": -0.009159851938736141
+      }
+    ]
+  },
+  {
+    "symbol": "QQQ",
+    "years": 10.666666666666666,
+    "net_return": 0.08054574579904838,
+    "ending_10000": 10805.457457990484,
+    "calendar_cagr": 0.007288895023801922,
+    "incorrect_252_bar_cagr": 0.0072997973103909874,
+    "gross_from_actual_fills": 0.4025241552802463,
+    "old_chart_formula_gross_same_fills": 5.150756238207965,
+    "trade_examples": [
+      {
+        "entry_date": "2024-12-04",
+        "entry_price": 515.64,
+        "exit_date": "2024-12-18",
+        "exit_price": 515.5407114200976,
+        "prior_close": 512.22,
+        "last_held_close": 530.98,
+        "old_chart_gross": 0.036624887743547774,
+        "actual_fill_gross": -0.0001925540685407956
+      },
+      {
+        "entry_date": "2020-02-05",
+        "entry_price": 220.91,
+        "exit_date": "2020-02-21",
+        "exit_price": 220.38433571838033,
+        "prior_close": 218.27,
+        "last_held_close": 225.28,
+        "old_chart_gross": 0.03211618637467306,
+        "actual_fill_gross": -0.0023795404536673948
+      }
+    ]
+  },
+  {
+    "symbol": "SPY",
+    "years": 10.666666666666666,
+    "net_return": 0.08673729252213169,
+    "ending_10000": 10867.372925221316,
+    "calendar_cagr": 0.007828599901962496,
+    "incorrect_252_bar_cagr": 0.007840312583639042,
+    "gross_from_actual_fills": 0.36103366794924807,
+    "old_chart_formula_gross_same_fills": 3.9416719313479422,
+    "trade_examples": [
+      {
+        "entry_date": "2021-01-08",
+        "entry_price": 353.37,
+        "exit_date": "2021-01-27",
+        "exit_price": 346.1885498625804,
+        "prior_close": 352.02,
+        "last_held_close": 356.31,
+        "old_chart_gross": 0.012186807567752034,
+        "actual_fill_gross": -0.020322749914875704
+      },
+      {
+        "entry_date": "2020-10-09",
+        "entry_price": 319.49,
+        "exit_date": "2020-10-26",
+        "exit_price": 312.27117861580365,
+        "prior_close": 317.72,
+        "last_held_close": 319.54,
+        "old_chart_gross": 0.005728314238952592,
+        "actual_fill_gross": -0.022594827331673506
+      }
+    ]
+  },
+  {
+    "symbol": "TLT",
+    "years": 10.666666666666666,
+    "net_return": -0.03928453665832676,
+    "ending_10000": 9607.154633416732,
+    "calendar_cagr": -0.0037501690283754385,
+    "incorrect_252_bar_cagr": -0.003755747445451596,
+    "gross_from_actual_fills": 0.0474312861739401,
+    "old_chart_formula_gross_same_fills": 0.6319003742005624,
+    "trade_examples": [
+      {
+        "entry_date": "2024-08-02",
+        "entry_price": 88.56,
+        "exit_date": "2024-08-07",
+        "exit_price": 87.61,
+        "prior_close": 87.02,
+        "last_held_close": 88.19,
+        "old_chart_gross": 0.013445185014939076,
+        "actual_fill_gross": -0.010727190605239412
+      },
+      {
+        "entry_date": "2016-06-28",
+        "entry_price": 104.49,
+        "exit_date": "2016-07-14",
+        "exit_price": 104.42670953015686,
+        "prior_close": 104.29,
+        "last_held_close": 106.34,
+        "old_chart_gross": 0.019656726435899996,
+        "actual_fill_gross": -0.0006057083916464201
+      }
+    ]
+  }
+]

@@ -6,7 +6,8 @@ export type FetchKind =
   | "macro"
   | "memberships"
   | "option_snapshots"
-  | "signal_universe";
+  | "signal_universe"
+  | "portfolio_simulation";
 
 export interface RunStatus {
   id: number;

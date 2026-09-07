@@ -16,6 +16,9 @@ export interface SignalParams {
   warmup_buffer: number;
   allow_long: boolean;
   allow_short: boolean;
+  initial_enabled?: boolean;
+  channel_enabled?: boolean;
+  trailing_enabled?: boolean;
 }
 
 export type Direction = "long" | "short";
@@ -40,7 +43,9 @@ export interface ResolvedStrategy {
 
 export interface DailyPoint {
   date: string;
-  state: -1 | 0 | 1; // signed exposure during that bar
+  state: -1 | 0 | 1 | 2; // 2 means both independent direction accounts held positions
+  long_active?: boolean;
+  short_active?: boolean;
   strat_ret: number; // that bar's contribution, costs included
   long_ret?: number;
   short_ret?: number;
@@ -88,6 +93,7 @@ export interface Overlays {
   donchian_up: (number | null)[];
   donchian_dn: (number | null)[];
   stop_line: (number | null)[];
+  short_stop_line?: (number | null)[];
 }
 
 export interface EquityCurve {
@@ -141,4 +147,12 @@ export interface TimingResponse {
   trades?: Trade[];
   state?: BoardState;
   metrics?: Metrics;
+  directions?: Partial<Record<Direction, {
+    state: BoardState;
+    pending_action?: TimingResponse['pending_action'];
+    overlays?: Overlays;
+    equity?: EquityCurve;
+    metrics?: Metrics;
+    params?: SignalParams;
+  }>>;
 }

@@ -1,0 +1,81 @@
+const report=__DATA__,meta=report.metadata,assets=report.assets,grid=report.grid;
+const el=id=>document.getElementById(id),pct=x=>x==null?'—':(100*x).toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1})+'%',
+ num=x=>x==null?'—':x.toLocaleString('en-US',{maximumFractionDigits:2}),money=x=>x==null?'—':'$'+x.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}),cls=x=>x<0?'negative':'positive';
+const entries=[10,20,55,200],exits=[10,20,55],architectures=Object.keys(meta.architecture_labels),configs=meta.configurations;
+const modeName={both:'Both directions',long:'Long only',short:'Short only'},shortName={channel:'Channel',channel_initial:'Channel + initial',initial_trailing:'Initial + trail',all:'All exits'};
+const scopes=['Priority assets','Whole universe','Watchlist ETFs & crypto','Bonds','Major companies','Other instruments'];
+let selectedSymbol='BTC/USD',selectedMode='both',dataConfig=null,currentRows=new Map(),generation=0,detailGeneration=0;
+const byId=new Map(configs.map(c=>[c.id,c])),loading=new Map();
+const baseLayout={paper_bgcolor:'white',plot_bgcolor:'white',font:{family:'Segoe UI,system-ui,sans-serif',size:11,color:'#536d72'},margin:{l:66,r:15,t:42,b:40},hovermode:'x unified',legend:{orientation:'h',x:0,y:1.16},xaxis:{showgrid:false},yaxis:{gridcolor:'#e7efea',tickformat:'.2s'}};
+const plotConfig={responsive:true,displaylogo:false,modeBarButtonsToRemove:['lasso2d','select2d']};
+el('scope').innerHTML=scopes.map(s=>`<option>${s}</option>`).join('');
+el('architecture').innerHTML=architectures.map(a=>`<option value="${a}">${meta.architecture_labels[a]}</option>`).join('');el('architecture').value='all';
+el('entry').innerHTML=entries.map(n=>`<option>${n}</option>`).join('');el('entry').value=20;
+el('exit').innerHTML=exits.map(n=>`<option>${n}</option>`).join('');el('exit').value=20;
+el('symbol').innerHTML=assets.map(s=>`<option>${s.symbol}</option>`).join('');el('symbol').value=selectedSymbol;
+el('stamp').textContent=`${meta.symbol_count} instruments · ${meta.simulation_count.toLocaleString()} simulations · ${meta.generated_utc.slice(0,10)} UTC`;
+el('method').textContent=`${meta.priority_symbols.length} priority assets: the existing watchlist, all 17 bond ETFs, the stored major-company list and ETH. The whole universe remains available. ${meta.ranking}`;
+el('checks').textContent=`${meta.step2_bridge_checks.toLocaleString()} solvent results with the production stop setup reproduce Step 2 (maximum relative error ${meta.step2_bridge_max_error.toExponential(2)}). All funded dollar ledgers reconcile; maximum absolute discrepancy ${money(meta.dollar_identity_max_error)}. A separate simulator builds its own indicators, signals, fills and cash marks on ${meta.cash_audit_symbols.join(', ')}: ${meta.cash_audit_bars.toLocaleString()} daily observations, maximum relative difference ${meta.cash_max_error.toExponential(2)}. Zero-cost reruns on those instruments preserve every signal and fill price. These are accounting and execution checks, not validation of future returns.`;
+el('priority-list').textContent='Priority assets: '+meta.priority_symbols.join(', ')+'.';
+el('hash').textContent=`Production engine SHA256: ${meta.engine_sha256} | Research engine SHA256: ${meta.research_engine_sha256} | Input SHA256: ${meta.inputs_sha256}`;
+el('accounting-rows').innerHTML=report.accounting_check.map(r=>`<tr><td><b>${r.symbol}</b></td><td>${pct(r.old_chart_formula_gross_same_fills)}</td><td>${pct(r.gross_from_actual_fills)}</td><td>${pct(r.net_return)}</td></tr>`).join('');
+const comparison=document.createElement('section');comparison.className='panel';
+comparison.innerHTML='<h2>A controlled comparison to review</h2><p class="sub">Fixed long-only test: 10-bar entry, 55-bar channel exit and 2× ATR initial stop. The only rule difference is enabling or disabling the 3× ATR Chandelier trail. Prices, costs and return calculations are identical.</p><div class="table-wrap"><table><thead><tr><th>Universe / measure</th><th>With Chandelier</th><th>Without Chandelier</th></tr></thead><tbody>'+['Priority assets','Whole universe'].map(scope=>{const a=grid.find(r=>r.scope===scope&&r.mode==='long'&&r.config==='all-e10-x55-i2-t3'),b=grid.find(r=>r.scope===scope&&r.mode==='long'&&r.config==='channel_initial-e10-x55-i2-t3');return `<tr><td><b>${scope}</b><small>Median CAGR · common window</small></td><td>${pct(a.median_cagr)}</td><td>${pct(b.median_cagr)}</td></tr><tr><td>Median drawdown · common window</td><td>${pct(a.median_drawdown)}</td><td>${pct(b.median_drawdown)}</td></tr><tr><td>Positive after costs · full history</td><td>${a.positive_net}/${a.instruments}</td><td>${b.positive_net}/${b.instruments}</td></tr>`}).join('')+'</tbody></table></div><p class="note">This historical comparison shows higher long-only returns with deeper drawdowns. It is a candidate for later stability checks, not a production selection. These fixed comparison values do not follow the controls below.</p>';
+document.querySelector('main').prepend(comparison);
+function resolve(architecture=el('architecture').value,entry=Number(el('entry').value)){
+ return configs.find(c=>c.architecture===architecture&&c.entry===entry&&(c.exit==null||c.exit===Number(el('exit').value))&&(c.initial==null||c.initial===Number(el('initial').value))&&(c.trailing==null||c.trailing===Number(el('trailing').value)));
+}
+function label(c){return `${shortName[c.architecture]} · ${c.entry}/${c.exit??'—'} · ${c.initial??'—'} / ${c.trailing??'—'} ATR`}
+function selectConfig(id){const c=byId.get(id);el('architecture').value=c.architecture;el('entry').value=c.entry;if(c.exit!=null)el('exit').value=c.exit;if(c.initial!=null)el('initial').value=c.initial;if(c.trailing!=null)el('trailing').value=c.trailing;refresh()}
+function loadScript(path){if(!loading.has(path))loading.set(path,new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=path;script.onload=resolve;script.onerror=reject;document.body.appendChild(script)}));return loading.get(path)}
+const get=(s,mode=selectedMode)=>currentRows.get(s.symbol+'|'+mode);
+function renderGrid(){const chosen=resolve(),scope=el('scope').value,rows=grid.filter(r=>r.scope===scope&&r.mode===selectedMode),find=c=>rows.find(r=>r.config===c.id),r=find(chosen);
+ el('kpis').innerHTML=[['Positive · after costs',`${r.positive_net} / ${r.instruments}`,'Full history, selected universe'],['Positive · zero costs',`${r.positive_gross} / ${r.instruments}`,'Same signal and fill schedule'],['Median CAGR · common window',pct(r.median_cagr),`${r.eligible} instruments with ≥2 years`],['Median drawdown · common window',pct(r.median_drawdown),`${r.exhausted} failed accounts · ${r.thin_samples} thin samples`]].map(([l,v,n])=>`<div class="card"><span>${l}</span><strong>${v}</strong><small>${n}</small></div>`).join('');
+ const cells=architectures.map(a=>entries.map(e=>find(resolve(a,e)))),z=cells.map(row=>row.map(r=>r.median_cagr==null?null:100*r.median_cagr));
+ Plotly.react('heatmap',[{type:'heatmap',x:entries.map(String),y:architectures.map(a=>shortName[a]),z,text:cells.map(row=>row.map(r=>pct(r.median_cagr))),texttemplate:'%{text}',customdata:cells.map(row=>row.map(r=>r.config)),colorscale:[[0,'#b54e53'],[.5,'#f6f5ee'],[1,'#18877b']],zmid:0,showscale:false,hovertemplate:'%{y}<br>Entry %{x} · %{text}<extra></extra>'}],{...baseLayout,margin:{l:118,r:12,t:25,b:50},xaxis:{type:'category',title:{text:'Entry lookback (bars)'}},yaxis:{type:'category',autorange:'reversed'},shapes:[{type:'rect',xref:'x',yref:'y',x0:entries.indexOf(chosen.entry)-.48,x1:entries.indexOf(chosen.entry)+.48,y0:architectures.indexOf(chosen.architecture)-.48,y1:architectures.indexOf(chosen.architecture)+.48,line:{color:'#15313b',width:3},fillcolor:'transparent'}]},plotConfig);
+ el('heatmap').removeAllListeners?.('plotly_click');el('heatmap').on('plotly_click',e=>selectConfig(e.points[0].customdata));
+ el('grid-rows').innerHTML=[...rows].sort((a,b)=>(b.median_cagr??-2)-(a.median_cagr??-2)).map(r=>{const c=byId.get(r.config);return `<tr data-config="${c.id}" class="${c.id===chosen.id?'selected':''}"><td><b>${shortName[c.architecture]}</b><small>Entry ${c.entry} · exit ${c.exit??'off'} · initial ${c.initial??'off'} · trail ${c.trailing??'off'}</small></td><td class="${cls(r.median_cagr)}">${pct(r.median_cagr)}</td><td>${r.positive_common}/${r.eligible}</td><td>${pct(r.median_drawdown)}</td><td>${r.thin_samples}/${r.exhausted}</td></tr>`}).join('');
+ el('grid-rows').querySelectorAll('tr').forEach(tr=>tr.onclick=()=>selectConfig(tr.dataset.config));
+}
+async function refresh(){const token=++generation,c=resolve();selectedMode=el('mode').value;renderGrid();el('table-sub').textContent='Loading '+label(c)+'…';
+ try{await loadScript('candidates/'+c.id+'.js')}catch(e){el('table-sub').textContent='Could not load the candidate data. Keep the candidates folder beside the report.';return}
+ if(token!==generation)return;currentRows=new Map(window.step3Summaries[c.id].map(r=>[r[0]+'|'+r[2],Object.fromEntries(meta.fields.map((f,i)=>[f,r[i+1]]))]));dataConfig=c.id;renderTable();renderDetail();
+}
+function renderTable(){const c=resolve();if(dataConfig!==c.id)return;const sort=el('sort').value,search=el('search').value.toUpperCase();
+ const view=assets.filter(s=>(el('table-scope').value==='all'||s.priority)&&s.symbol.includes(search)).sort((a,b)=>sort==='symbol'?a.symbol.localeCompare(b.symbol):(get(b)[sort]??-Infinity)-(get(a)[sort]??-Infinity));
+ el('table-sub').textContent=`${view.length} of ${assets.length} instruments · ${label(c)} · ${modeName[selectedMode]}. Click a row for its curves and dollar ledger.`;
+ el('asset-rows').innerHTML=view.map(s=>{const r=get(s);return `<tr data-symbol="${s.symbol}" class="${s.symbol===selectedSymbol?'selected':''}"><td><b>${s.symbol}</b>${s.priority?' <span class="badge">Priority</span>':''}<small>${s.start} → ${s.end}</small>${r.exhausted?'<small style="color:#b14b50">Account exhausted</small>':''}${r.common_days<730.5?'<small>Short history · outside ranking</small>':''}</td><td class="${cls(r.net)}">${pct(r.net)}</td><td>${pct(r.gross)}</td><td>${pct(r.cagr)}</td><td>${pct(r.common_cagr)}</td><td>${pct(r.drawdown)}</td><td>${r.trades}</td><td class="${cls(r.long_contribution)}">${pct(r.long_contribution)}</td><td class="${cls(r.short_contribution)}">${pct(r.short_contribution)}</td></tr>`}).join('');
+ el('asset-rows').querySelectorAll('tr').forEach(tr=>tr.onclick=()=>{selectedSymbol=tr.dataset.symbol;el('symbol').value=selectedSymbol;renderTable();renderDetail();el('instrument-panel').scrollIntoView({behavior:'smooth'})});
+}
+
+async function renderDetail(){const token=++detailGeneration,requested=selectedSymbol,c=resolve(),s=assets.find(s=>s.symbol===requested);if(dataConfig!==c.id)return;
+ let detail;try{await loadScript(s.detail_file);detail=await window.step3Ready[requested]}catch(e){el('instrument-meta').textContent='Could not decode instrument data. Use a browser with gzip DecompressionStream support and keep the instruments folder beside this report.';return}
+ if(token!==detailGeneration||selectedSymbol!==requested||resolve().id!==c.id)return;
+ const r=get(s),d=detail,variant=m=>d.variants[c.id+'|'+m],selected=variant(selectedMode);
+ el('instrument-title').textContent=requested+' · '+modeName[selectedMode];
+ el('instrument-meta').textContent=`${label(c)} · ${s.start} → ${s.end} · ${s.bars.toLocaleString()} bars · Common window begins ${s.common_start??'after the available history'}`;
+ el('badges').innerHTML=[s.priority?'Priority asset':'Full-universe coverage',s.group,c.label,'Fixed entry units · 1× equity notional'].map(t=>`<span class="badge">${t}</span>`).join('');
+ el('exhaustion').classList.toggle('hidden',!r.exhausted);el('exhaustion').textContent=`Funded measurement ends at a nonpositive value on ${r.exhausted}. ${r.unfunded_signals} later hypothetical trades are unfunded. The recorded deficit is retained; no fictitious recovery or liquidation fill is introduced.`;
+ el('instrument-cards').innerHTML=[['Net total return · full history',pct(r.net)],['CAGR · full history',pct(r.cagr)],['Net CAGR · common window',pct(r.common_cagr)],['Worst daily drawdown',pct(r.drawdown)]].map(([l,v])=>`<div class="card"><span>${l}</span><strong>${v}</strong></div>`).join('');
+ const traces=[['net','Net · fees + slippage','#087f7a'],['fee_only','Fees only','#7098ad'],['gross','Zero costs','#ba873e']].map(([key,name,color])=>({x:d.dates,y:selected[key],name,type:'scatter',mode:'lines',line:{color,width:2,dash:key==='gross'?'dot':'solid'}}));
+ for(const m of meta.modes){if(m===selectedMode)continue;traces.push({x:d.dates,y:variant(m).net,name:modeName[m]+' · net',type:'scatter',mode:'lines',visible:'legendonly',line:{color:m==='long'?'#507dc5':m==='short'?'#be6571':'#39736c',width:1.5}})}
+ for(const side of ['long','short'])traces.push({x:d.dates,y:variant('both')[side],name:side[0].toUpperCase()+side.slice(1)+' contribution (combined)',type:'scatter',mode:'lines',visible:'legendonly',line:{color:side==='long'?'#70a99d':'#cc979d',dash:'dot',width:1.5}});
+ traces.push({x:d.dates,y:d.buy_hold,name:'Buy & hold',type:'scatter',mode:'lines',visible:'legendonly',line:{color:'#989aaa',width:1.4}});
+ Plotly.react('equity',traces,{...baseLayout,yaxis:{...baseLayout.yaxis,title:{text:'Simulated account ($)'},type:'linear'},uirevision:requested+'|'+c.id},plotConfig);
+ el('direction-table').innerHTML='<table><thead><tr><th>Simulation</th><th>Net return</th><th>Zero costs</th><th>Full CAGR</th><th>Common CAGR</th><th>Drawdown</th><th>Funded closed trades</th></tr></thead><tbody>'+meta.modes.map(m=>{const v=get(s,m);return `<tr><td>${modeName[m]}</td><td class="${cls(v.net)}">${pct(v.net)}</td><td>${pct(v.gross)}</td><td>${pct(v.cagr)}</td><td>${pct(v.common_cagr)}</td><td>${pct(v.drawdown)}</td><td>${v.trades}</td></tr>`}).join('')+'</tbody></table>';
+ el('money-equation').textContent=`$10,000 ${r.price_pnl>=0?'+':'−'} ${money(Math.abs(r.price_pnl))} price P&L − ${money(r.fees)} fees − ${money(r.slippage)} slippage ≈ ${money(r.ending)}`;
+ Plotly.react('waterfall',[{type:'waterfall',x:['Starting cash','Price P&L','Fees','Slippage','Ending value'],measure:['absolute','relative','relative','relative','total'],y:[10000,r.price_pnl,-r.fees,-r.slippage,0],connector:{line:{color:'#bdcac3'}},increasing:{marker:{color:'#168879'}},decreasing:{marker:{color:'#b9545a'}},totals:{marker:{color:'#254a58'}},hovertemplate:'%{x}<br>$%{y:,.2f}<extra></extra>'}],{...baseLayout,margin:{l:55,r:12,t:18,b:50},showlegend:false,hovermode:'closest'},plotConfig);
+ const years=(Date.parse(s.end)-Date.parse(s.start))/(86400000*365.25);
+ el('cagr-equation').textContent=r.cagr==null?'CAGR is unavailable after account exhaustion.':`Full-history CAGR = (${money(r.ending)} / $10,000)^(1 / ${years.toFixed(3)} years) − 1 = ${pct(r.cagr)}. Calendar time includes periods spent in cash.`;
+ el('exit-note').textContent=`Funded exits: ${r.channel_exits} channel, ${r.initial_exits} initial stop, ${r.trailing_exits} trailing stop. ${r.unfunded_signals} subsequent signals were not funded.`;
+ const family=c.architecture==='all'?'all-e'+c.entry:c.architecture;
+ el('ledger-download').href=`trades-${family}-${selectedMode}.csv.gz`;
+ el('ledger-summary').textContent=`${selected.ledger.length} funded trades including any final open or exhaustion mark. Every row satisfies starting equity + price P&L − fees − slippage = ending equity. Displayed dollars are rounded to cents; calculations retain full precision. Most recent first.`;
+ el('trade-rows').innerHTML=[...selected.ledger].reverse().map(t=>`<tr><td>${t[0]}<small>${t[1]}</small></td><td>${num(t[2])}</td><td>${num(t[4])}</td><td>${t[12]}<small>${t[5]}</small></td><td>${num(t[6])}</td><td>${money(t[7])}</td><td class="${cls(t[8])}">${money(t[8])}</td><td>${money(t[9])}</td><td>${money(t[10])}</td><td>${money(t[11])}</td></tr>`).join('');
+}
+
+for(const id of ['scope','mode','architecture','entry','exit','initial','trailing'])el(id).onchange=refresh;
+for(const id of ['table-scope','sort'])el(id).onchange=renderTable;
+el('search').oninput=renderTable;
+el('symbol').onchange=()=>{selectedSymbol=el('symbol').value;renderTable();renderDetail()};
+refresh();
