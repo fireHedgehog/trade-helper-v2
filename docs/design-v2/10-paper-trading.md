@@ -4,8 +4,9 @@ The application has no connected paper-trading workflow. There is no Paper
 Trading route, order-submission client, holdings reconciliation worker or
 persistent paper-account journal.
 
-Trend and Timing contain historical simulated trades. Sizing is an unsaved
-allocation sandbox with operator-entered NAV and exposure by sleeve. Those
+Trend and Timing contain historical simulated trades. Sizing provides fresh
+allocation estimates and saved historical portfolios with explicit capital,
+costs and long/short funding assumptions. Those
 outputs do not represent broker fills, actual positions or available cash.
 
 The Alpaca provider supports the catalog and market-data workflow. A configured

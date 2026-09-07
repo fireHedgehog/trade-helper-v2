@@ -11,7 +11,8 @@ polls `GET /api/data/runs/{id}` → `LinearProgress` + live counters + Cancel.
 
 | Provider | Used for | Limits / notes |
 | --- | --- | --- |
-| **Alpaca** Market Data | stock bars, crypto bars, option snapshots | Stock requests use `feed=sip`; the app requests through the prior weekday in America/New_York, plus any configured extra lag. A recent-data rejection can move the requested endpoint back. Options use the indicative snapshot feed. |
+| **Alpaca** Market Data | stock bars, option snapshots | Stock requests use `feed=sip`; the app requests through the prior weekday in America/New_York, plus any configured extra lag. A recent-data rejection can move the requested endpoint back. Options use the indicative snapshot feed. |
+| **Coinbase Exchange** | BTC/USD and ETH/USD trade candles | Public `/products/{product}/candles`, no credentials. Daily UTC buckets, at most 300 per request, paced at 5 requests/second with shared retry/backoff. |
 | **Alpaca** Trading | asset catalog | `/v2/assets` active + inactive, one call each. |
 | **FRED** | macro series + commodity spot | 120 req/min; one call returns a full daily history. Values revised → store latest vintage + re-pull trailing 90 days each run. |
 | **Issuer sites** | index / sector / theme membership | SSGA SPDR daily-holdings XLSX, Nasdaq-100 list API, iShares CSV, ARK CSV. `User-Agent: Mozilla/5.0`, ≥2 s spacing. Minimal stdlib XLSX reader. |
@@ -22,7 +23,7 @@ polls `GET /api/data/runs/{id}` → `LinearProgress` + live counters + Cancel.
 | --- | --- | --- |
 | `asset_catalog` | `catalog.py` | Upsert the full Alpaca equity + crypto catalog (metadata). Then `universe.recompute_active_universe()`. |
 | `asset_prices` | `prices.py` | Raw and adjusted daily bars merged by date. Incremental starts 30 calendar days before each symbol’s last stored date and compares adjusted OHLC on overlapping dates. Changed values trigger a full-history fetch for that symbol before saving. A six-hour cooldown limits repeat checks, including when no new session exists. Batch size depends on history span. Full re-fetch bypasses cooldown and replaces returned historical rows from `history_start_date`. |
-| `crypto_bars` | `crypto.py` | `BTC/USD`, `ETH/USD` daily bars, one pass. |
+| `crypto_bars` | `crypto.py` | Coinbase `BTC-USD` / `ETH-USD` candles stored under `BTC/USD` / `ETH/USD`. Fetch through yesterday UTC; incremental overlaps the last stored day. Full mode or any stored non-Coinbase source downloads and atomically replaces the symbol's complete history. |
 | `commodity_prices` | `commodities.py` | WTI / Brent / Gold / NatGas from FRED. |
 | `macro` | `macro.py` | ~30 FRED series → `macro_observations` (+ trailing-90d revision re-pull). |
 | `memberships` | `memberships.py` | Scrape the issuer holdings; write `membership_groups` + `symbol_memberships`; derive `assets.sector`; fill NDX `market_cap`; then `recompute_active_universe()`. First run item per group + `derive-sectors` + `recompute-universe`. |
@@ -63,6 +64,17 @@ Commodities · **Options** (IV-grid coverage) · Run history. Endpoints under
 `/api/data/*` (see doc 01 for the router list).
 
 ## Manual refresh and repair
+
+Standalone crypto fetch and Refresh everything use the same handler. A crypto
+source replacement starts at the earlier of `crypto_history_start_date` (default
+2021-01-01, the existing crypto research window) and the first stored date.
+Coinbase's earliest ETH history has missing days in May 2016. All pages are
+downloaded before writing; OHLCV must be valid, every
+day from the first available candle through yesterday must be present, and
+existing historical coverage must be retained. Dates before a new product's
+first available candle are allowed. Failed or cancelled downloads retain stored
+history. Run history records source replacement and the number of page requests.
+Crypto candles are from one exchange, not a consolidated or executable index.
 
 Complete the price fetch and check its outcome before recomputing rankings and
 running Trend. An interrupted or failed calculation can be rerun manually.

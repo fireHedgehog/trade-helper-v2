@@ -1,5 +1,9 @@
 # Naive Donchian V1 — result
 
+Historical V1 reference. The current selection is
+[Naive Donchian V2](naive-donchian-v2-result.md), using corrected execution and
+accounting. The V1 performance figures below are not a comparable V2 baseline.
+
 Frozen conclusions of the strategy research: the single reference for the app's
 first strategy version. Results and guidance only — not the process. Do not
 delete; add a sibling file for a new model.

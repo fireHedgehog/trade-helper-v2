@@ -1,101 +1,96 @@
 # Position sizing
 
-`/sizing` is a client-side allocation sandbox over the saved Trend board.
-The operator supplies NAV, held exposure by sleeve and risk assumptions.
-The page computes total target holdings, compares them with deployed exposure,
-and explains the limiting constraints. It places no orders and saves no account
-or holdings ledger.
+`/sizing` provides a fresh allocation estimate and a historical portfolio
+simulation. It places no orders and never invokes macro AI. The default is
+priority assets, long only, equal capital, normal costs, $100,000 initial capital
+and history from 2020. Whole-database and full-available-history runs are available.
 
-## Inputs
+Long signals use each asset's assigned preset, defaulting to 20/55 with an initial
+3×ATR stop and no Chandelier. Short signals use the fixed 20/20 benchmark, initial
+2×ATR and Chandelier3×ATR. Both sides remain functional; short optimisation is parked.
 
-- `GET /api/signals/board`: simulated positions, pending next-open actions,
-  last close, `vol_60d`, sector, momentum and quantity rules.
-- Macro: the last successful AI regime reading, falling back to the live
-  deterministic composite. Only the zone affects sizing. The overlay is off
-  by default; refreshing the page does not generate a new AI assessment.
-- Controls: NAV, target volatility, maximum gross, name/sector caps, optional
-  sleeve budgets, selected directions and held percentage of NAV per sleeve.
+## Controls and allocation rules
 
-Pending entries and reversals use the intended direction and the last close
-for provisional quantities. Pending exits are omitted from the target book.
-Their next opening price remains unknown. New entries only filters the visible
-rows by age; the target calculation and book totals still include all names
-in the selected direction/watchlist scope.
+| Control | Behaviour |
+| --- | --- |
+| Universe | Priority watchlist, bonds and major companies; or all stored OHLC history |
+| Direction | Long only, short benchmark only, or combined |
+| Equal capital | Each eligible asset receives an equal budget, including flat names |
+| Inverse volatility | Budget proportional to inverse trailing 60-return sample volatility |
+| Capped volatility | Inverse volatility with gross entry limits: symbol10%, equities/other ETFs70%, bonds40%, crypto10% |
+| Costs | Normal or doubled fees, slippage and borrow |
+| History | Full available history or 2020 onward; each begins flat after warmup |
 
-## Total target calculation
+Volatility uses only completed prior bars for historical entries, annualised
+252 for equities and 365 for crypto, with a 1% floor. At least 65 prior bars
+are required. An asset whose latest prior price is over seven calendar days
+old receives no new allocation. Flat names retain their budget as cash;
+unused or capped allocations are not redistributed to active signals.
 
-Targets are independent of the deployed-by-sleeve inputs:
+Combined accounts start with a fixed 50/50 long/short capital split and no
+transfers. Gross symbol and asset-class limits aggregate both directions.
+Opposite positions do not cancel each other for sizing or reporting.
 
-1. Inverse-volatility weights sum to `k_max × NAV`. Missing volatility uses a
-   disclosed 25% assumption.
-2. The per-name cap clips large weights and redistributes available excess
-   proportionally among names below the cap. Unallocated amounts remain cash.
-3. Each sleeve's total target is capped at `sector_cap × k_max × NAV`.
-   Optional Equities/Bonds/Crypto/Other budgets cap those groups on the same
-   reference gross. Deployed holdings are not subtracted from these caps.
-4. Estimated portfolio volatility uses name volatilities and a fixed 0.35
-   pairwise correlation, or the supplied override. All targets scale down by
-   `min(1, target_volatility / estimated_volatility)`.
-5. When enabled, macro scales targets by risk-on 1, neutral 0.65 or risk-off
-   0.35, with adjustable neutral/risk-off multipliers. Risk-off also removes
-   names with a known momentum rank below 50.
-6. Quantities round down to whole equity shares or the crypto catalog's
-   `min_trade_increment`, subject to `min_order_size`. Missing crypto metadata
-   uses 0.00000001 units as a research assumption. Final target dollars equal
-   rounded quantity times reference price. Unused dollars remain in cash.
+## Allocation today
 
-The dollar/quantity output is the total desired holding. It is not the number
-of additional units to buy or sell. Eligibility, live borrow availability and
-actual fill prices require separate operator verification.
+This tab uses the saved Trend board and latest closing prices to estimate total
+holdings for a fresh allocation. Pending entries can receive a budget; pending
+exits are omitted. All eligible saved symbols, including flat names, determine
+weights. Quantities round down to instrument increments and minimum order sizes;
+short quantities are negative. Cost-aware budgets reserve entry fees and slippage.
 
-## Comparing with existing holdings
+It shows each asset's signal, volatility, signed units, gross value and weight,
+plus gross allocation, estimated entry costs and unallocated capital. Actual
+next-open prices will differ. These are fresh target holdings, not changes to
+an existing broker account or rebalanced historical simulation positions.
 
-For each sleeve:
+## Historical simulation
 
-- Target: sum of final target weights.
-- Room to target: `max(0, target − deployed)`.
-- Exposure to reduce: `max(0, deployed − target)`.
+The backend reuses production signal fills and the reviewed fixed-unit portfolio
+accounting. At entry it calculates units from available capital and the prior-bar
+weight, including trading costs in the budget. Units remain fixed until the
+native strategy exit; positions are not resized daily. Caps apply at entry and
+can drift as prices change. Historical units are fractional to isolate allocation
+behaviour from instrument rounding.
 
-The whole-book summary compares total target gross with total deployed gross.
-That is a net difference: a portfolio can need both an addition in one sleeve
-and a reduction in another. The sleeve view shows those differences explicitly.
-Entering the proposed portfolio as existing holdings leaves its target weights
-unchanged and shows no additional room or required reduction.
+Cash earns zero interest. Short-sale proceeds are reserved rather than treated
+as extra spending money. Short liabilities are marked with signed units; falling
+prices produce gains and rising prices losses. Normal costs are 5 bps plus
+0.05×ATR each side and 2% annual short borrow; doubled costs use 10 bps, 0.10×ATR
+and 4%. Borrow availability and crypto funding are unverified assumptions of the
+synthetic benchmark.
 
-Cash at target is `max(0, 100% − target_gross)`. It describes the allocation at
-the displayed reference prices after rebalancing, including quantity rounding;
-it is not a broker cash balance. The volatility readout describes the estimate
-before the volatility/macro scaling.
+The daily account tracks equity, long holdings, short liabilities, reserved
+capital, free capital and costs. Open trades are marked at the last known price.
+Stale held prices remain marked and are counted; no exit is invented. Unfunded
+native entries and funding-deficit days are reported.
 
-## Sleeves and verdicts
+The page shows portfolio CAGR, drawdown, ending equity, exposure, costs, calendar
+returns and an equal-capital buy-and-hold reference. The reference uses the same
+eligible history window, costs and initial capital. Asset contributions include
+all symbols, even those with no funded trades, with a full CSV export and a
+searchable trade ledger. Long and short price P&L less all costs reconciles to
+the account's net profit. Portfolio CAGR is not median per-asset CAGR.
 
-Sleeves are the 11 GICS sectors, Bonds, Crypto and Other. Equity sector metadata
-drives GICS assignment; configured bond ETFs and crypto symbols have dedicated
-sleeves. Untagged and commodity ETFs use Other. Related ETFs and individual
-stocks can overlap economically despite occupying different sleeves.
+Allocation direction changes require a new simulation. Show-long/Show-short
+checkboxes in the saved trade ledger only filter rows; they never alter the
+saved allocation, exits or performance. Changed controls are visibly distinguished
+from the last computed result.
 
-Per-name verdicts are coarse sleeve-level review cues because actual per-name
-holdings are not supplied:
+## Background execution and storage
 
-- TRIM: deployed sleeve exposure exceeds its total target by more than 0.5% NAV.
-- WAIT: macro excludes the name or its allocation cannot buy a minimum unit.
-- BLOCKED: its sleeve is at target, or the whole book must be reduced before adding.
-- LIGHT: there is room, but a cap reduces the name below its raw inverse-vol weight.
-- ADD: there is room toward the sleeve target and no such cap reduction.
+`POST /api/sizing/run` validates the request and submits `portfolio_simulation`
+to the existing single worker. Progress, errors and cancellation use
+`/api/data/runs/{id}`. Preparation reports each symbol, followed by portfolio
+accounting and the buy-and-hold reference. Revisiting the page resumes monitoring
+an active job. This action fetches no data and generates no macro AI output.
 
-A TRIM cue does not establish that the operator owns the named instrument.
-The actual holdings determine which positions to reduce.
+`GET /api/sizing/latest` returns the last successful result. The singleton
+`portfolio_result` stores its exact settings, engine version, timestamp and
+compressed curves, contributions, ledger and assumptions. A failed or cancelled
+calculation leaves the previous successful result available. Changed prices or
+assignments require an explicit new run; engine-version mismatch is labelled.
 
-## Page
-
-Parameters and deployed-by-sleeve presets are on the left. Outputs include:
-net room/reduction, gross exposure, cash at target, cap/volatility explanation,
-sleeve target comparisons and k_max sensitivity. Grey represents held exposure
-within target, green is room to add, red is exposure above target, and the tick
-marks total sleeve target. The per-name table shows volatility, rounded target
-weight, target dollars, target units and verdict; hover shows the calculation.
-
-Targets are computed for all names in the selected scope before the recent-entry
-and verdict display filters. The scenario resets when the page unmounts.
-Refresh reloads cached signals and macro context; the operator fetches data,
-recomputes rankings, runs Trend and reruns the AI assessment separately.
+The full universe is the current stored database, not historical index membership.
+Results use latest adjusted equity history and available Coinbase crypto history.
+They describe this research universe and do not establish future performance.

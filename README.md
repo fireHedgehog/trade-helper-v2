@@ -1,16 +1,21 @@
 # Trade Helper
 
-A local-first, single-operator trading **research** app. Six honest surfaces,
-each doing one job, all naive-v1 — real, known, never claimed to be
-statistically validated. See [`docs/`](docs/) for the full design package
-(read [`docs/00-overview.md`](docs/00-overview.md) first).
+A local-first trading research app with market data, macro context, momentum
+rankings, trend signals and portfolio sizing. It does not place broker orders.
+Start with the [current application design](docs/design-v2/README.md).
+
+The permanent strategy research reference is
+[Naive Donchian V2](docs/strategy-experiments/naive-donchian-v2-result.md).
+Its archive commit preserves the full experiments; the temp folders are absent
+from the current checkout. Agents must not retrieve or restore those archived
+files unless the user explicitly requests it. Multi-strategy development is parked.
 
 ## Repository layout
 
 ```
-docs/        Design package — the specification. Start here.
+docs/        Current design in design-v2/; concise results in strategy-experiments/.
 schema/      Ordered SQL migrations. The single source of truth for the DB.
-database/    Runtime home of the SQLite file (git-ignored, disposable).
+database/    Local SQLite file (git-ignored).
 backend/     FastAPI + SQLite. One folder per feature under app/features/.
 frontend/    React + TypeScript + Vite. One folder per feature under src/features/.
 ```
@@ -23,8 +28,10 @@ outside both so a data migration is just a new `schema/migrations/NNNN_*.sql`.
 
 | Surface | State |
 | --- | --- |
-| Credentials | **Implemented** — store/rotate FRED + Alpaca keys, per-key Test button |
-| Macro, Multisectional, Trend, Timing, Data management | Placeholder pages, feature folders scaffolded |
+| Credentials / Data management | Provider keys, paced fetching, adjustment repair and one-click data + computation workflow |
+| Macro / Multisectional | Weighted macro baseline, manual optional AI and cross-sectional momentum context |
+| Trend / Timing / Strategies | Assigned long preset plus independent fixed short benchmark; saved signals and scratch previews |
+| Sizing | Current allocations and historical long, short or combined portfolios, with per-asset contributions |
 
 ## Run it
 
@@ -60,10 +67,11 @@ The raw secret value is **never** stored in the database, never returned by
 an API, never logged, never bundled into the frontend. It is written once to
 the OS keychain and resolved from there (or a per-field environment variable)
 at runtime. The `credentials` table holds only provider configuration and
-verification metadata. See [`docs/07-credentials-page.md`](docs/07-credentials-page.md).
+verification metadata. See [credentials and shell](docs/design-v2/07-credentials-and-shell.md).
 
-## Reset the database
+## Local data
 
-```bash
-rm database/trade_helper.sqlite3    # migrations rebuild it on next backend start
-```
+Schema migrations apply on backend startup. Market history can be fetched again;
+back up the SQLite database to retain assignments, saved results and accumulated
+option snapshots. Macro AI is a separate manual action and is never triggered by
+the one-click data refresh or portfolio simulation.

@@ -15,9 +15,13 @@ Read in order:
 | 06 | `06-trend-and-timing.md` | The Donchian signal engine, the single-symbol Timing page, the whole-universe Trend board |
 | 07 | `07-credentials-and-shell.md` | The provider registry + secret handling, the app shell / routing / theme |
 | 08 | `08-strategy-management.md` | Strategy registry, symbol assignment, preview, and the Strategies page |
-| 09 | `09-position-sizing.md` | Target holdings, quantity rounding, deployed exposure comparisons and sizing verdicts |
+| 09 | `09-position-sizing.md` | Fresh allocations, historical funded portfolios, costs and direction contributions |
 | 10 | `10-paper-trading.md` | Current boundary between research simulation and broker execution |
 
-Everything here is **naive-v1 / descriptive / not statistically validated** by
-design (see 00). Keep these docs updated as the app changes; when a section
-goes stale, fix it or delete it — don't let stale design docs accumulate.
+The [multiple-strategy discussion](11-strategy-design-draft.md) is **parked** and
+describes proposed behaviour only. Files 00–10 describe current application state.
+The permanent research reference is
+[Naive Donchian V2](../strategy-experiments/naive-donchian-v2-result.md), including
+the archive commit. Experiment folders are removed from the current checkout.
+Do not retrieve archived files unless the user explicitly requests it.
+Update design documents in place; new research uses temporary folders until review.

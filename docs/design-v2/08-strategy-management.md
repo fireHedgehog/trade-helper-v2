@@ -1,42 +1,44 @@
-# Strategy registry, assignment, and per-symbol universe execution
+# Strategy presets and assignment
 
-## Registry and resolution
+The application assigns one long preset per asset. A separate fixed short
+benchmark always runs alongside it. Multiple strategy families and multiple
+assignments per asset are [parked](11-strategy-design-draft.md).
 
-- **`signal_strategies`** — `(id, key, name, params_json, is_default, note,
-  created_at, updated_at)`. One immutable parameter snapshot per row. Seeded:
-  - `naive-donchian-v1` (`is_default = 1`) — the frozen benchmark: `entry_len`
-    20, `exit_len` 20, Chandelier 3×ATR, initial 2×ATR stop, `allow_short`
-    `false`.
-  - `naive-donchian-v1-slow-entry` — identical except `entry_len` 100.
-  - "Edit" is not offered: a new parameter set is a new row (V3, V4…).
-- **`assets.strategy_id` / `crypto_assets.strategy_id`** — explicit id on every
-  active row (default → V1, the `ETF_BONDS` set → V2). Dormant rows stay NULL
-  and fall back to the default at resolve time. **`signal_symbol_stats` has a
-  nullable `strategy_id`** stamped by each universe run; its existing
-  `params_json` column already holds the exact per-symbol params used.
-- **`signal_config` and `GET`/`PUT /api/signals/config`** provide a standalone
-  fallback preset. The board resolves parameters from the strategy registry.
-- **Resolver**: `run_universe` builds `symbol -> params` once from the registry
-  and runs each symbol with its own parameters. **Direction is forced two-sided
-  regardless of the strategy** — the board computes long *and* short for research coverage. `allow_short` in a strategy's
-  `params_json` is documentation, not a filter.
-- **API** (all under `/api/signals`): `GET /strategies`,
-  `GET /strategies/{id}` (with assigned symbols), `POST /strategies/{id}/assign`
-  `{symbols:[…]}`, `GET /strategies/resolve/{symbol}`, and
-  `POST /preview {symbol, params}` — a stateless single-symbol run that persists
-  **nothing**.
-- **Timing page**: no "Save parameters". The form pre-fills from the symbol's
-  resolved strategy; **Run** calls `/preview` and only updates what is on screen.
-  The Trend board still shows the symbol's last *stored* (universe-run) signals
-  until the next Trend run.
-- **Strategies page** (`/strategies`): lists each strategy, its param table
-  (rows differing from the default highlighted), its `note`, its assigned-symbol
-  list, and an "Apply to…" symbol multi-select that writes `strategy_id`.
-- **Trend page**: the Watchlist header expands a static **advisory allocation
-  note** (inverse-vol sizing, ~12% vol target, ~10% position cap, sleeve
-  budgets 50/20/15/5/10, long-only default with bonds + BTC as the short
-  exceptions, weekly re-check). No portfolio engine — reference text only, from
-  the frozen research (`docs/strategy-experiments/naive-donchian-v1-result.md`).
+## Registry
 
-There are no separate version, assignment-priority, shadow-run or approval-lifecycle tables.
-Each saved symbol result contains the strategy id and exact parameter snapshot.
+`signal_strategies` stores named parameter snapshots: `id`, `key`, `name`,
+`params_json`, `is_default`, `note` and timestamps. The default is
+`trend-long-v2`: 20-bar entry, 55-bar exit, ATR20, initial 3×ATR stop, no
+Chandelier, next-open fills, 5 bps and 0.05×ATR per-side costs.
+
+Legacy 20/20 and 100/20 presets remain available for deliberate long comparison.
+They are not the default or automatic bond exceptions. Presets are immutable
+through the UI; the page offers assignment, not parameter editing.
+
+`assets.strategy_id` and `crypto_assets.strategy_id` select the long preset.
+A NULL or absent assignment resolves to the current registry default, including
+newly fetched catalog names. Catalog refreshes preserve existing assignments.
+Resolution includes stored inactive assets when their price history is evaluated.
+`signal_config` is a standalone fallback API; normal board runs use the registry.
+
+The fixed short benchmark uses entry20, exit20, ATR20, initial2×ATR and
+Chandelier3×ATR. Its parameters and execution are independent of the long
+assignment. A long parameter change cannot rewrite short fills.
+
+## Page and API
+
+The Strategies page lists presets, highlights parameter differences, shows
+assigned symbols and offers an Apply-to symbol selection. Assignment changes
+take effect on the next Trend or portfolio run; they do not alter already saved
+history. Each saved symbol result records the exact parameters and strategy id.
+
+API routes under `/api/signals`:
+
+- `GET /strategies` and `GET /strategies/{id}` list presets and assignments.
+- `POST /strategies/{id}/assign` accepts `{symbols:[…]}`.
+- `GET /strategies/resolve/{symbol}` resolves the long preset.
+- `POST /preview {symbol, params}` runs a stateless Timing preview.
+
+Timing edits only its current long preview. It has no Save-parameters action.
+Both directions still run and remain separately inspectable. Sizing uses assigned
+long presets from the database, not unsaved Timing edits.

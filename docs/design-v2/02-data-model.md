@@ -1,7 +1,7 @@
 # Data model
 
 All tables live in one SQLite file, defined only in `schema/migrations/`
-(0001–0013). Grouped by instrument / concern family. `*_stats` tables are
+(0001–0018). Grouped by instrument / concern family. `*_stats` tables are
 maintained summaries so list views never scan the fact table.
 
 ## Equities / ETFs
@@ -17,7 +17,7 @@ maintained summaries so list views never scan the fact table.
 | Table | Key | Notes |
 | --- | --- | --- |
 | `crypto_assets` | `symbol` | Alpaca crypto catalog; only `BTC/USD`, `ETH/USD` are `active`. |
-| `crypto_bars` | `(symbol, date)` | Raw OHLCV only — no adjustment concept, 24/7. |
+| `crypto_bars` | `(symbol, date)` | Coinbase Exchange trade OHLCV, completed UTC days, 24/7; `source = coinbase`. No adjustment. Trade count and VWAP are NULL because the candle endpoint does not provide them. |
 | `crypto_bar_stats` | `symbol` | as `price_bar_stats` minus the adjusted fields. |
 
 ## Commodities (FRED daily spot)
@@ -66,18 +66,29 @@ No persisted "macro regime" — the composite is computed live (doc 04).
 
 | Table | Key | Notes |
 | --- | --- | --- |
-| `signal_strategies` | `id` (one `is_default=1`) | Named parameter snapshots (migration `0014`): `key`, `name`, `params_json`, `note`. Seeded with `naive-donchian-v1` (default) and `naive-donchian-v1-slow-entry` (bond exception, `entry_len` 100). Immutable — a new set is a new row. See `08-strategy-management.md`. |
+| `signal_strategies` | `id` (one `is_default=1`) | Named parameter snapshots: `key`, `name`, `params_json`, `note`. Default `trend-long-v2` is long20/55 with initial3×ATR and no Chandelier. Legacy20/20 and100/20 presets remain available for comparison. See `08-strategy-management.md`. |
 | `signal_config` | `id` (one `is_active=1`) | Standalone fallback preset. Board runs resolve the strategy registry. |
-| `assets.strategy_id` / `crypto_assets.strategy_id` | — | Which `signal_strategies` row a symbol runs. Explicit on every active row (default → V1, `ETF_BONDS` → slow-entry); NULL falls back to the default. |
+| `assets.strategy_id` / `crypto_assets.strategy_id` | — | The assigned long preset. NULL falls back to the registry default. The independent short benchmark does not use this assignment. |
 | `signal_runs` | `run_id` | One per Run. `scope ∈ {single, universe}`, `symbol` (single only), `params_json` (a resolver marker for universe runs), `engine_version`, `status`, counts. |
 | `signal_events` | `id` | The trade list: `direction`, `entry_date/price`, `exit_date/price/reason` (NULL while open), `bars_held`, `return_pct`, `return_r`, `mae_atr`, `mfe_atr`, `initial_stop`. Index `(symbol, entry_date)`. |
 | `signal_symbol_stats` | `(run_id, symbol)` | Cached board state, `metrics_json`, exact `params_json` and `strategy_id`: `state ∈ {long,short,flat}`, `state_since`, `entry_price`, `last_close`, `last_date`, `unrealized_pct`, `current_stop` for the next session, `vol_60d`, and nullable `pending_action_json` (action, direction, signal date, fill timing and reason). |
-| `signal_chart` | `(run_id, symbol)` | Timing-only chart payload JSON: `{overlays (donchian_up/dn, stop_line), equity, key_levels, daily}`. **Not** written by universe runs. |
+| `signal_chart` | `(run_id, symbol)` | Timing-only chart payload JSON: overlays, equity, key levels, daily records and independent direction states/metrics/equity/overlays. Not written by universe runs. |
+
+`signal_symbol_stats.directions_json` stores independent long/short states and
+pending actions. Primary state columns remain for compact views; both directions'
+trades share the symbol's event list. A single current snapshot therefore retains
+both accounts without separate assignment or strategy-family tables.
 
 **Invariant:** a symbol has at most one `signal_symbol_stats` row at a time —
 `wipe_symbol` deletes its `signal_events` / `signal_symbol_stats` /
 `signal_chart` before each write (full recompute, single or universe). So the
 "current" run for a symbol = whichever ran last.
+
+## Portfolio sizing
+
+| Table | Key | Notes |
+| --- | --- | --- |
+| `portfolio_result` | `id=1` | Last successful portfolio: worker run id, engine version, timestamp, exact settings JSON and gzip-compressed result. Curves, all asset contributions, funded trades and assumptions remain available until a successful replacement. |
 
 ## Multisectional ranking
 

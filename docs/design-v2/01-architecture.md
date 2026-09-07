@@ -22,7 +22,7 @@ frontend/src/
   app/{router,AppShell,theme}.tsx
   shared/{api/client.ts, components/}
   features/<name>/            page.tsx + api.ts + types.ts + components/
-schema/migrations/            NNNN_*.sql  (0001–0017)
+schema/migrations/            NNNN_*.sql  (0001–0018)
 database/                     runtime SQLite file only (git-ignored)
 docs/design-v2/               this set (the as-built reference; superseded whole, not archived)
 ```
@@ -39,7 +39,12 @@ Each `backend/app/features/<name>/` has, as needed:
 
 Registered in `main.py`: `credentials`, `data_management` (`/api/data`),
 `macro` (`/api/macro`), `multisectional` (`/api/multisectional`), `signals`
-(`/api/signals`).
+(`/api/signals`) and `sizing` (`/api/sizing`).
+
+`features/sizing/data.py` prepares past-only portfolio inputs from stored prices
+and production signals; `portfolio.py` computes fixed-unit funded accounts.
+`service.py` persists the latest successful compressed result. Trend and Timing
+use `signals/engine.py::run_pair` for independent long and short simulations.
 
 ## Database
 
@@ -49,9 +54,9 @@ Registered in `main.py`: `credentials`, `data_management` (`/api/data`),
 
 ## Fetch worker, runs, pacing (`features/data_management/`)
 
-- **`worker.py`** — one `asyncio.Queue`, one consumer task, started in the lifespan. `submit(kind, mode, scope, scope_arg) -> (run_id, deduped)`: de-dupes by kind (a second submit while one is queued/running returns the existing `run_id`). On startup `_reconcile_orphaned_runs()` marks any still-`queued`/`running` `fetch_runs` row `failed` ("interrupted by a server restart"). `VALID_KINDS = {asset_catalog, asset_prices, crypto_bars, commodity_prices, macro, memberships, option_snapshots, signal_universe}`.
+- **`worker.py`** — one `asyncio.Queue`, one consumer task, started in the lifespan. `submit(kind, mode, scope, scope_arg) -> (run_id, deduped)`: de-dupes by kind (a second submit while one is queued/running returns the existing `run_id`). On startup `_reconcile_orphaned_runs()` marks any still-`queued`/`running` `fetch_runs` row `failed` ("interrupted by a server restart"). Kinds cover data fetches, `signal_universe` and `portfolio_simulation`. Portfolio settings are stored in the job's `scope_arg`; progress and cancellation reuse the existing run API.
 - **`runs.py`** — `fetch_runs` / `fetch_run_items` bookkeeping + an in-process cancel-flag set. Handlers call `set_planned` → `start_target` / `finish_target` per symbol/series (per-target commit, so a crash or cancel loses at most one target), and `raise_if_cancelled` between targets. `GET /api/data/runs/{id}` polls the counters row for the progress bar.
-- **`pacing.py`** — `HostLimiter` serialises requests per host to a minimum interval (Alpaca 0.40 s ≈ 150/min, FRED 0.70 s, issuer sites 2.0 s). `clients/http.py` adds 429/5xx exponential backoff.
+- **`pacing.py`** — `HostLimiter` serialises requests per host to a minimum interval (Alpaca 0.40 s ≈ 150/min, Coinbase 0.20 s, FRED 0.70 s, issuer sites 2.0 s). `clients/http.py` adds 429/5xx exponential backoff.
 
 ## Config (`core/config.py`, all overridable via env / `backend/.env`)
 
