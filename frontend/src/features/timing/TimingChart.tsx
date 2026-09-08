@@ -56,10 +56,10 @@ function toMarker(m: Marker): SeriesMarker<Time> {
   const isEntry = m.kind === "entry";
   return {
     time: m.time as Time,
-    position: isEntry ? "belowBar" : "aboveBar",
-    shape: isEntry ? "arrowUp" : "arrowDown",
+    position: m.side === "long" ? "belowBar" : "aboveBar",
+    shape: isEntry ? (m.side === "long" ? "arrowUp" : "arrowDown") : "circle",
     color: m.side === "long" ? (isEntry ? "#1f9d55" : "#7bbf9c") : isEntry ? "#d64545" : "#e39b9b",
-    text: m.label ?? `${m.side} ${m.kind}`,
+    text: `${m.side === "long" ? "Long" : "Short"} ${m.kind}`,
   };
 }
 

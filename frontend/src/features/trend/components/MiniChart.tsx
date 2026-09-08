@@ -48,14 +48,15 @@ function eventMarkers(events: MiniEvent[], firstVisible: string): SeriesMarker<T
     if (e.entry_date >= firstVisible) {
       out.push({
         time: e.entry_date as Time,
-        position: "belowBar",
-        shape: "arrowUp",
+        position: e.dir === "long" ? "belowBar" : "aboveBar",
+        shape: e.dir === "long" ? "arrowUp" : "arrowDown",
         color: e.dir === "long" ? green : red,
-        text: e.dir === "long" ? "L" : "S",
+        text: e.dir === "long" ? "L entry" : "S entry",
       });
     }
     if (e.exit_date && e.exit_date >= firstVisible) {
-      out.push({ time: e.exit_date as Time, position: "aboveBar", shape: "arrowDown", color: grey, text: "out" });
+      out.push({ time: e.exit_date as Time, position: e.dir === "long" ? "belowBar" : "aboveBar",
+        shape: "circle", color: e.dir === "long" ? green : red, text: e.dir === "long" ? "L exit" : "S exit" });
     }
   }
   return out.sort((a, b) => ((a.time as string) < (b.time as string) ? -1 : 1));

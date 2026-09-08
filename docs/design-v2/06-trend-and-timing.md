@@ -97,8 +97,12 @@ The background run covers all stored equity history, active catalog assets,
 active crypto and the fixed watchlist. Missing/insufficient history is not a
 profitable or flat strategy result. Pending actions are separate from long,
 short-benchmark and flat tables. An independently held asset may appear in both
-direction tables. Watchlist summaries indicate when the short benchmark is
-also held. Symbol links open Timing.
+direction tables. The watchlist defaults to Long strategy, with a Short benchmark
+selector. Its state, entry, stop, unrealised return and chart trades belong to
+the selected direction. After that direction exits it shows Flat, even when the
+other account holds a position. Missing direction results show Not computed.
+The universe flat table contains assets flat in both strategies. Symbol links
+open Timing.
 
 Watchlist table/chart views include price, entry, stop, momentum context and
 60-return annualised sample volatility (252 equity / 365 crypto; 1% floor).
@@ -117,6 +121,14 @@ The default display is long; the browser remembers the operator's direction
 selection. Charts include price, volume, MACD, RSI and KDJ. Daily/weekly/monthly
 chart aggregation does not change the daily simulation. Full overlays and
 per-direction curves require a preview after a universe-only saved run.
+
+Current-position summaries always show the Long strategy and Short benchmark
+separately, including Flat states and the previous trade's exit when a new
+position is open. The summary identifies saved results versus a live preview.
+Chart/history filters do not hide those current-position summaries. Entry arrows
+and exit circles are labelled with their direction; an exit belongs only to its
+own trade. Trade history names the strategy account, shows Open/Closed explicitly,
+and lists newest entries first. Opposing positions remain independent.
 
 Research code belongs in `backend/temp`; reports, tables and charts belong in
 `docs/temp` until reviewed and archived. Full-universe results remain available,

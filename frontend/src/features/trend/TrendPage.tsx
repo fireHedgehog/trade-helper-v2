@@ -35,6 +35,7 @@ import { FetchPanel } from "@/features/data-management/components/FetchPanel";
 import { fmtTs } from "@/shared/format";
 
 import { trendApi } from "./api";
+import { watchlistForDirection, type WatchDirection } from "./watchlist";
 import { WatchlistCharts } from "./components/WatchlistCharts";
 import { MA_RAMP, type MiniTf, type MiniWindow } from "./components/MiniChart";
 import type { BoardResponse, BoardRow, BoardStrategy, MomentumInfo, WatchSection } from "./types";
@@ -176,6 +177,7 @@ export function TrendPage() {
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [showFlat, setShowFlat] = useState(false);
   const [showAlloc, setShowAlloc] = useState(false);
+  const [watchDirection, setWatchDirection] = useState<WatchDirection>("long");
 
   // Watchlist view: default is always the compact table; "charts" is opt-in and
   // triggers a heavier board fetch (?charts=1) the first time it's opened.
@@ -202,6 +204,7 @@ export function TrendPage() {
     setMiniMas((xs) => (xs.includes(n) ? xs.filter((x) => x !== n) : [...xs, n].sort((a, b) => a - b)));
 
   const notComputed = board?.status === "not_computed";
+  const watchSections = watchlistForDirection(board?.watchlist ?? [], watchDirection);
 
   return (
     <div>
@@ -283,6 +286,16 @@ export function TrendPage() {
           <ToggleButtonGroup
             size="small"
             exclusive
+            value={watchDirection}
+            aria-label="Watchlist strategy direction"
+            onChange={(_, v: WatchDirection | null) => v && setWatchDirection(v)}
+          >
+            <ToggleButton value="long">Long strategy</ToggleButton>
+            <ToggleButton value="short">Short benchmark</ToggleButton>
+          </ToggleButtonGroup>
+          <ToggleButtonGroup
+            size="small"
+            exclusive
             value={wlView}
             onChange={(_, v) => v && setWlView(v)}
           >
@@ -344,18 +357,22 @@ export function TrendPage() {
             </>
           )}
         </Stack>
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+          Positions and trades for the {watchDirection === "long" ? "long strategy" : "short benchmark"}.
+          Flat means this direction has no open position. Confirmed next-open actions appear above.
+        </Typography>
         <Collapse in={showAlloc}>
           <AllocationNote strategies={board?.strategies ?? []} />
         </Collapse>
         {wlView === "table" ? (
-          <WatchlistTable sections={board?.watchlist ?? []} />
+          <WatchlistTable sections={watchSections} />
         ) : !chartsLoaded ? (
           <Typography color="text.secondary" sx={{ py: 3 }}>
             Loading charts…
           </Typography>
         ) : (
           <WatchlistCharts
-            sections={board?.watchlist ?? []}
+            sections={watchSections}
             tf={miniTf}
             windowKey={miniWindow}
             mas={miniMas}
@@ -387,7 +404,7 @@ export function TrendPage() {
 
           <Paper sx={{ p: 2 }}>
             <Button size="small" onClick={() => setShowFlat((s) => !s)}>
-              {showFlat ? "Hide" : "Show"} flat ({board.counts?.flat ?? board.flat.length})
+              {showFlat ? "Hide" : "Show"} flat in both strategies ({board.counts?.flat ?? board.flat.length})
             </Button>
             <Collapse in={showFlat}>
               <Box sx={{ mt: 1 }}>
@@ -407,7 +424,9 @@ export function TrendPage() {
 }
 
 export function StateCell({ row }: { row: BoardRow }) {
-  if (!row.state || row.state === "flat")
+  if (!row.state)
+    return <Chip size="small" variant="outlined" label="not computed" />;
+  if (row.state === "flat")
     return <Chip size="small" variant="outlined" label="flat" />;
   return (
     <Chip
@@ -594,7 +613,6 @@ function WatchRow({ r }: { r: BoardRow }) {
       </TableCell>
       <TableCell>
         <StateCell row={r} />
-        {r.directions?.long?.state === 'long' && r.directions?.short?.state === 'short' && <Chip size="small" label="+ short benchmark" sx={{ml:1}} />}
       </TableCell>
       <TableCell>{r.state_since ?? NA}</TableCell>
       <TableCell align="right">{flat ? NA : daysSince(r.state_since)}</TableCell>

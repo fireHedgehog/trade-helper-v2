@@ -275,11 +275,9 @@ export function TimingPage() {
         Timing
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
-        Long uses {strategyLabel || 'the assigned preset'}; the default is 20/55 with an initial 3×ATR stop and no Chandelier.
-        Short: independent fixed 20/20 benchmark, initial 2×ATR and Chandelier 3×ATR.
-        Run previews both directions; the toggles change the view without changing exits.
-        Both together show two accounts starting with equal capital. Portfolio sizing and
-        short borrowing costs are handled on the Sizing page.
+        Two independent strategy accounts for {symbol}: {strategyLabel || 'the assigned long strategy'}
+        {" "}and the fixed short benchmark. Each owns its position and exits; they can hold opposite
+        positions at the same time. Run previews both using the parameters below.
       </Typography>
 
       <Stack
@@ -518,24 +516,48 @@ export function TimingPage() {
 
       {data?.status === "ok" && (
         <>
+          <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Current simulated positions {data.preview ? "· preview" : "· saved Trend result"}
+            </Typography>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
+              {(['long', 'short'] as const).map(side => {
+                const state = data.directions?.[side]?.state;
+                const lastExit = (data.trades ?? []).filter(t => t.direction === side && t.exit_date)
+                  .sort((a, b) => b.exit_date!.localeCompare(a.exit_date!))[0];
+                return (
+                  <Box key={side} sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600, color: side === 'long' ? green : red }}>
+                      {side === 'long' ? 'Long strategy' : 'Short benchmark'}
+                    </Typography>
+                    {state ? <StateChip state={state} /> : <Chip variant="outlined" label="Not computed" />}
+                    {state?.state === side && lastExit && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                        Previous {side} trade exited {lastExit.exit_date}. The position above is a separate trade.
+                      </Typography>
+                    )}
+                  </Box>
+                );
+              })}
+            </Box>
+          </Paper>
           <Stack
             direction="row"
             spacing={2}
             useFlexGap
             sx={{ mb: 1, alignItems: "center", flexWrap: "wrap" }}
           >
-            {showBoth && data.directions ? Object.entries(data.directions).map(([side, d]) => d && <Box key={side}><Typography variant="caption">{side === 'long' ? 'Long strategy' : 'Short benchmark'}</Typography><StateChip state={d.state} /></Box>) : view.state && <StateChip state={view.state} />}
             <Box sx={{ display: "flex", alignItems: "center" }}>
               <Typography variant="body2" color="text.secondary" sx={{ mr: 0.5 }}>
-                Show
+                Chart & history
               </Typography>
               <FormControlLabel
                 control={<Checkbox size="small" checked={effLong} onChange={(e) => setDirLong(e.target.checked)} />}
-                label="Long"
+                label="Long strategy"
               />
               <FormControlLabel
                 control={<Checkbox size="small" checked={effShort} onChange={(e) => setDirShort(e.target.checked)} />}
-                label="Short"
+                label="Short benchmark"
               />
             </Box>
             <ToggleButtonGroup size="small" exclusive value={timeframe} onChange={(_, v) => v && setTimeframe(v)}>
@@ -572,6 +594,10 @@ export function TimingPage() {
           </Stack>
 
           <Paper sx={{ p: 1, mb: 2 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", px: 1, mb: 0.5 }}>
+              Green: Long strategy · Red: Short benchmark. Arrows mark entries; circles mark exits.
+              Each exit closes only its own trade.
+            </Typography>
             <TimingChart
               bars={data.bars ?? []}
               overlays={showBoth && data.directions?.long?.overlays ? {...data.directions.long.overlays, short_stop_line: data.directions.short?.overlays?.stop_line} : data.directions?.[effLong ? 'long' : 'short']?.overlays ?? data.overlays}
@@ -658,6 +684,9 @@ export function TimingPage() {
               Trade history ({view.trades.length}
               {view.filtered ? ` of ${data.trades?.length ?? 0}` : ""})
             </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+              Newest entry first. Each row is one trade in the named strategy account.
+            </Typography>
             <Box sx={{ overflowX: "auto" }}>
               <TradeTable trades={view.trades} />
             </Box>
@@ -669,15 +698,17 @@ export function TimingPage() {
 }
 
 function StateChip({ state: s }: { state: BoardState }) {
-  if (!s?.state) return null;
+  const wrap = { height: "auto", maxWidth: "100%", "& .MuiChip-label": { whiteSpace: "normal", py: 0.75 } };
+  if (!s?.state) return <Chip label="Not computed" variant="outlined" />;
   if (s.state === "flat") {
-    return <Chip label={`Flat since ${s.state_since ?? NA}`} variant="outlined" />;
+    return <Chip sx={wrap} label={`Flat · no open position${s.state_since ? ` · last exit ${s.state_since}` : ''}`} variant="outlined" />;
   }
   const up = (s.unrealized_pct ?? 0) >= 0;
   return (
     <Chip
+      sx={wrap}
       color={s.state === "long" ? "success" : "error"}
-      label={`${s.state.toUpperCase()} since ${s.state_since} · entry ${money(s.entry_price)} · ${
+      label={`Open ${s.state} · entered ${s.state_since} at ${money(s.entry_price)} · ${
         s.unrealized_pct == null ? NA : (up ? "+" : "") + (s.unrealized_pct * 100).toFixed(1) + "%"
       } · stop ${money(s.current_stop)}`}
     />
@@ -709,12 +740,12 @@ function TradeTable({ trades }: { trades: Trade[] }) {
     <Table size="small" sx={{ "& td, & th": { whiteSpace: "nowrap" } }}>
       <TableHead>
         <TableRow>
-          {["Dir", "Entry", "Entry px", "Exit", "Exit px", "Reason", "Bars", "Return", "R", "Result"].map(
+          {["Strategy account", "Status", "Entry", "Entry px", "Exit", "Exit px", "Reason", "Bars", "Return", "R", "Result"].map(
             (h) => (
               <TableCell
                 key={h}
                 align={
-                  h === "Dir" || h === "Entry" || h === "Exit" || h === "Reason" || h === "Result"
+                  h === "Strategy account" || h === "Status" || h === "Entry" || h === "Exit" || h === "Reason" || h === "Result"
                     ? "left"
                     : "right"
                 }
@@ -726,25 +757,26 @@ function TradeTable({ trades }: { trades: Trade[] }) {
         </TableRow>
       </TableHead>
       <TableBody>
-        {trades.map((t, i) => {
+        {[...trades].sort((a, b) => b.entry_date.localeCompare(a.entry_date)).map((t, i) => {
           const open = t.exit_date == null;
           const win = (t.return_pct ?? 0) > 0;
           return (
             <TableRow key={i}>
               <TableCell sx={{ color: t.direction === "long" ? green : red, fontWeight: 600 }}>
-                {t.direction}
+                {t.direction === 'long' ? 'Long strategy' : 'Short benchmark'}
               </TableCell>
+              <TableCell><Chip size="small" variant={open ? "filled" : "outlined"} label={open ? "Open" : "Closed"} /></TableCell>
               <TableCell>{t.entry_date}</TableCell>
               <TableCell align="right">{money(t.entry_price)}</TableCell>
               <TableCell>{t.exit_date ?? "—"}</TableCell>
               <TableCell align="right">{money(t.exit_price)}</TableCell>
-              <TableCell>{t.exit_reason ?? "—"}</TableCell>
+              <TableCell>{({ stop_initial: "Initial stop", stop_trailing: "Trailing stop", channel_reversal: "Channel exit" } as Record<string, string>)[t.exit_reason ?? ''] ?? t.exit_reason ?? "—"}</TableCell>
               <TableCell align="right">{t.bars_held ?? "—"}</TableCell>
               <TableCell align="right" sx={{ color: t.return_pct == null ? undefined : win ? green : red }}>
                 {t.return_pct == null ? "—" : `${win ? "+" : ""}${(t.return_pct * 100).toFixed(2)}%`}
               </TableCell>
               <TableCell align="right">{t.return_r == null ? "—" : t.return_r.toFixed(2)}</TableCell>
-              <TableCell>{open ? <Chip size="small" label="Open" /> : win ? "Win" : "Loss"}</TableCell>
+              <TableCell>{open ? "Unrealised" : t.return_pct === 0 ? "Breakeven" : win ? "Win" : "Loss"}</TableCell>
             </TableRow>
           );
         })}

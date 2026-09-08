@@ -14,6 +14,46 @@ require.extensions[".ts"] = (module, filename) => {
 const { computeAllocation } = require("../src/features/sizing/engine.ts");
 const { DEFAULT_PARAMS } = require("../src/features/sizing/types.ts");
 const { filterDaily, filterState, compound, summariseView } = require("../src/features/timing/metrics.ts");
+const { watchlistForDirection } = require("../src/features/trend/watchlist.ts");
+
+test("Trend shows an exited long as flat while the independent short is held", () => {
+  const flat = { state: "flat", state_since: "2026-08-11", entry_price: null,
+    unrealized_pct: null, current_stop: null, pending_action: null };
+  const short = { state: "short", state_since: "2026-09-02", entry_price: 100,
+    unrealized_pct: .05, current_stop: 105, pending_action: null };
+  const events = [
+    { dir: "long", entry_date: "2026-07-01", exit_date: "2026-08-11" },
+    { dir: "short", entry_date: "2026-09-02", exit_date: null },
+  ];
+  const sections = [{ title: "Watchlist", rows: [{ symbol: "GOOGL", ...short,
+    last_close: 95, directions: { long: flat, short }, chart: { bars: [], events } }] }];
+  const original = JSON.stringify(sections);
+  const longRow = watchlistForDirection(sections, "long")[0].rows[0];
+  assert.equal(longRow.state, "flat");
+  assert.equal(longRow.state_since, "2026-08-11");
+  assert.equal(longRow.entry_price, null);
+  assert.equal(longRow.current_stop, null);
+  assert.equal(longRow.unrealized_pct, null);
+  assert.deepEqual(longRow.chart.events, [events[0]]);
+  const shortRow = watchlistForDirection(sections, "short")[0].rows[0];
+  assert.equal(shortRow.state, "short");
+  assert.equal(shortRow.entry_price, 100);
+  assert.deepEqual(shortRow.chart.events, [events[1]]);
+  assert.equal(JSON.stringify(sections), original);
+});
+
+test("Trend keeps pending entries flat, pending exits held, and missing results unknown", () => {
+  const row = { symbol: "TEST", state: "short", directions: {
+    long: { state: "flat", pending_action: { action: "enter", direction: "long" } },
+    short: { state: "short", pending_action: { action: "exit", direction: "short" } },
+  } };
+  const sections = [{ title: "Test", rows: [row, { symbol: "MISSING", state: "short" }] }];
+  const long = watchlistForDirection(sections, "long")[0].rows;
+  assert.equal(long[0].state, "flat");
+  assert.equal(long[0].pending_action.action, "enter");
+  assert.equal(long[1].state, null);
+  assert.equal(watchlistForDirection(sections, "short")[0].rows[0].state, "short");
+});
 const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-8, `${actual} != ${expected}`);
 const macro = { source: "none", score: null, zone: "neutral", label: "test" };
 test("filtered-view CAGR uses calendar time for stocks and crypto, including cash periods", () => {
