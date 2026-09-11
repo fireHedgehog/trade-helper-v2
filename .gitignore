@@ -25,6 +25,13 @@ node_modules/
 frontend/dist/
 *.tsbuildinfo
 
+# --- Playwright generated sessions, reports, screenshots and traces ---
+.playwright/
+.playwright-cli/
+playwright-report/
+test-results/
+output/playwright/
+
 # --- Secrets / local env (templates stay: *.env.example) ---
 .env
 .env.local

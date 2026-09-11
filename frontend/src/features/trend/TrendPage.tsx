@@ -1,6 +1,9 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import Alert from "@mui/material/Alert";
+import Accordion from "@mui/material/Accordion";
+import AccordionDetails from "@mui/material/AccordionDetails";
+import AccordionSummary from "@mui/material/AccordionSummary";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 import Collapse from "@mui/material/Collapse";
@@ -20,6 +23,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import AirRounded from "@mui/icons-material/AirRounded";
+import ExpandMoreRounded from "@mui/icons-material/ExpandMoreRounded";
 import GrainRounded from "@mui/icons-material/GrainRounded";
 import ThunderstormRounded from "@mui/icons-material/ThunderstormRounded";
 import WbCloudyRounded from "@mui/icons-material/WbCloudyRounded";
@@ -252,27 +256,32 @@ export function TrendPage() {
         </Alert>
       )}
 
-      {!!board?.pending?.length && (
-        <Paper sx={{ p: 2, mb: 2 }}>
-          <Typography variant="subtitle2">Pending next open ({board.pending.length})</Typography>
-          <Typography variant="caption" color="text.secondary">
-            Confirmed at the signal date’s close. Entries have no fill price yet.
-          </Typography>
-          <Table size="small">
-            <TableHead><TableRow>
-              <TableCell>Symbol</TableCell><TableCell>Next-session action</TableCell>
-              <TableCell>Signal date</TableCell><TableCell>Simulated position</TableCell>
-            </TableRow></TableHead>
-            <TableBody>{board.pending.map((r) => (
-              <TableRow key={`${r.symbol}-${r.direction ?? r.pending_action?.direction ?? ''}`}>
-                <TableCell><SymLink symbol={r.symbol} /></TableCell>
-                <TableCell>{r.pending_action?.action === "reverse" ? "Reverse to" : r.pending_action?.action === "exit" ? "Exit" : "Enter"} {r.pending_action?.direction}</TableCell>
-                <TableCell>{r.pending_action?.signal_date}</TableCell>
-                <TableCell>{r.state}</TableCell>
-              </TableRow>
-            ))}</TableBody>
-          </Table>
-        </Paper>
+      {board?.status === "ok" && (
+        <Accordion defaultExpanded={false} disableGutters sx={{ mb: 2 }}>
+          <AccordionSummary
+            expandIcon={<ExpandMoreRounded />}
+            id="trend-signals-header"
+            aria-controls="trend-signals-content"
+          >
+            <Typography variant="subtitle2">
+              Today's signals ({board.pending?.length ?? 0})
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ minWidth: 0 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+              Confirmed at each symbol's latest available close, pending the next market open.
+              Check the signal date for data freshness. Entries have no fill price yet.
+            </Typography>
+            <Box sx={{ overflowX: "auto" }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(260px, 1fr))", gap: 2 }}>
+                <SignalTable title="Long signals" rows={board.pending ?? []} direction="long" action="enter" />
+                <SignalTable title="Long exit signals" rows={board.pending ?? []} direction="long" action="exit" />
+                <SignalTable title="Short signals" rows={board.pending ?? []} direction="short" action="enter" />
+                <SignalTable title="Short exit signals" rows={board.pending ?? []} direction="short" action="exit" />
+              </Box>
+            </Box>
+          </AccordionDetails>
+        </Accordion>
       )}
 
       <Paper sx={{ p: 2, mb: 2 }}>
@@ -420,6 +429,54 @@ export function TrendPage() {
         </>
       )}
     </div>
+  );
+}
+
+function SignalTable({ title, rows, direction, action }: {
+  title: string;
+  rows: BoardRow[];
+  direction: "long" | "short";
+  action: "enter" | "exit";
+}) {
+  const signals = rows.filter((row) => {
+    const pending = row.pending_action;
+    if (!pending) return false;
+    // A reversal exits the old direction and enters the new direction.
+    if (pending.action === "reverse")
+      return action === "enter" ? pending.direction === direction : pending.direction !== direction;
+    return pending.action === action && pending.direction === direction;
+  }).sort((a, b) =>
+    (b.pending_action?.signal_date ?? "").localeCompare(a.pending_action?.signal_date ?? "") ||
+    a.symbol.localeCompare(b.symbol)
+  );
+
+  return (
+    <Paper variant="outlined" sx={{ minWidth: 0, alignSelf: "start" }}>
+      <Typography variant="subtitle2" sx={{ p: 1.5 }}>
+        {title} ({signals.length})
+      </Typography>
+      <Table size="small" aria-label={title}>
+        <TableHead>
+          <TableRow>
+            <TableCell>Symbol</TableCell>
+            <TableCell>Signal date</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {signals.map((row) => (
+            <TableRow key={`${row.symbol}-${row.direction ?? row.pending_action?.direction}`}>
+              <TableCell><SymLink symbol={row.symbol} /></TableCell>
+              <TableCell sx={{ whiteSpace: "nowrap" }}>{row.pending_action?.signal_date}</TableCell>
+            </TableRow>
+          ))}
+          {signals.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={2} sx={{ color: "text.secondary" }}>No signals</TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </Paper>
   );
 }
 
