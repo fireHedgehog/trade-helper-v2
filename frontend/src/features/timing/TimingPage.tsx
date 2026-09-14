@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
@@ -24,6 +24,8 @@ import Typography from "@mui/material/Typography";
 
 import { ApiError } from "@/shared/api/client";
 import { fmtTs } from "@/shared/format";
+import { pmApi, pmToken, type PMChoices } from "@/features/pms/api";
+import { AssessmentPanel } from "@/features/pms/AssessmentPanel";
 
 import { EquityChart } from "./EquityChart";
 import { searchSymbols, timingApi, type SymbolOption } from "./api";
@@ -43,10 +45,6 @@ const num = (v: number | null | undefined, d = 2) => (v == null ? NA : Number(v)
 const money = (v: number | null | undefined) => (v == null ? NA : Number(v).toFixed(2));
 const green = "#1f9d55";
 const red = "#d64545";
-
-const MODELS: { value: SignalParams["model"]; label: string }[] = [
-  { value: "donchian", label: "Donchian breakout (Turtle)" },
-];
 
 const NUM_FIELDS: { key: keyof SignalParams; label: string; step?: number; help: string }[] = [
   {
@@ -98,6 +96,15 @@ const NUM_FIELDS: { key: keyof SignalParams; label: string; step?: number; help:
 export function TimingPage() {
   const { symbol: routeSymbol } = useParams();
   const navigate = useNavigate();
+  const [search, setSearch] = useSearchParams();
+  const linkedPM = search.get("pm");
+  const linkedVersion = search.get("version");
+  const linkedRun = Number(search.get("run")) || undefined;
+  const [selection, setSelection] = useState(linkedPM && linkedVersion ? `${linkedPM}@${linkedVersion}` : "legacy");
+  const [pmChoices, setPmChoices] = useState<PMChoices | null>(null);
+  useEffect(() => {
+    setSelection(linkedPM && linkedVersion ? `${linkedPM}@${linkedVersion}` : "legacy");
+  }, [linkedPM, linkedVersion]);
 
   const initialSymbol = (routeSymbol || localStorage.getItem(LS_SYMBOL) || "QQQ").toUpperCase();
 
@@ -122,12 +129,13 @@ export function TimingPage() {
   const [dirLong, setDirLong] = useState(savedView.includes("long"));
   const [dirShort, setDirShort] = useState(savedView.includes("short"));
   const bothOff = !dirLong && !dirShort;
-  const effLong = dirLong || bothOff; // "neither" is meaningless -> show both
-  const effShort = dirShort || bothOff;
+  const effLong = selection === "legacy" ? dirLong || bothOff : data?.pm_direction === "long";
+  const effShort = selection === "legacy" ? dirShort || bothOff : data?.pm_direction === "short";
   const showBoth = effLong && effShort;
   useEffect(() => {
+    if (selection !== "legacy") return;
     localStorage.setItem(LS_VIEW, [effLong && "long", effShort && "short"].filter(Boolean).join(","));
-  }, [effLong, effShort]);
+  }, [effLong, effShort, selection]);
 
   // --- symbol picker (remote search-as-you-type) ---
   // `symValue` is the picked option, held in state — NOT derived from the
@@ -171,22 +179,34 @@ export function TimingPage() {
     });
   }, [symbol]);
 
-  const load = useCallback((sym: string) => {
-    setError(null);
-    void timingApi
-      .timing(sym)
-      .then(setData)
-      .catch((e) => setError(e instanceof ApiError ? e.message : String(e)));
-  }, []);
+  useEffect(() => {
+    let alive = true;
+    setPmChoices(null);
+    void pmApi.choices(symbol, linkedRun).then(value => { if (alive) setPmChoices(value); })
+      .catch(e => { if (alive) setError(String(e)); });
+    return () => { alive = false; };
+  }, [symbol, linkedRun]);
 
   useEffect(() => {
+    let alive = true;
     localStorage.setItem(LS_SYMBOL, symbol);
-    load(symbol);
-  }, [symbol, load]);
+    setError(null);
+    setData(null);
+    const choice = pmChoices?.choices.find(p => pmToken(p) === selection);
+    if (selection !== "legacy" && (!choice || !pmChoices?.run_id)) {
+      if (pmChoices) setError("This PM is unavailable in the selected saved run. Choose a listed PM or run enabled PMs on Trend.");
+      return () => { alive = false; };
+    }
+    const request = selection === "legacy" ? timingApi.timing(symbol) : pmApi.timing(symbol, pmChoices!.run_id!, choice!);
+    void request.then(value => { if (alive) setData(value); })
+      .catch(e => { if (alive) setError(e instanceof ApiError ? e.message : String(e)); });
+    return () => { alive = false; };
+  }, [symbol, selection, pmChoices]);
 
   const onPickSymbol = (s: string) => {
     const up = s.toUpperCase();
     setSymbol(up);
+    setSelection("legacy");
     navigate(`/timing/${encodeURIComponent(up)}`, { replace: true });
   };
 
@@ -275,9 +295,9 @@ export function TimingPage() {
         Timing
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
-        Two independent strategy accounts for {symbol}: {strategyLabel || 'the assigned long strategy'}
+        {selection !== "legacy" ? <>Inspect a saved independent PM for {symbol}. Its entries, exits and position belong to this PM; selecting another view does not rerun it.</> : <>Two independent strategy accounts for {symbol}: {strategyLabel || 'the assigned long strategy'}
         {" "}and the fixed short benchmark. Each owns its position and exits; they can hold opposite
-        positions at the same time. Run previews both using the parameters below.
+        positions at the same time. Run previews both using the parameters below.</>}
       </Typography>
 
       <Stack
@@ -323,21 +343,28 @@ export function TimingPage() {
         <TextField
           select
           size="small"
-          label="Model"
-          sx={{ width: 220 }}
-          value={params?.model ?? "donchian"}
-          onChange={(e) => setParam("model", e.target.value as SignalParams["model"])}
+          label="Model / saved PM"
+          disabled={running}
+          sx={{ width: 300 }}
+          value={selection}
+          onChange={(e) => {
+            const value = e.target.value;
+            setSelection(value);
+            const pm = pmChoices?.choices.find(p => pmToken(p) === value);
+            setSearch(pm && pmChoices?.run_id ? { pm: pm.key, version: pm.version, run: String(pmChoices.run_id) } : {}, { replace: true });
+          }}
         >
-          {MODELS.map((mdl) => (
-            <MenuItem key={mdl.value} value={mdl.value}>
-              {mdl.label}
-            </MenuItem>
-          ))}
+          <MenuItem value="legacy">Assigned Donchian / preview</MenuItem>
+          {pmChoices?.choices.map(pm => <MenuItem key={pmToken(pm)} value={pmToken(pm)}>
+            {pm.name}{pm.status !== "ok" ? ` · ${pm.status}` : ""}{pm.stale ? " · prices changed" : ""}
+          </MenuItem>)}
+          {selection !== "legacy" && !pmChoices?.choices.some(pm => pmToken(pm) === selection) &&
+            <MenuItem value={selection}>Requested saved PM</MenuItem>}
         </TextField>
-        <Button variant="contained" onClick={doRun} disabled={running}>
+        <Button variant="contained" onClick={doRun} disabled={running || selection !== "legacy"}>
           {running ? "Running…" : `Run ${symbol}`}
         </Button>
-        <Button size="small" onClick={() => setShowParams((s) => !s)}>
+        <Button size="small" disabled={selection !== "legacy"} onClick={() => setShowParams((s) => !s)}>
           {showParams ? "Hide parameters & guide" : "Parameters & guide"}
         </Button>
         {data?.computed_at && (
@@ -345,10 +372,18 @@ export function TimingPage() {
             last run {fmtTs(data.computed_at)}
           </Typography>
         )}
-        {data?.stale && <Chip size="small" color="warning" label="newer bars — re-run" />}
+        {data?.stale && <Chip size="small" color="warning" label="prices changed — saved chart retained" />}
       </Stack>
 
-      <Collapse in={showParams}>
+      {pmChoices?.run_id && <AssessmentPanel symbol={symbol} runId={pmChoices.run_id} />}
+
+      {selection !== "legacy" && <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+        Saved PM: {data?.pm_name ?? "loading"}. Use Trend's Run all enabled PMs to refresh saved results; choose Assigned Donchian / preview for unsaved parameter experiments.
+      </Typography>}
+      {data?.pm_run_status && data.pm_run_status !== "succeeded" && <Alert severity="warning" sx={{ mb: 2 }}>
+        This PM belongs to a {data.pm_run_status} run. Other PMs may be unavailable.
+      </Alert>}
+      <Collapse in={showParams && selection === "legacy"}>
         <Paper sx={{ p: 2, mb: 2 }}>
           {params && (
             <>
@@ -364,7 +399,7 @@ export function TimingPage() {
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 900 }}>
                 These controls preview the long preset only. The short benchmark stays fixed and
                 runs independently, so long changes cannot alter its comparison history.
-                Additional strategy families are parked.
+                Additional families are being evaluated in separate research runs.
               </Typography>
 
               <Button size="small" sx={{ mt: 1, px: 0 }} onClick={() => setShowGuide((s) => !s)}>
@@ -491,7 +526,7 @@ export function TimingPage() {
 
       {notComputed && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          No run stored for {symbol} yet — press <b>Run {symbol}</b>.
+          {selection === "legacy" ? <>No run stored for {symbol} yet — press <b>Run {symbol}</b>.</> : data?.reason ?? "This PM has no usable result. Run enabled PMs on Trend."}
         </Alert>
       )}
 
@@ -521,14 +556,14 @@ export function TimingPage() {
               Current simulated positions {data.preview ? "· preview" : "· saved Trend result"}
             </Typography>
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
-              {(['long', 'short'] as const).map(side => {
+              {(data.pm_direction ? [data.pm_direction] : ['long', 'short'] as const).map(side => {
                 const state = data.directions?.[side]?.state;
                 const lastExit = (data.trades ?? []).filter(t => t.direction === side && t.exit_date)
                   .sort((a, b) => b.exit_date!.localeCompare(a.exit_date!))[0];
                 return (
                   <Box key={side} sx={{ minWidth: 0 }}>
                     <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600, color: side === 'long' ? green : red }}>
-                      {side === 'long' ? 'Long strategy' : 'Short benchmark'}
+                      {data.pm_name ?? (side === 'long' ? 'Long strategy' : 'Short benchmark')}
                     </Typography>
                     {state ? <StateChip state={state} /> : <Chip variant="outlined" label="Not computed" />}
                     {state?.state === side && lastExit && (
@@ -552,11 +587,11 @@ export function TimingPage() {
                 Chart & history
               </Typography>
               <FormControlLabel
-                control={<Checkbox size="small" checked={effLong} onChange={(e) => setDirLong(e.target.checked)} />}
+                control={<Checkbox size="small" disabled={selection !== "legacy"} checked={effLong} onChange={(e) => setDirLong(e.target.checked)} />}
                 label="Long strategy"
               />
               <FormControlLabel
-                control={<Checkbox size="small" checked={effShort} onChange={(e) => setDirShort(e.target.checked)} />}
+                control={<Checkbox size="small" disabled={selection !== "legacy"} checked={effShort} onChange={(e) => setDirShort(e.target.checked)} />}
                 label="Short benchmark"
               />
             </Box>
@@ -622,7 +657,7 @@ export function TimingPage() {
               </Typography>
               {view.filtered && (
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-                  {effLong ? "Long strategy" : "Short benchmark"}: standalone account performance.
+                  {data.pm_name ?? (effLong ? "Long strategy" : "Short benchmark")}: standalone account performance.
                   Selecting both shows two independent accounts starting with equal capital.
                 </Typography>
               )}

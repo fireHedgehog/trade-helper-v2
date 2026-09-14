@@ -8,7 +8,9 @@ The permanent strategy research reference is
 [Naive Donchian V2](docs/strategy-experiments/naive-donchian-v2-result.md).
 Its archive commit preserves the full experiments; the temp folders are absent
 from the current checkout. Agents must not retrieve or restore those archived
-files unless the user explicitly requests it. Multi-strategy development is parked.
+files unless the user explicitly requests it. Independent PM development is active;
+the [agent checklist](docs/temp/agent-work-checklist.md) records completed work,
+running experiments and the next eligible task.
 
 ## Repository layout
 
@@ -30,7 +32,7 @@ outside both so a data migration is just a new `schema/migrations/NNNN_*.sql`.
 | --- | --- |
 | Credentials / Data management | Provider keys, paced fetching, adjustment repair and one-click data + computation workflow |
 | Macro / Multisectional | Weighted macro baseline, manual optional AI and cross-sectional momentum context |
-| Trend / Timing / Strategies | Assigned long preset plus independent fixed short benchmark; saved signals and scratch previews |
+| Trend / Timing / Strategies | Versioned independent PM runs, saved chart selection, family-support assessment, and scratch previews; assigned long and fixed short remain available |
 | Sizing | Current allocations and historical long, short or combined portfolios, with per-asset contributions |
 
 ## Run it

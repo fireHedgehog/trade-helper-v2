@@ -120,6 +120,13 @@ export interface Metrics {
 }
 
 export interface TimingResponse {
+  pm_key?: string;
+  pm_name?: string;
+  pm_direction?: Direction;
+  pm_run_id?: number;
+  pm_run_status?: string;
+  pm_status?: string;
+  reason?: string;
   status: "ok" | "not_computed";
   symbol: string;
   computed_at?: string;

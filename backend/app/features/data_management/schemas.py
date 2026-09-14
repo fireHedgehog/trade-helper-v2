@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 FetchKind = Literal[
     "asset_catalog", "asset_prices", "crypto_bars", "commodity_prices", "macro",
-    "memberships", "option_snapshots", "signal_universe",
+    "memberships", "option_snapshots", "signal_universe", "pm_universe",
 ]
 
 

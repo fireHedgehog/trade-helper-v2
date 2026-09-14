@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 VALID_KINDS = {
     "asset_catalog", "asset_prices", "crypto_bars", "commodity_prices", "macro",
-    "memberships", "option_snapshots", "signal_universe", "portfolio_simulation",
+    "memberships", "option_snapshots", "signal_universe", "portfolio_simulation", "pm_universe",
 }
 
 
@@ -56,6 +56,10 @@ def _reconcile_orphaned_runs() -> None:
             "WHERE status IN ('queued','running')",
             (datetime.now(timezone.utc).isoformat(),),
         )
+        conn.execute("""UPDATE pm_targets SET status='failed',error='interrupted by a server restart'
+          WHERE status='queued' AND run_id IN (SELECT id FROM pm_runs WHERE status='running')""")
+        conn.execute("""UPDATE pm_runs SET status='failed',finished_at=?,error='interrupted by a server restart'
+          WHERE status='running'""",(datetime.now(timezone.utc).isoformat(),))
         logger.warning("Marked %d orphaned fetch run(s) failed: %s", len(ids), ids)
 
 
@@ -143,6 +147,9 @@ async def _run_job(job: Job) -> None:
             elif job.kind == "portfolio_simulation":
                 from app.features.sizing import service as sizing_service
                 await asyncio.to_thread(sizing_service.run, conn, job.run_id, job.scope_arg)
+            elif job.kind == "pm_universe":
+                from app.features.pms import service as pm_service
+                await asyncio.to_thread(pm_service.run,conn,job.run_id,job.scope_arg)
             else:  # pragma: no cover - guarded by submit()
                 raise ValueError(job.kind)
 

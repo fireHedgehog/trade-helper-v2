@@ -7,6 +7,7 @@ export type FetchKind =
   | "memberships"
   | "option_snapshots"
   | "signal_universe"
+  | "pm_universe"
   | "portfolio_simulation";
 
 export interface RunStatus {

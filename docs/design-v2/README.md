@@ -18,10 +18,12 @@ Read in order:
 | 09 | `09-position-sizing.md` | Fresh allocations, historical funded portfolios, costs and direction contributions |
 | 10 | `10-paper-trading.md` | Current boundary between research simulation and broker execution |
 
-The [multiple-strategy discussion](11-strategy-design-draft.md) is **parked** and
-describes proposed behaviour only. Files 00–10 describe current application state.
+The [multiple-strategy discussion](11-strategy-design-draft.md) is an earlier
+proposal. Active independent-PM development is tracked in the
+[agent checklist](../temp/agent-work-checklist.md), with implemented contracts in
+[the PM module](../../backend/app/features/pms/README.md).
 The permanent research reference is
 [Naive Donchian V2](../strategy-experiments/naive-donchian-v2-result.md), including
-the archive commit. Experiment folders are removed from the current checkout.
+the archive commit. New experiments have their own frozen inputs and local outputs.
 Do not retrieve archived files unless the user explicitly requests it.
 Update design documents in place; new research uses temporary folders until review.

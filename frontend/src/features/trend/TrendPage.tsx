@@ -37,6 +37,8 @@ import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 
 import { FetchPanel } from "@/features/data-management/components/FetchPanel";
 import { fmtTs } from "@/shared/format";
+import { pmApi, type PMBoard } from "@/features/pms/api";
+import { SavedPMBoard } from "@/features/pms/SavedPMBoard";
 
 import { trendApi } from "./api";
 import { watchlistForDirection, type WatchDirection } from "./watchlist";
@@ -178,6 +180,15 @@ function MomCell({ row }: { row: BoardRow }) {
 const MA_CHOICES = [5, 10, 50, 100];
 
 export function TrendPage() {
+  const [pmView, setPmView] = useState("legacy");
+  const [pmBoard, setPmBoard] = useState<PMBoard | null>(null);
+  const [pmError, setPmError] = useState<string | null>(null);
+  const loadPMs = useCallback(() => {
+    setPmError(null);
+    void pmApi.board().then(setPmBoard).catch(e => setPmError(String(e)));
+  }, []);
+  const pmDone = useCallback(() => { loadPMs(); setPmView("all"); }, [loadPMs]);
+  useEffect(loadPMs, [loadPMs]);
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [showFlat, setShowFlat] = useState(false);
   const [showAlloc, setShowAlloc] = useState(false);
@@ -209,6 +220,7 @@ export function TrendPage() {
 
   const notComputed = board?.status === "not_computed";
   const watchSections = watchlistForDirection(board?.watchlist ?? [], watchDirection);
+  const shownComputedAt = pmView === "legacy" ? board?.computed_at : pmBoard?.computed_at;
 
   return (
     <div>
@@ -228,20 +240,27 @@ export function TrendPage() {
         useFlexGap
         sx={{ mb: 2, alignItems: "center", flexWrap: "wrap" }}
       >
-        <TextField select size="small" label="Model" sx={{ width: 240 }} value="donchian">
-          <MenuItem value="donchian">Donchian breakout (Turtle)</MenuItem>
+        <TextField select size="small" label="Model / PM view" sx={{ width: 280 }} value={pmView} onChange={e => setPmView(e.target.value)}>
+          <MenuItem value="legacy">Assigned Donchian (existing board)</MenuItem>
+          <MenuItem value="all">All saved PMs</MenuItem>
+          {pmBoard?.pms.map(pm => <MenuItem key={pm.key} value={pm.key}>{pm.name}</MenuItem>)}
         </TextField>
+        <FetchPanel kind="pm_universe" buttonLabel="Run all enabled PMs" onDone={pmDone} />
+        {pmView === "legacy" &&
         <FetchPanel
           kind="signal_universe"
           buttonLabel="Run trend backtest"
           onDone={() => loadBoard(wlView === "charts")}
-        />
-        {board?.computed_at && (
+        />}
+        {shownComputedAt && (
           <Typography variant="caption" color="text.secondary">
-            last run {fmtTs(board.computed_at)}
+            last run {fmtTs(shownComputedAt)}
           </Typography>
         )}
       </Stack>
+
+      {pmError && <Alert severity="error" sx={{ mb: 2 }}>{pmError}</Alert>}
+      {pmView === "legacy" ? <>
 
       {notComputed && (
         <Alert severity="info" sx={{ mb: 2 }}>
@@ -428,6 +447,7 @@ export function TrendPage() {
           </Paper>
         </>
       )}
+      </> : <SavedPMBoard board={pmBoard} selected={pmView} />}
     </div>
   );
 }

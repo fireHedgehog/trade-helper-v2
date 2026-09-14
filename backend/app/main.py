@@ -56,6 +56,7 @@ from app.features.macro.router import router as macro_router  # noqa: E402
 from app.features.multisectional.router import router as multisectional_router  # noqa: E402
 from app.features.signals.router import router as signals_router  # noqa: E402
 from app.features.sizing.router import router as sizing_router  # noqa: E402
+from app.features.pms.router import router as pms_router  # noqa: E402
 
 app.include_router(credentials_router)
 app.include_router(data_router)
@@ -63,3 +64,4 @@ app.include_router(macro_router)
 app.include_router(multisectional_router)
 app.include_router(signals_router)
 app.include_router(sizing_router)
+app.include_router(pms_router)
