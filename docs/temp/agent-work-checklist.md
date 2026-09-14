@@ -15,11 +15,11 @@ or competing checklists.
 | Field | Current value |
 | --- | --- |
 | Authorised execution scope | Progress through eligible checklist tasks; user said to start and granted full permission. Preserve data, avoid unrelated actions, record evidence and handoffs. |
-| Current batch | Strategy breadth: fixed SMA trend, then pullback and predefined controls |
-| Active task / owner | T20 controls running / Codex coordinator |
+| Current batch | Research review and next PM integration slice |
+| Active task / owner | T25 candidate integration review / Codex coordinator |
 | Blocker / decision needed now | None; use roadmap proposals as research defaults, record unresolved provenance without inventing it |
-| Next eligible task | T21 complete report after T20; predefined concentration reruns and uncertainty diagnostics remain |
-| Completed new tasks | 22 of 50: T01-T19, T26-T28 |
+| Next eligible task | T25: prepare a non-voting SMA200 research comparator; retain D default and keep rejected pullback/short candidates in research. T29 historical context is independently eligible. |
+| Completed new tasks | 27 of 50: T01-T24, T26-T28 |
 
 The 50 tasks are work slices, not equal effort or a promise of 2% completion per
 task. A working increment matters more than a percentage. If an item grows into
@@ -96,7 +96,7 @@ stash, overwrite or delete another agent's work to obtain a clean checkout.
 | --- | --- | --- | --- | --- | --- |
 | T01-T15 | Codex coordinator, 2026-09-14 | `abf3c46`, main shared checkout | PM implementation and research foundation | done | Evidence below; do not rerun completed reference or live PM jobs |
 | T26-T28 | Codex coordinator, 2026-09-14 | `abf3c46`, main shared checkout | `backend/app/features/pms/assessment*`, PM read API, `backend/tests/test_assessments.py`, Timing assessment UI | done | T26-T28 complete: contract, read API, Timing panel; five assessment tests and 11 PM tests passed; frontend build passed; live A long/short evidence reviewed |
-| T20-T21 | Codex coordinator, 2026-09-14 | `abf3c46`, main shared checkout | `backend/temp/pm-research/`, separate output per control; `docs/temp/` | active | Controls coordinator PID 21820 (child Python); `results/20260914T032109Z/controls-v1/run.json`, logs `output/logs/research-controls.*.log` and `control-*.log`. At most two controls concurrently. Do not change `comparisons.py` or `strategies.py` until it finishes. Inspect manifests before launching anything again. |
+| T20-T24 | Codex coordinator, 2026-09-15 | `f1bffc4`, main shared checkout | `backend/temp/pm-research/`, `docs/temp/` | done | All controls, long diagnostics and short comparisons finished. Read `research-report.md`; manifests `controls-v1`, `long-diagnostics-v1`, `short-comparison-v1` all succeeded. No research process remains to wait on or restart. |
 | T16-T19 | Codex coordinator, 2026-09-14 | `abf3c46`, main shared checkout | `backend/temp/pm-research/`, `docs/temp/` | done | T16 complete. T17 v2 PID 10632 finished successfully; output `results/20260914T032109Z/sma-comparison-v2/run.json`. T19 PID 10848 completed, `pullback-v1/run.json` succeeded. Logs `output/logs/sma-research-v2.*.log` and `pullback-research.*.log`. Check manifests/processes before resubmitting. Source copies frozen per run. |
 
 Permitted states: **proposed, ready, active, blocked, done, deferred**. All unchecked
@@ -195,11 +195,11 @@ Roadmap reference: Part II and Part I F. Research strategies live under
 | [x] | T17 | T16, T06 | Research results | Run the SMA candidate on the frozen snapshot at normal/doubled costs; save matched-date standalone and funded comparisons against the references, with complete coverage. |
 | [x] | T18 | T01 | Research signals | Implement the specified SMA200/RSI2 pullback. Verify Wilder edge cases, SMA5/regime/time exits, entry-day stop and tenth-held-bar confirmation. |
 | [x] | T19 | T18, T06 | Research results | Run pullback at both cost levels on the same snapshot; reconcile its ledgers and report its cash time, turnover and losses against the references. |
-| [ ] | T20 | T17, T19 | Research controls | Run all predefined M3/P0 stop controls and four neighbouring settings. Save every trial, including failures; do not add a parameter search based on attractive results. |
-| [ ] | T21 | T20 | Research report | Complete paired/annual/concentration diagnostics and the four tables/three charts specified in Part II. State retain/replace/complement/inconclusive with limitations; no automatic production promotion. |
-| [ ] | T22 | T01 | Short specification | Freeze one failed-rally short's exact regime, entry, exit, stop, horizon, borrow assumptions and matching-date fixed-short/cash comparisons. Resolve thresholds before execution; a prose strategy name alone is not done. |
-| [ ] | T23 | T22, T05 | Research signals | Implement that short candidate independently; reconcile rising-price losses, gap-through stops, exits and costs on deterministic fixtures. Never infer a short entry from another PM's long exit. |
-| [ ] | T24 | T23, T04 | Research results | Compare the short candidate with the fixed short and cash, with borrow stress, coverage and feasibility limitations. Retain the possibility that no short allocation is justified. |
+| [x] | T20 | T17, T19 | Research controls | Run all predefined M3/P0 stop controls and four neighbouring settings. Save every trial, including failures; do not add a parameter search based on attractive results. |
+| [x] | T21 | T20 | Research report | Complete paired/annual/concentration diagnostics and the four tables/three charts specified in Part II. State retain/replace/complement/inconclusive with limitations; no automatic production promotion. |
+| [x] | T22 | T01 | Short specification | Freeze one failed-rally short's exact regime, entry, exit, stop, horizon, borrow assumptions and matching-date fixed-short/cash comparisons. Resolve thresholds before execution; a prose strategy name alone is not done. |
+| [x] | T23 | T22, T05 | Research signals | Implement that short candidate independently; reconcile rising-price losses, gap-through stops, exits and costs on deterministic fixtures. Never infer a short entry from another PM's long exit. |
+| [x] | T24 | T23, T04 | Research results | Compare the short candidate with the fixed short and cash, with borrow stress, coverage and feasibility limitations. Retain the possibility that no short allocation is justified. |
 | [ ] | T25 | T15, T21, T24 | PM integration | Record the reviewed candidate selection, then adapt only the deliberately enabled candidates into the PM contract. Match research results on the frozen sample; benchmarks and rejected candidates are not silently promoted or allowed to vote. |
 
 ### Assessment — a new function reading independent PM results
@@ -314,3 +314,21 @@ before the prescribed time and coverage exist.
 - Full backend regression suite passed after adding descriptive assessment. All 20 frontend tests passed, production build passed, and all 16 dedicated research fixtures passed.
 - Git index audit found no tracked Playwright output, logs or SQLite databases. Small research source/conventions and this checklist/report are retained deliberately; frozen data, ledgers and generated outputs stay local and ignored.
 - Frontend http://localhost:5173 and backend http://localhost:8000 remain running. Research controls have their own hidden coordinator process and do not need the browser open.
+
+### Strategy breadth continuation
+
+- T20 complete: all six controls succeeded, 48 funded scenarios and 16,272 standalone rows. Each run retained source/parameter/input hashes; ledgers rechecked against ending equity. No control process needs restarting.
+- T22-T23 complete: `backend/temp/pm-research/short-specification.md` freezes one failed-rally short in a falling SMA200 regime, next-open entry, fixed 3 ATR stop, SMA20/regime/20-held-close exits, synthetic 2%/4% borrow and fixed-short/cash comparisons. `short_candidate.py` passes three fixtures for independent trigger/time exit, entry-day/gap/scheduled exits, and rising-price/borrow losses with collateral shortfall. This is a research hypothesis, not production selection.
+- Current write scope: `backend/temp/pm-research/` diagnostic/short-comparison scripts and tests; `docs/temp/` report/checklist/results. Sources of completed runs stay preserved in their output directories.
+
+- T21 running as hidden process 11736: `results/20260914T032109Z/long-diagnostics-v1/run.json`, logs `output/logs/long-diagnostics.*.log`. It reuses all 80 completed funded results, creates paired/annual/class/subgroup diagnostics, then runs the eight predefined matched concentration comparisons and three charts. Two new accounting/bootstrap fixtures passed. Optional research-only NumPy/Matplotlib versions are frozen in `requirements-research.txt`.
+- T24 running as hidden process 2064: `results/20260914T032109Z/short-comparison-v1/run.json`, logs `output/logs/short-research.*.log`. Fixed short / failed rally / cash, matched windows and costs, complete per-asset coverage. All 19 earlier research fixtures passed before launch. Do not rerun either process without checking manifests.
+
+### Completed research review and next handoff
+
+- T21 complete: all 80 long funded trials, 27,120 standalone coverage rows, complete/partial annual results, fixed subperiods, class/subgroup contributions, paired 2,000-resample 28/84-day intervals, eight matched top-five-removal funded reruns, and three visually checked charts. Four long-study tables and all artifact links are in the single rewritten `research-report.md`.
+- T24 complete: 24 funded short/cash scenarios and 8,136 standalone coverage rows. Dates/statuses match long-study windows; all funded ledgers reconcile. Recent priority failed-rally CAGR -2.31% normal / -3.92% double versus fixed short -5.81% / -7.38% and cash 0%. No short allocation selected.
+- Instrument-gap evidence: two doubled-cost ECHO fixed-short standalone scenarios end below zero after a gap exit (27.13 entry to 54.11 exit), on explicitly flagged unresolved inputs. 5,348 standalone cases have synthetic collateral-reserve deficit days. These are model outputs, not verified broker failures. No margin-call/forced-liquidation model exists yet.
+- All 21 research fixtures pass. The report generator reuses completed artifacts; optional NumPy/Matplotlib versions are pinned separately. Completed run sources remain preserved.
+- Research selection review: retain Donchian as the app default. SMA200 is a lower-return/lower-drawdown comparison candidate; prepare only a clearly named, non-voting research observer for T25. Pullback and failed-rally remain research outputs. T25 is NOT complete: its adapter, frozen-input parity and app integration still need implementation.
+- No active research subprocesses remain. Do not rerun completed controls, primary comparisons, diagnostics or the short study on resume. Start with T25 contract/adapter work and its relevant evidence; T29 is another independently eligible task.

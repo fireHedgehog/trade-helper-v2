@@ -1,136 +1,169 @@
-# PM research — inputs and results
+# PM research: strategy breadth and remaining gaps
 
-**Status: in progress.** This is the evidence report for the
-[agent checklist](agent-work-checklist.md). The [roadmap](strategy-comparison-experiment-design.md)
-defines the hypotheses. No production strategy has been selected by this research.
+**Current long-study decision: inconclusive; retain the existing Donchian default.**
+SMA200 offers lower return with shallower drawdown in the predefined recent
+priority comparison. The fixed pullback is highly sensitive to costs. Neither
+earns automatic production promotion. Unresolved price flags prevent a validated
+replacement claim, even where a control looks attractive.
 
-## Conventions (T01)
+The [roadmap](strategy-comparison-experiment-design.md) owns the frozen hypotheses;
+the [agent checklist](agent-work-checklist.md) owns implementation state and live
+job handoffs. This report records completed research, not a live trading policy.
 
-Frozen machine-readable settings: [conventions.json](../../backend/temp/pm-research/conventions.json),
-version `pm-research-1`, 2026-09-14. Warmup is 250 prior valid asset bars; first
-entry is the next open after the first reporting close. No warmup position carries
-into a reporting window. Buy and hold uses that same earliest execution open.
+## Inputs, conventions and accounting
 
-Active portfolios divide prior equity across currently eligible names, including
-flat names. Buy and hold reserves initial capital across the frozen price-history
-membership, including names that become eligible later or never do. This explicit
-cash exposure difference is retained from production and must accompany comparison
-results. Catalog-only symbols remain in coverage but are outside funded membership.
+Snapshot `20260914T032109Z`, database SHA-256 `6f4a0ade16bcb62eebba819078153f822c97ba3c2c3b5603cae7a826adafc711`. Equity history ends 2026-09-11 and crypto history 2026-09-13. All stored priced members are retained; catalog-only names have explicit missing-history coverage. No prices were corrected.
 
-Simultaneous entries share one prior-cash snapshot and scale proportionally;
-same-day exit proceeds cannot finance those entries. Costs reserve cash. Units
-remain fixed until exit. Open positions are marked without hypothetical exit fees.
-
-The current doubled-cost setting is 10 bps + 0.10 ATR per side and 4% annual
-synthetic-short borrow, versus 5 bps + 0.05 ATR and 2% normally. It does not double
-positions. The earlier 2× position test recalled by the user remains unidentified;
-it is not represented as verified leverage evidence and no archive was retrieved.
-
-## Snapshot and data quality (T02–T04)
-
-Snapshot: `20260914T032109Z`, [manifest](../../backend/temp/pm-research/inputs/20260914T032109Z/manifest.json).
-Database SHA-256: `6f4a0ade16bcb62eebba819078153f822c97ba3c2c3b5603cae7a826adafc711`.
-Exported through a consistent read-only transaction; only market/catalog,
-membership and strategy-definition tables were copied. Credential and AI tables
-are excluded. The live database was not changed.
-
-| Coverage | Count / dates |
+| Coverage / issue | Count or disposition |
 | --- | --- |
-| Stored price-history universe | 678 symbols, 60 priority |
-| Equity / ETF bars | 1,720,661 across 676 symbols, 2016-01-04 to 2026-09-11 |
-| Crypto bars | 4,164 across 2 symbols, 2021-01-01 to 2026-09-13 |
-| Comparable without screening flags | 576 symbols |
-| Comparable history with unresolved review flags | 96 symbols |
-| Insufficient common history | 6 symbols |
-| Catalog symbols without stored history | 32,711; reported but not funded members |
-| Structural invalidity | No symbols detected by the implemented checks |
+| Priced assets / priority members | 678 / 60 |
+| Comparable without flagged input | 576 |
+| Provisional priced assets | 96 |
+| Insufficient history | 6 |
+| Catalog-only, no history | 32711 |
+| Structurally invalid symbols | 0 |
+| Extreme daily ranges / close returns | 217 / 37 |
+| Approximate calendar gaps | 2 |
+| SPY 2026-02-02 low | Raw 69.005; adjusted 68.64; unresolved, retained |
 
-Full outputs: [coverage](results/20260914T032109Z/coverage.csv),
-[issues](results/20260914T032109Z/data-issues.csv),
-[summary](results/20260914T032109Z/data-summary.json).
-Screening found 217 extreme ranges, 37 extreme close returns and two possible
-calendar gaps. These are investigation flags, not proof that all those prices
-are incorrect. Equity gap screening uses dates observed in peer histories rather
-than a certified exchange calendar. Crypto source checks matched Coinbase.
+Complete [coverage](results/20260914T032109Z/coverage.csv), [issue evidence](results/20260914T032109Z/data-issues.csv), and [snapshot manifest](../../backend/temp/pm-research/inputs/20260914T032109Z/manifest.json) remain local. Peer session dates screen for gaps; they are not an authoritative exchange calendar. Adjusted equities, current stored membership, surviving symbols and overlapping ETFs limit generalisation.
 
-**T04 disposition:** retain the snapshot unchanged. Every unresolved flagged
-symbol and any funded portfolio including it remains provisional. The known SPY
-row still has adjusted O/L/C 685.90 / 68.64 / 691.70 and raw O/L/C 689.58 /
-69.005 / 695.41. Its problem is also present in raw prices; no independent repair
-has been established here. Exploratory runs may continue, but no winner or
-production promotion may be justified using these affected comparisons.
+All candidates start flat after 250 prior valid asset bars. The first reporting
+close can confirm an action; the next asset open is the earliest fill. Asset-only
+comparisons use the same decision, earliest-execution and final-mark dates across
+all candidates. Funded accounts use a common calendar, including cash days.
 
-Meaningful snapshot tests passed: source changes do not change the frozen export;
-credential tables are omitted; read-only writes fail; snapshot tampering is
-detected; missing-history coverage and invalid OHLC / extreme-range / crypto-gap
-flags are preserved. Two tests passed on 2026-09-14.
+Each funded account starts with $100,000, fractional fixed units, zero cash
+interest and no instrument leverage. Active budgets equal prior equity divided
+by currently eligible members, including flat names. Buy-and-hold instead reserves
+initial capital across the frozen member count, including later/never eligible
+names. This allocation difference and delayed cash deployment matter when comparing
+timing rules. Entries share pre-batch cash and scale proportionally; same-day exit
+proceeds cannot fund entries. New funding stops after seven days without a price;
+held stale marks remain flagged.
 
-## Accounting examples (T05)
+Normal costs are 5 bps plus 0.05 ATR per unit per side; doubled costs are 10 bps
+plus 0.10 ATR. Stops use signal-bar ATR; adverse gaps fill at the open. Scheduled
+exits precede intraday stops. Final positions are marked without invented exit
+costs. Doubled costs are **not** doubled positions. The user's recalled 2x-position
+test remains unverified; no archive was retrieved and no instrument survival
+claim is inferred.
 
-Five deterministic accounting tests passed on 2026-09-14 in
-[test_accounting.py](../../backend/temp/pm-research/tests/test_accounting.py).
-Expected values are calculated independently, rather than comparing two calls
-to the same production calculation:
+Independent arithmetic fixtures reconcile entry costs, scheduled/gap exits,
+same-day funding, open marks and short borrow/collateral. For example, $1,000 at
+$100 with $0.05 fee and $0.10 slippage buys 1,000/100.15 units; an open $120 mark
+has no closing fee. Every funded run asserts cash/equity identities and contribution
+sums; completed results were also checked against ending equity. Frozen conventions
+and per-run source copies/hashes support reproduction on the retained input.
 
-| Example | Independent expected result |
-| --- | --- |
-| Initial ATR and adverse gap | Prior TR 2, signal TR 5 => Wilder ATR20 2.15. Entry 105 gives stop 98.55; next adverse open 90 fills at 90, not 98.55. |
-| Entry and exit costs | Entry cost 0.16/unit; next known ATR 2.1425 gives exit cost 0.152125/unit. Return is `(90 - 105 - .16 - .152125) / 105`. |
-| Scheduled channel exit | A confirmed exit fills at next open 93, without substituting the intraday low 80. |
-| Open mark | An open position remains open and carries entry costs only; no hypothetical final exit is recorded. |
-| Funded purchase | $1,000 / (100 + .05 + .10) = 9.9850224663 units; cash after purchase is zero within floating-point tolerance. |
-| Funded open/closed account | Open at final mark 120: `units × 120`. Closed at 95 with known ATR3: `units × (95 - .0475 - .15)`. Contributions reconcile to equity. |
-| Same-day cash competition | X spends the $1,000 account, then exits for $1,200 on the day Y asks to enter. Y is unfunded because X's exit proceeds were unavailable to the prior-cash batch. |
+## Primary long comparison
 
-## Reference portfolios (T06)
+The decision window is 2020-onward, priority members, starting flat. Full-history
+and universe accounts are robustness checks; no metric or candidate was selected
+after seeing these outputs. CAGR and maximum drawdown are presented together.
 
-All 16 reference scenarios completed and reconciled on the frozen snapshot.
-Results remain **provisional** because their universes include unresolved price flags.
-These are the new common-warmup results, not a reproduction of the older V2 window.
+| Strategy | Costs | CAGR | Max drawdown | Entries | Average cash | Worst complete year | Longest recovery days |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| D: Donchian | normal | 12.07% | -17.77% | 733 | 19.80% | -15.64% | 765 |
+| D: Donchian | double | 11.47% | -18.43% | 733 | 19.76% | -16.44% | 771 |
+| M: SMA200 | normal | 11.09% | -15.22% | 1630 | 21.53% | -9.54% | 563 |
+| M: SMA200 | double | 9.81% | -15.61% | 1630 | 21.35% | -10.84% | 716 |
+| P: Pullback | normal | 0.79% | -4.86% | 5473 | 83.13% | -3.24% | 650 |
+| P: Pullback | double | -2.91% | -19.14% | 5473 | 83.15% | -5.03% | 2398 |
+| B: Buy and hold | normal | 19.06% | -26.55% | 60 | 0.88% | -22.88% | 680 |
+| B: Buy and hold | double | 19.04% | -26.54% | 60 | 0.88% | -22.88% | 680 |
 
-[Complete summary](results/20260914T032109Z/references-v1/summary.csv) and
-[run manifest](results/20260914T032109Z/references-v1/run.json). Compressed scenario
-artifacts alongside them contain daily curves, funded trade ledgers and every asset contribution.
+All 80 original funded scenarios are in [the full comparison](results/20260914T032109Z/long-diagnostics-v1/summary.csv). Whether a drawdown remains open at the cutoff is recorded separately from its longest historical duration. Entry turnover is gross entry notional divided by initial capital, not trade count; exact costs, exposure, stale marks and funding audits remain in the ledgers.
 
-| Window | Universe | Costs | Book | CAGR | Max drawdown |
-| --- | --- | --- | --- | ---: | ---: |
-| full | priority | normal | long-initial | 10.51% | -17.83% |
-| full | priority | normal | buy-hold | 17.78% | -29.29% |
-| full | priority | double | long-initial | 10.02% | -18.49% |
-| full | priority | double | buy-hold | 17.77% | -29.28% |
-| full | universe | normal | long-initial | 10.54% | -20.46% |
-| full | universe | normal | buy-hold | 14.90% | -34.94% |
-| full | universe | double | long-initial | 9.79% | -21.26% |
-| full | universe | double | buy-hold | 14.88% | -34.93% |
-| recent | priority | normal | long-initial | 12.07% | -17.77% |
-| recent | priority | normal | buy-hold | 19.06% | -26.55% |
-| recent | priority | double | long-initial | 11.47% | -18.43% |
-| recent | priority | double | buy-hold | 19.04% | -26.54% |
-| recent | universe | normal | long-initial | 12.44% | -20.47% |
-| recent | universe | normal | buy-hold | 16.37% | -33.17% |
-| recent | universe | double | long-initial | 11.52% | -21.27% |
-| recent | universe | double | buy-hold | 16.35% | -33.17% |
+![Funded equity and drawdown](results/20260914T032109Z/long-diagnostics-v1/funded-equity-drawdown.png)
 
-## Fixed pullback candidate (T18-T19)
+## Annual, asset-class and concentration stability
 
-All 8 funded scenarios and 2,712 standalone coverage rows completed in `results/20260914T032109Z/pullback-v1`. The 672 executable assets have matching decision/last-close windows; six short histories remain explicitly unavailable. Each funded ledger reconciles to ending equity within $0.00001. Frozen sources and hashes are retained with the run.
+The year test uses complete calendar years only; 2026 stays explicitly partial. Asset-class numbers below are contributions to the shared account, not separately funded class returns. The asset median is a standalone statistic, not portfolio CAGR.
 
-The 2020-onward priority account is the predefined primary window:
+| Normal costs | Complete years | Years beating D | Median priority asset CAGR | Equity/ETF contribution | Bond contribution | Crypto contribution |
+| --- | --- | --- | --- | --- | --- | --- |
+| D: Donchian | 6 | - | 6.31% | 108.27% | 3.09% | 3.24% |
+| M: SMA200 | 6 | 2/6 | 3.79% | 95.52% | 1.52% | 5.28% |
+| P: Pullback | 6 | 1/6 | -0.64% | 7.16% | -2.28% | 0.51% |
+| B: Buy and hold | 6 | 5/6 | 10.68% | 218.50% | 2.74% | 0.61% |
 
-| Cost | CAGR | Maximum drawdown | Entries | Average cash fraction | Entry notional / initial capital | Worst closed trade P&L |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| double | -2.91% | -19.14% | 5,473 | 83.15% | 84.90 | $-495.83 |
-| normal | 0.79% | -4.86% | 5,473 | 83.13% | 96.30 | $-484.09 |
+Machine-readable [annual returns and drawdowns](results/20260914T032109Z/long-diagnostics-v1/annual.csv), [fixed 2020-2022 / 2023-2025 subperiods](results/20260914T032109Z/long-diagnostics-v1/fixed-subperiods.csv), [asset classes](results/20260914T032109Z/long-diagnostics-v1/asset-class.csv) and [priority subgroups](results/20260914T032109Z/long-diagnostics-v1/priority-subgroups.csv) retain all scenarios. Positions are not reset at calendar-year boundaries.
 
-At normal costs, the same-window Donchian reference returned 12.07% CAGR with -17.77% drawdown; buy-and-hold returned 19.06% with -26.55%. Pullback holds much more cash and turns over frequently: lower drawdown alone does not establish superiority. Doubling costs turns its primary-window CAGR negative. All comparisons remain provisional because of unresolved market-data flags. No candidate has been enabled in the application or selected based on these results. Predefined controls and complete diagnostics remain pending.
+Paired uncertainty uses the same date blocks for every candidate within each scope/window/cost comparison: 2,000 resamples, seed 20260908, 28-day blocks and an 84-day sensitivity. The statistic is annualized **mean daily return difference**, not compounded CAGR or a win probability. Crypto weekend returns and equity cash/weekend marks remain aligned. Primary candidate-minus-D 95% intervals are:
 
-## Fixed SMA200 candidate (T16-T17)
+- M: SMA200, normal: 28-day blocks [-4.64%, 2.40%]; 84-day blocks [-3.96%, 2.39%].
+- M: SMA200, double: 28-day blocks [-5.34%, 1.87%]; 84-day blocks [-4.71%, 1.90%].
+- P: Pullback, normal: 28-day blocks [-17.57%, -4.73%]; 84-day blocks [-17.68%, -5.07%].
+- P: Pullback, double: 28-day blocks [-20.82%, -7.79%]; 84-day blocks [-21.05%, -7.95%].
 
-All 8 new funded scenarios and 8,136 D/B/M standalone coverage rows completed in `results/20260914T032109Z/sma-comparison-v2`. Existing 16 funded references were reused. Every paired asset/window/cost has identical decision, earliest execution and final-mark dates, including the pullback comparison; 672 executable assets and six short histories are retained. The first attempt failed during metadata writing before saving any standalone result; its failed manifest and source remain in `sma-comparison-v1`.
+Full [paired diagnostics](results/20260914T032109Z/long-diagnostics-v1/paired-uncertainty.csv) include every predefined variant against D and buy-and-hold. Intervals spanning zero leave the return advantage uncertain. These conditional historical diagnostics do not remove data defects, repeated inspection or multiple-trial selection effects. No historical segment is called untouched out-of-sample data.
 
-| Cost | Recent priority CAGR | Maximum drawdown | Entries | Average cash fraction |
-| --- | ---: | ---: | ---: | ---: |
-| double | 9.81% | -15.61% | 1,630 | 21.35% |
-| normal | 11.09% | -15.22% | 1,630 | 21.53% |
+Concentration checks remove each candidate/cost case's five largest positive contributors, then **rerun both that candidate and D on the identical reduced universe**, recomputing eligible funding counts. The original primary universe is retained:
 
-SMA200 has lower recent-priority CAGR and shallower drawdown than D under both cost levels. That is a tradeoff, not evidence of replacement. Unresolved price flags still make the experiment provisional. Annual, paired uncertainty, concentration and predefined-control diagnostics are required before the final T21 conclusion.
+- M: SMA200, normal, remove NVDA,AVGO,TSLA,SOXX,LLY: candidate CAGR 7.08% / drawdown -12.89%; D 7.74% / -17.12%.
+- M: SMA200, double, remove NVDA,AVGO,TSLA,LLY,SOXX: candidate CAGR 5.90% / drawdown -13.37%; D 7.17% / -17.78%.
+- P: Pullback, normal, remove NVDA,AVGO,GOOG,SOXX,GOOGL: candidate CAGR -0.21% / drawdown -5.27%; D 9.04% / -15.41%.
+- P: Pullback, double, remove GOOG,NVDA,SOXX,GOOGL,QQQ: candidate CAGR -3.66% / drawdown -23.03%; D 9.19% / -15.75%.
+
+Exact [concentration results](results/20260914T032109Z/long-diagnostics-v1/concentration.csv) and reduced-account ledgers are retained.
+
+M: SMA200 versus D has daily-return correlation 0.91; both lose on 33.6% of calendar return days in the normal-cost primary account. P: Pullback versus D has daily-return correlation 0.62; both lose on 24.0% of calendar return days in the normal-cost primary account. Distinct holding patterns can motivate a separately frozen funded-combination test; correlation alone does not justify allocation.
+
+![Asset contributions](results/20260914T032109Z/long-diagnostics-v1/asset-contributions.png)
+
+## Costs, stop controls and neighbours
+
+All ten configurations were fixed before results. M3 adds the fixed 3 ATR stop; P0 removes it. Only SMA150/SMA250 and RSI10/RSI30 are neighbouring checks. Every trial is shown; none replaces the primary candidate because it happens to look better.
+
+| Configuration | Normal CAGR | Normal drawdown | Doubled-cost CAGR | Doubled-cost drawdown |
+| --- | --- | --- | --- | --- |
+| donchian | 12.07% | -17.77% | 11.47% | -18.43% |
+| buy-hold | 19.06% | -26.55% | 19.04% | -26.54% |
+| sma200 | 11.09% | -15.22% | 9.81% | -15.61% |
+| pullback | 0.79% | -4.86% | -2.91% | -19.14% |
+| sma200-stop | 11.09% | -15.25% | 9.76% | -15.79% |
+| pullback-no-stop | 1.00% | -6.52% | -2.53% | -17.05% |
+| sma150 | 10.39% | -13.97% | 8.88% | -15.53% |
+| sma250 | 11.27% | -19.53% | 10.19% | -21.05% |
+| pullback-rsi10 | 0.70% | -3.93% | -1.39% | -9.80% |
+| pullback-rsi30 | 0.18% | -6.13% | -4.83% | -29.13% |
+
+![All configurations, return versus drawdown](results/20260914T032109Z/long-diagnostics-v1/return-drawdown.png)
+
+The [complete standalone table](results/20260914T032109Z/long-diagnostics-v1/standalone-all.csv) has 27,120 asset/window/cost/configuration rows: 26,852 with trades, 28 valid no-trade accounts, and 240 unavailable histories. No-trade cash returns are not confused with insufficient history. Native funded ledgers, open marks and per-asset standalone curves are retained in each run's compressed files; [diagnostic provenance](results/20260914T032109Z/long-diagnostics-v1/run.json) identifies all input runs. The failed first SMA metadata-writing attempt remains recorded; its successful successor is `sma-comparison-v2`.
+
+The frozen replacement criterion requires higher recent-priority CAGR and no
+deeper drawdown than D at both cost levels, plus positive differences in more than
+half of at least four complete years. The primary SMA and pullback do not meet
+that combined criterion. Lower drawdown with lower return is a tradeoff, not
+superiority. Retain D while input issues and further review remain unresolved.
+No result here activates a PM, a vote, a grade or leverage.
+
+## Independent short direction study
+
+The separate [failed-rally specification](../../backend/temp/pm-research/short-specification.md) was frozen before execution. Both short PMs and cash use identical asset comparison dates, funding and costs. These are synthetic short accounts with 2% annual borrow at normal costs and 4% under doubled costs; borrow/product access is not established.
+
+| Short comparison | Costs | CAGR | Drawdown | Entries | Borrow paid | Collateral-deficit days |
+| --- | --- | --- | --- | --- | --- | --- |
+| failed-rally | normal | -2.31% | -16.36% | 1792 | $920.20 | 0 |
+| failed-rally | double | -3.92% | -25.17% | 1792 | $1,739.69 | 0 |
+| fixed-short | normal | -5.81% | -40.17% | 1729 | $2,191.85 | 0 |
+| fixed-short | double | -7.38% | -46.13% | 1729 | $4,148.73 | 0 |
+| cash | normal | 0.00% | 0.00% | 0 | $0.00 | 0 |
+| cash | double | 0.00% | 0.00% | 0 | $0.00 | 0 |
+
+Complete [funded short results](results/20260914T032109Z/short-comparison-v1/funded-comparison.csv), [asset-only accounts](results/20260914T032109Z/short-comparison-v1/standalone.csv) and [run/source provenance](results/20260914T032109Z/short-comparison-v1/run.json) preserve all cases. Cash is a zero-interest, zero-trade reference. Inspect negative equity and free-capital/short-liability paths rather than treating a preset stop as a guaranteed loss limit.
+
+Of 8,136 standalone coverage rows, 2 end with nonpositive equity and 5,348 have at least one synthetic collateral-reserve deficit day. These deficits are measured using the existing reserve convention, with no broker margin-call or forced-liquidation mechanism. They are not a count of observed broker failures.
+
+- ECHO, fixed-short, full window, double costs: ending equity $-85.13 from $100,000; flagged inputs = True.
+- ECHO, fixed-short, recent window, double costs: ending equity $-81.82 from $100,000; flagged inputs = True.
+
+In the flagged ECHO series, the last short enters at 27.13 on 2025-08-04 and its trailing-stop exit fills at the adverse 54.11 open on 2025-08-26. Prior losses plus costs and that gap exhaust the synthetic account. This is a model failure case on unresolved inputs, **not a verified real-market event**; it cannot validate leverage safety or establish how a broker would have liquidated the position. The recorded ledger remains available for input investigation.
+
+Borrow availability/recalls, dividend settlement, product mapping, margin changes and forced liquidation remain instrument gaps. No short allocation is justified solely by this synthetic comparison. Candidate selection and any production integration remain T25 review work.
+
+## Application boundary and next work
+
+Independent PM runs, persisted chart selection and descriptive family support are implemented. Funded vote policies, grade sizing, historical Multisectional context, actual instrument accounting and forward observation remain separate tasks in the checklist. Descriptive disagreement never overwrites a PM. No broker orders are placed by this research.

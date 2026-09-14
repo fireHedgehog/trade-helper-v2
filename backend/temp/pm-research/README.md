@@ -35,3 +35,14 @@ Do not rerun it when its manifest already exists; inspect or resume deliberately
 
 All experiments are research only. They use local frozen prices, never provider
 fetches, live database writes, broker orders or automatic strategy promotion.
+
+`short-specification.md` freezes the separate failed-rally hypothesis;
+`short_comparison.py` compares it with fixed short and cash. `long_diagnostics.py`
+reuses completed long runs for annual/class/paired analysis, executes the predefined
+matched concentration checks, and writes three charts. Optional plotting libraries
+are pinned in `requirements-research.txt`.
+
+`write_report.py` rebuilds the single working report from completed outputs without
+rerunning experiments. Completed manifests for the September snapshot are recorded
+in the checklist. Never infer that missing ignored outputs should be regenerated
+automatically; first locate the original snapshot and recorded run artifacts.
