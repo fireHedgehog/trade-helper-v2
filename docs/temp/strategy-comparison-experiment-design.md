@@ -31,6 +31,25 @@ not source-endorsed optimal settings or a claim of profitability.
 
 ## 2. Established foundations
 
+### User clarification: non-directional opportunities are first-class
+
+Direction and volatility are separate parts of the planned app display. An asset without
+a clear up/down trend still needs an explicit description: established narrow/wide range,
+compression, expansion/break attempt, transition or genuinely insufficient evidence.
+Range width and volatility describe different observations; show their inputs and timeframe.
+
+Define three separate setup paths: range-edge trading (long near support, short near
+resistance), buying volatility (including a named long-straddle candidate), and selling
+volatility through a named defined-risk structure. Each needs its own conditions, trigger,
+invalidation, management rule and required data. “Straddle” must specify long or short.
+Neither a wide range nor a sideways label automatically selects one of these paths.
+
+First deliver these state/setup definitions and their app cards alongside the directional
+setups. Then combine evidence into discretionary A/B/C opportunity grades and base-lot
+sizing, followed by concrete instrument selection and leverage mechanics. A grade and a
+leverage multiplier are separate decisions. Actual options pricing needs contract quotes;
+the initial setup card must label any missing inputs rather than fabricate a priced trade.
+
 | Foundation | Source-backed meaning | App use |
 | --- | --- | --- |
 | Swing structure | Higher highs with higher lows describe an uptrend; lower highs with lower lows describe a downtrend. | Give every timeframe its own direction label and visible swing anchors. |
@@ -398,9 +417,11 @@ Use [the checklist](agent-work-checklist.md) for current authorisation and task 
 1. Deliver the already-requested SMA as ordinary production PMs, long and short, with saved
    results and overlays in the existing dropdowns. No renewed performance-comparison gate.
 2. Deliver visible market structure, zones, location and manual review controls.
-3. Deliver both trend-pullback directions and both range directions using daily data.
+3. Deliver both trend-pullback directions and both range directions using daily data;
+   define explicit volatility-buying and volatility-selling setup cards alongside them.
 4. Add completed weekly context, then genuine 4-hour ingestion and optional timing evidence.
-5. Add the opportunity composer, explicit assessment policy, grades and instrument sizing.
+5. Add the opportunity composer, explicit assessment policy and discretionary A/B/C grades.
+6. Add concrete instrument plans, options pricing/legs where relevant and leverage-aware sizing.
 
 A production strategy task is done when it runs through the app, saves independently, can be
 selected and understood on its chart, exposes entries/exits/stops/reasons for both directions,

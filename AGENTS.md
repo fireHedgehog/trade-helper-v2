@@ -1,5 +1,12 @@
 # Project instructions
 
+## Git control belongs to the user
+
+- Never run git commit or git push. The user explicitly prohibited both.
+- Leave changes uncommitted for the user to review, revert, commit and push.
+- Earlier commit/push authorisation is revoked. Broad implementation permission
+  never authorises committing, pushing or rewriting Git history.
+
 The user reset the workflow on 2026-09-15: **build application features for a
 discretionary technical trader; implementation first, parameter tuning later.**
 
