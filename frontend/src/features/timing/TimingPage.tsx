@@ -380,6 +380,26 @@ export function TimingPage() {
       {selection !== "legacy" && <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
         Saved PM: {data?.pm_name ?? "loading"}. Use Trend's Run all enabled PMs to refresh saved results; choose Assigned Donchian / preview for unsaved parameter experiments.
       </Typography>}
+      {selection !== "legacy" && data?.params?.model === "sma" && <Paper sx={{ p: 2, mb: 2 }}>
+        <Typography variant="subtitle2">{data.pm_name}: entry, exit and stop</Typography>
+        <Typography variant="body2" color="text.secondary">
+          A completed daily close {data.pm_direction === 'long' ? 'above' : 'below'} SMA{data.params.period} schedules
+          a {data.pm_direction} entry at the next open. A close {data.pm_direction === 'long' ? 'below' : 'above'} the
+          average schedules an exit; equality leaves the position unchanged.
+          The initial stop stays fixed {data.params.atr_stop_mult} × ATR({data.params.atr_len})
+          {data.pm_direction === 'long' ? ' below' : ' above'} the entry, using ATR known at the signal close.
+          Gaps through a stop fill at the open. There is no trailing stop or fixed profit target.
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          Orange line: strategy SMA. Dotted red line: stop. Each fill includes {data.params.cost_bps} bps
+          and {data.params.slippage_atr} × ATR in modeled costs; short borrow and financing are excluded.
+          This PM owns its positions and exits independently.
+        </Typography>
+        {data.pending_action && <Typography variant="body2" sx={{ mt: 1 }}>
+          Pending {data.pending_action.action}: {data.pending_action.reason?.replaceAll('_', ' ')};
+          confirmed {data.pending_action.signal_date}, next-open fill.
+        </Typography>}
+      </Paper>}
       {data?.pm_run_status && data.pm_run_status !== "succeeded" && <Alert severity="warning" sx={{ mb: 2 }}>
         This PM belongs to a {data.pm_run_status} run. Other PMs may be unavailable.
       </Alert>}
@@ -399,7 +419,7 @@ export function TimingPage() {
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 900 }}>
                 These controls preview the long preset only. The short benchmark stays fixed and
                 runs independently, so long changes cannot alter its comparison history.
-                Additional families are being evaluated in separate research runs.
+                SMA long and short are available as saved PMs through Run all enabled PMs on Trend.
               </Typography>
 
               <Button size="small" sx={{ mt: 1, px: 0 }} onClick={() => setShowGuide((s) => !s)}>
@@ -586,14 +606,14 @@ export function TimingPage() {
               <Typography variant="body2" color="text.secondary" sx={{ mr: 0.5 }}>
                 Chart & history
               </Typography>
-              <FormControlLabel
+              {selection === "legacy" ? <><FormControlLabel
                 control={<Checkbox size="small" disabled={selection !== "legacy"} checked={effLong} onChange={(e) => setDirLong(e.target.checked)} />}
                 label="Long strategy"
               />
               <FormControlLabel
                 control={<Checkbox size="small" disabled={selection !== "legacy"} checked={effShort} onChange={(e) => setDirShort(e.target.checked)} />}
                 label="Short benchmark"
-              />
+              /></> : <Chip size="small" label={data.pm_name} color={data.pm_direction === 'long' ? 'success' : 'error'} />}
             </Box>
             <ToggleButtonGroup size="small" exclusive value={timeframe} onChange={(_, v) => v && setTimeframe(v)}>
               {(["D", "W", "M"] as Timeframe[]).map((t) => (
@@ -630,7 +650,8 @@ export function TimingPage() {
 
           <Paper sx={{ p: 1, mb: 2 }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", px: 1, mb: 0.5 }}>
-              Green: Long strategy · Red: Short benchmark. Arrows mark entries; circles mark exits.
+              {data.pm_name ? `${data.pm_direction === 'long' ? 'Green' : 'Red'}: ${data.pm_name}. ` : 'Green: Long strategy · Red: Short benchmark. '}
+              Arrows mark entries; circles mark exits.
               Each exit closes only its own trade.
             </Typography>
             <TimingChart
@@ -645,7 +666,7 @@ export function TimingPage() {
             />
             {timeframe !== "D" && (
               <Typography variant="caption" color="text.secondary" sx={{ pl: 1 }}>
-                Donchian channel, stop line and entry/exit markers show on the Daily timeframe only.
+                Saved strategy lines, stops and entry/exit markers show on the Daily timeframe only.
               </Typography>
             )}
           </Paper>
@@ -658,7 +679,7 @@ export function TimingPage() {
               {view.filtered && (
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
                   {data.pm_name ?? (effLong ? "Long strategy" : "Short benchmark")}: standalone account performance.
-                  Selecting both shows two independent accounts starting with equal capital.
+                  {!data.pm_name && 'Selecting both shows two independent accounts starting with equal capital.'}
                 </Typography>
               )}
               <Stack direction={{ xs: "column", md: "row" }} spacing={4}>
@@ -723,7 +744,7 @@ export function TimingPage() {
               Newest entry first. Each row is one trade in the named strategy account.
             </Typography>
             <Box sx={{ overflowX: "auto" }}>
-              <TradeTable trades={view.trades} />
+              <TradeTable trades={view.trades} pmName={data.pm_name} />
             </Box>
           </Paper>
         </>
@@ -770,7 +791,7 @@ function StatGrid({ title, rows }: { title: string; rows: [string, string][] }) 
   );
 }
 
-function TradeTable({ trades }: { trades: Trade[] }) {
+function TradeTable({ trades, pmName }: { trades: Trade[]; pmName?: string }) {
   return (
     <Table size="small" sx={{ "& td, & th": { whiteSpace: "nowrap" } }}>
       <TableHead>
@@ -798,14 +819,14 @@ function TradeTable({ trades }: { trades: Trade[] }) {
           return (
             <TableRow key={i}>
               <TableCell sx={{ color: t.direction === "long" ? green : red, fontWeight: 600 }}>
-                {t.direction === 'long' ? 'Long strategy' : 'Short benchmark'}
+                {pmName ?? (t.direction === 'long' ? 'Long strategy' : 'Short benchmark')}
               </TableCell>
               <TableCell><Chip size="small" variant={open ? "filled" : "outlined"} label={open ? "Open" : "Closed"} /></TableCell>
               <TableCell>{t.entry_date}</TableCell>
               <TableCell align="right">{money(t.entry_price)}</TableCell>
               <TableCell>{t.exit_date ?? "—"}</TableCell>
               <TableCell align="right">{money(t.exit_price)}</TableCell>
-              <TableCell>{({ stop_initial: "Initial stop", stop_trailing: "Trailing stop", channel_reversal: "Channel exit" } as Record<string, string>)[t.exit_reason ?? ''] ?? t.exit_reason ?? "—"}</TableCell>
+              <TableCell>{({ stop_initial: "Initial stop", stop_trailing: "Trailing stop", channel_reversal: "Channel exit", sma_exit: "SMA exit" } as Record<string, string>)[t.exit_reason ?? ''] ?? t.exit_reason ?? "—"}</TableCell>
               <TableCell align="right">{t.bars_held ?? "—"}</TableCell>
               <TableCell align="right" sx={{ color: t.return_pct == null ? undefined : win ? green : red }}>
                 {t.return_pct == null ? "—" : `${win ? "+" : ""}${(t.return_pct * 100).toFixed(2)}%`}

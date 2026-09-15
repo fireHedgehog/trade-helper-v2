@@ -1,6 +1,6 @@
 # Trade Helper
 
-A local-first trading research app with market data, macro context, momentum
+A local-first discretionary trading app with market data, macro context, momentum
 rankings, trend signals and portfolio sizing. It does not place broker orders.
 Start with the [current application design](docs/design-v2/README.md).
 
@@ -9,8 +9,11 @@ The permanent strategy research reference is
 Its archive commit preserves the full experiments; the temp folders are absent
 from the current checkout. Agents must not retrieve or restore those archived
 files unless the user explicitly requests it. Independent PM development is active;
-the [agent checklist](docs/temp/agent-work-checklist.md) records completed work,
-running experiments and the next eligible task.
+the [agent checklist](docs/temp/agent-work-checklist.md) records completed features,
+current scope and the next implementation task. The
+[technical playbook](docs/temp/strategy-comparison-experiment-design.md) defines
+direction, entry location and timeframe evidence. Implementation comes first;
+new quantitative research requires an explicit user request.
 
 ## Repository layout
 
@@ -32,7 +35,7 @@ outside both so a data migration is just a new `schema/migrations/NNNN_*.sql`.
 | --- | --- |
 | Credentials / Data management | Provider keys, paced fetching, adjustment repair and one-click data + computation workflow |
 | Macro / Multisectional | Weighted macro baseline, manual optional AI and cross-sectional momentum context |
-| Trend / Timing / Strategies | Versioned independent PM runs, saved chart selection, family-support assessment, and scratch previews; assigned long and fixed short remain available |
+| Trend / Timing / Strategies | Versioned independent Donchian and SMA200 long/short PM runs, saved chart selection, SMA/stop overlays and rule explanations, family-support assessment, and scratch previews |
 | Sizing | Current allocations and historical long, short or combined portfolios, with per-asset contributions |
 
 ## Run it

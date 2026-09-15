@@ -24,6 +24,9 @@ proposal. Active independent-PM development is tracked in the
 [the PM module](../../backend/app/features/pms/README.md).
 The permanent research reference is
 [Naive Donchian V2](../strategy-experiments/naive-donchian-v2-result.md), including
-the archive commit. New experiments have their own frozen inputs and local outputs.
+the archive commit. The current
+[technical playbook](../temp/strategy-comparison-experiment-design.md) specifies
+direction, location and multiple-timeframe evidence for application delivery.
 Do not retrieve archived files unless the user explicitly requests it.
-Update design documents in place; new research uses temporary folders until review.
+Update design documents in place. New quantitative research requires an explicit
+user request; it is not a prerequisite for implementing a strategy.

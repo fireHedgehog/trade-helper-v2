@@ -9,10 +9,11 @@ import zlib
 
 from app.features.data_management import runs as jobs
 from app.features.signals import data as prices, engine, repository as signals
-from app.features.signals.params import ENGINE_VERSION, SignalParams
-from . import repository as repo
+from app.features.signals.params import SignalParams
+from . import repository as repo, sma
 from .adapters import adapt, definitions
 from .contracts import PMResult, Position, content_hash
+from .versions import current_engine_version
 
 
 def load_bars(conn, symbol):
@@ -29,7 +30,7 @@ def freeze(conn, symbols=None):
             symbols=[r[0] for r in conn.execute('SELECT symbol FROM price_bars UNION SELECT symbol FROM crypto_bars UNION SELECT symbol FROM pm_assignments')]
         for symbol in sorted({prices.normalize_symbol(s) for s in symbols}):
             params=SignalParams(**signals.resolve_one(conn,symbol)['params'])
-            selected={d.key:d for d in definitions(params)}
+            selected={d.key:d for d in (*definitions(params), *sma.definitions())}
             for definition,enabled in repo.assignments(conn,symbol):
                 if enabled: selected[definition.key]=definition
                 else: selected.pop(definition.key,None)
@@ -48,11 +49,16 @@ def evaluate(symbol,bars,definition):
         return PMResult(symbol=symbol,pm=definition,input_hash=content_hash(bars),
                         as_of=bars[-1]['date'] if bars else None,status='invalid_data',
                         status_reason='Invalid OHLC input; no rows silently removed',position=Position(state=None))
-    if definition.family!='donchian': raise ValueError(f'Unsupported PM family: {definition.family}')
+    expected_version=current_engine_version(definition.family)
+    if expected_version is None: raise ValueError(f'Unsupported PM family: {definition.family}')
+    if definition.engine_version!=expected_version: raise ValueError('PM engine version needs a new definition')
+    if definition.family=='sma':
+        params=sma.SMAParams(**definition.parameters)
+        start=max(definition.start_bar,params.start_bar())
+        return adapt(symbol,bars,definition,sma.run(bars,params,definition.direction,start=start),start)
     params=SignalParams(**definition.parameters)
     if params.allow_long!=(definition.direction=='long') or params.allow_short!=(definition.direction=='short'):
         raise ValueError('PM direction does not match its engine parameters')
-    if definition.engine_version!=ENGINE_VERSION: raise ValueError('PM engine version needs a new definition')
     start=max(definition.start_bar,params.warmup())
     result=engine.run(bars,params,start=start)
     return adapt(symbol,bars,definition,result,start)
@@ -115,7 +121,8 @@ def choices(conn,symbol,run_id=None):
         definition=json.loads(row['definition_json'])
         options.append({'key':row['pm_key'],'version':row['version'],'name':definition['name'],
                         'direction':definition['direction'],'status':row['status'],'error':row['error'],
-                        'stale':row['input_hash']!=current_hash,'engine_stale':definition['engine_version']!=ENGINE_VERSION})
+                        'stale':row['input_hash']!=current_hash,
+                        'engine_stale':definition['engine_version']!=current_engine_version(definition['family'])})
     return {'status':'ok','symbol':symbol,'run_id':run_id,'run_status':run_info['status'],
             'computed_at':run_info['finished_at'],'choices':options}
 
@@ -127,7 +134,8 @@ def timing(conn,run_id,symbol,key,version):
     run_info=repo.get_run(conn,run_id)
     base={'symbol':symbol,'pm_key':key,'pm_version':version,'pm_name':result.pm.name,'pm_direction':result.pm.direction,'pm_run_id':run_id,
           'pm_run_status':run_info['status'],'computed_at':run_info['finished_at'],
-          'preview':False,'engine_version':result.pm.engine_version,'params':result.pm.parameters}
+          'preview':False,'engine_version':result.pm.engine_version,'params':result.pm.parameters,
+          'pm_family':result.pm.family}
     if result.status!='ok': return {**base,'status':'not_computed','pm_status':result.status,'reason':result.status_reason}
     frozen=conn.execute('SELECT bars FROM pm_inputs WHERE run_id=? AND symbol=?',(run_id,symbol)).fetchone()
     if frozen is None: raise ValueError('Original PM chart inputs are unavailable')
@@ -144,7 +152,7 @@ def timing(conn,run_id,symbol,key,version):
     pending=result.pending_action.model_dump() if result.pending_action else None
     return {**base,'status':'ok','run_scope':'universe','chart_cached':True,
             'stale':content_hash(load_bars(conn,symbol))!=result.input_hash,
-            'needs_recompute':result.pm.engine_version!=ENGINE_VERSION,
+            'needs_recompute':result.pm.engine_version!=current_engine_version(result.pm.family),
             'run_through_date':result.as_of,'state':state,'pending_action':pending,'metrics':result.metrics,
             'trades':result.trades,'daily':result.daily,'overlays':result.overlays,'equity':equity,'markers':markers,
             'bars':[{'time':b['date'],'open':b['o'],'high':b['h'],'low':b['l'],'close':b['c'],'volume':b['v']} for b in bars],

@@ -122,12 +122,13 @@ def test_worker_persists_both_pms_and_reads_frozen_charts_without_rerun(client):
     reply=client.post('/api/pms/run',json={'symbols':['SPY','SPY']}).json()
     job=wait_job(client,reply['run_id'])
     assert job['status']=='succeeded',job
-    assert job['planned_targets']==job['completed_targets']==2
+    assert job['planned_targets']==job['completed_targets']==4
     choices=client.get('/api/pms/choices/SPY').json()
     assert choices['run_status']=='succeeded'
-    assert len(choices['choices'])==2
+    assert len(choices['choices'])==4
     board=client.get('/api/pms/board').json()
-    assert len(board['rows'])==2 and len(board['pms'])==2
+    assert len(board['rows'])==4 and len(board['pms'])==4
+    assert {r['status'] for r in board['rows'] if r['pm_key'].startswith('sma-')}=={'insufficient_history'}
     params={'run_id':choices['run_id'],'key':choices['choices'][0]['key'],'version':choices['choices'][0]['version']}
     selected=client.get('/api/pms/timing/SPY',params=params).json()
     assert selected['status']=='ok' and len(selected['bars'])==180
@@ -158,7 +159,9 @@ def test_disabled_assignments_and_partial_pm_failure_are_visible(client):
     assert job['status']=='failed' and job['failed_targets']==1
     choices=client.get('/api/pms/choices/SPY').json()
     assert choices['run_status']=='partial'
-    assert {r['key']:r['status'] for r in choices['choices']}=={'donchian-long':'ok','unsupported-pm':'failed'}
+    assert {r['key']:r['status'] for r in choices['choices']}=={
+        'donchian-long':'ok','unsupported-pm':'failed',
+        'sma-trend-long':'insufficient_history','sma-trend-short':'insufficient_history'}
 
 
 def test_frozen_definitions_and_inputs_do_not_change_during_run(client):
@@ -172,7 +175,7 @@ def test_frozen_definitions_and_inputs_do_not_change_during_run(client):
             bars=json.loads(zlib.decompress(frozen[symbol][1]))
             result=pm_service.evaluate(symbol,bars,definition)
             assert result.input_hash==input_hash
-            assert result.status=='ok'
+            assert result.status==('insufficient_history' if definition.family=='sma' else 'ok')
 
 
 def test_worker_cancellation_preserves_completed_pm_and_marks_remaining(client,monkeypatch):
@@ -190,7 +193,7 @@ def test_worker_cancellation_preserves_completed_pm_and_marks_remaining(client,m
     assert job['status']=='cancelled' and job['completed_targets']==1
     choices=client.get('/api/pms/choices/SPY').json()
     assert choices['run_status']=='cancelled'
-    assert sorted(r['status'] for r in choices['choices'])==['cancelled','ok']
+    assert sorted(r['status'] for r in choices['choices'])==['cancelled','cancelled','cancelled','ok']
 
 
 def test_worker_deduplicates_a_queued_pm_job(client,monkeypatch):

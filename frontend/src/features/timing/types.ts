@@ -23,6 +23,16 @@ export interface SignalParams {
 
 export type Direction = "long" | "short";
 
+export interface SMAParams {
+  model: "sma";
+  period: number;
+  atr_len: number;
+  atr_stop_mult: number;
+  fill_at: "open_next";
+  cost_bps: number;
+  slippage_atr: number;
+}
+
 export interface StrategySummary {
   id: number;
   key: string;
@@ -90,8 +100,10 @@ export interface KeyLevel {
 
 export interface Overlays {
   dates: string[];
-  donchian_up: (number | null)[];
-  donchian_dn: (number | null)[];
+  donchian_up?: (number | null)[];
+  donchian_dn?: (number | null)[];
+  sma?: (number | null)[];
+  sma_period?: number;
   stop_line: (number | null)[];
   short_stop_line?: (number | null)[];
 }
@@ -122,6 +134,7 @@ export interface Metrics {
 export interface TimingResponse {
   pm_key?: string;
   pm_name?: string;
+  pm_family?: string;
   pm_direction?: Direction;
   pm_run_id?: number;
   pm_run_status?: string;
@@ -131,7 +144,7 @@ export interface TimingResponse {
   symbol: string;
   computed_at?: string;
   engine_version?: string;
-  params?: SignalParams;
+  params?: SignalParams | SMAParams;
   preview?: boolean; // true when returned by /preview (nothing was persisted)
   run_scope?: "single" | "universe" | "preview";
   chart_cached?: boolean; // false after a Trend (universe) run — press Run for overlays/equity
@@ -142,6 +155,7 @@ export interface TimingResponse {
     direction: Direction;
     signal_date: string;
     fill_at: "open_next";
+    reason?: string | null;
   } | null;
   newest_price_date?: string | null;
   run_through_date?: string | null;
@@ -160,6 +174,6 @@ export interface TimingResponse {
     overlays?: Overlays;
     equity?: EquityCurve;
     metrics?: Metrics;
-    params?: SignalParams;
+    params?: SignalParams | SMAParams;
   }>>;
 }

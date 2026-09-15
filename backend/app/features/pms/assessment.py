@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 import json
 import zlib
 
-from app.features.signals.params import ENGINE_VERSION
+from .versions import current_engine_version
 from app.features.signals.data import normalize_symbol
 from . import repository as repo
 from .contracts import content_hash
@@ -34,7 +34,7 @@ def assess(symbol, run_id, targets, bars, current_hash, assessed_on):
             age=(assessed_on-date.fromisoformat(cutoff)).days
             if age>MAX_AGE_DAYS: reasons.append(f'Saved prices are {age} calendar days old')
             if age<0: reasons.append('Saved cutoff is after the assessment date')
-        if definition['engine_version']!=ENGINE_VERSION: reasons.append('PM engine version is outdated')
+        if definition['engine_version']!=current_engine_version(definition['family']): reasons.append('PM engine version is outdated')
         if definition['horizon']!='daily': reasons.append('Unsupported comparison horizon')
         if result is not None and result.as_of!=cutoff: reasons.append('PM cutoff differs from saved asset cutoff')
         pending=result.pending_action if result is not None else None

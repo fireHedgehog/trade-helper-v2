@@ -1,504 +1,414 @@
-# Strategy research roadmap — current gaps and experiment design
+# Technical trading playbook: direction, location and timeframe evidence
 
-**Status: DRAFT — research and product direction. No new experiments started;
-no strategy, grade or leverage policy selected for production.**
+Updated: 2026-09-15. Status: implementation specification for review.
+This replaces the former experiment-design roadmap; the filename is retained for existing links.
+Task ownership and progress live in [the agent checklist](agent-work-checklist.md).
 
-The goal is a small research desk inside the app: several independent strategy
-"PMs" evaluate the same assets, explain their long and short views, and help
-decide whether an opportunity deserves no allocation, a small allocation, or a
-larger one. Eventually, an explicit instrument and financing model can translate
-an approved exposure into a feasible position. Donchian is one PM and the current
-reference; finding its replacement is only one possible research question.
+## 1. Product purpose and working discipline
 
-Keep the experience simple: run all enabled strategies in the backend, choose
-one in the chart dropdown, inspect agreement and objections, then see an
-explainable opportunity grade and proposed size. Complexity belongs in the
-research and accounting needed to make those simple labels honest.
+Help a discretionary trader find an actionable opportunity with an understandable entry,
+invalidation, target and estimated cost, in either direction. Combine established techniques
+instead of making one indicator responsible for every decision.
 
-Part I maps the gaps and future work. Part II retains the first, bounded long
-strategy experiment. Later phases require their own exact frozen rules before
-execution; the examples in Part I are proposals, not validated trading settings.
-The [agent work checklist](agent-work-checklist.md) breaks this roadmap into
-small tasks and records ownership, dependencies and completion evidence. This
-roadmap remains the rationale; use the checklist to resume execution without
-re-reading completed work.
+The core workflow is:
 
-This is one working design, revised in place. Code and frozen research inputs
-belong in `backend/temp`; reports, tables and charts belong in `docs/temp`.
-Use the [current V2 paper](../strategy-experiments/naive-donchian-v2-result.md)
-and current production code. Do not retrieve archived experiment contents.
-Committing, force-adding ignored files, pushing and deleting research require
-the user's explicit instruction; preparing or running research does not authorise them.
-The [multiple-strategy draft](../design-v2/11-strategy-design-draft.md) supplies
-earlier product ideas; implementation there remains parked. This roadmap resumes
-the discussion without treating those future capabilities as already available.
+**Market structure -> price location -> entry trigger -> stop and target -> supporting evidence -> trader decision.**
 
-## Part I — gaps and future work
+- Uptrend: look for a long near support or the lower channel.
+- Downtrend: look for a short near resistance or the upper channel.
+- Established sideways range: consider buying the lower boundary and shorting the upper boundary.
+- Transition or unclear structure: explain what is missing; do not invent a range.
+- Weekly context, daily setup and 4-hour timing can reinforce or challenge the idea.
+- Implement usable app features first; allow manual parameter tuning afterward.
+- No comparative backtests, profitability admission gates, sweeps or new quantitative research.
+  Functional checks of calculations, bar timing, persistence and UI remain necessary.
+- The earlier request to bring SMA into production remains active. Deliver its long and short
+  PMs without making SMA the entire strategy framework or reopening the experiment phase.
 
-### A. What exists, what is missing, and what would close the gap
+Sources below establish technical vocabulary and conventional methods. The composite rules,
+numeric tolerances and workflow in this document are **our proposed editable app defaults**,
+not source-endorsed optimal settings or a claim of profitability.
 
-| Gap | Current position | Work needed / evidence of completion |
+## 2. Established foundations
+
+| Foundation | Source-backed meaning | App use |
 | --- | --- | --- |
-| Direction | Independent long Donchian and fixed short Donchian accounts exist. Keeping short functionality does not establish a useful short strategy. | Evaluate purpose-built short rules against the fixed short and cash, with separate costs, coverage and downside behaviour. A valid result is to keep short research available but allocate no short capital. |
-| Strategy breadth | The app assigns a long Donchian preset and a fixed short benchmark; arbitrary PM families are not implemented. | Compare distinct entry/exit families, retain standalone ledgers, and identify complementary behaviour as well as possible replacements. |
-| Multiple PMs | The same asset cannot yet have arbitrary independently saved family results. | Run every enabled assignment once, store each version independently, and inspect one through a chart dropdown without changing the computation set. |
-| Agreement and denial | Multisectional momentum is advisory; there is no validated vote or veto portfolio. | Define positive confirmation, explicit opposition, abstention, missing data and exit separately; test each combination rule against its component strategies. |
-| Opportunity size | Current sizing uses equal capital or volatility, not A/B/C opportunity grades. | Define an understandable base allocation and grade mapping; test whether grade changes improve a funded account after costs. |
-| Instruments and leverage | Existing accounting models cash-funded long positions and a synthetic short benchmark. Instrument-specific financing and liquidation are not established. | Choose an instrument route, obtain its actual data and rules, and reconcile exposure, cash, margin, costs and forced exits. |
-| Portfolio overlap | Existing portfolios support defined long/short books, not arbitrary PM capital sharing. | Track duplicate underlying exposure, correlated holdings and competing cash requests; reconcile every PM contribution to one funded account. |
-| Evidence and data | V2 provides a reference; the documented SPY input issue, current-universe bias and previously inspected history limit inference. | Freeze reproducible inputs, resolve or label defects, retain every trial, and begin forward observation only after freezing the new rules. |
+| Swing structure | Higher highs with higher lows describe an uptrend; lower highs with lower lows describe a downtrend. | Give every timeframe its own direction label and visible swing anchors. |
+| Trading with swings | A trough in an uptrend can frame a long; a rally in a downtrend can frame a short. | Separate the trend from the entry location. |
+| Support and resistance | Areas where price has previously encountered buying or selling; a broken level can change role. | Show levels, zones, breaks and retests with their dates. |
+| Range trading | Price oscillates between identifiable support and resistance. | Two explicit setups: range long and range short. |
+| Multiple timeframes | A larger timeframe supplies context while a smaller one helps identify entries. | Use weekly / daily / 4-hour roles without demanding identical direction everywhere. |
 
-The user recalls a 2× position pressure test that did not exhaust capital with
-stops enabled. Its exact settings and ledger have not been established in this
-review. The current production `double` option doubles fees, ATR slippage and
-short borrow charges; it is **not** a position-leverage control. Record these as
-different tests. Obtain the earlier test specification from the user, or rerun a
-new explicitly specified exposure test; do not silently retrieve archived work.
-Historical survival also does not establish that the stop caused survival.
+Sources: [Schwab: swing trading](https://www.schwab.com/learn/story/ins-and-outs-swing-trade),
+[Fidelity: support, resistance and role reversal](https://www.fidelity.com/learning-center/trading-investing/technical-analysis/support-and-resistance),
+[IG: range trading](https://bts.ig.com/uk/learn-to-trade/ig-academy/range-trading/what-is-range-trading),
+[IG: multiple timeframe analysis](https://www.ig.com/uk/trading-strategies/what-are-the-best-timeframes-in-forex-trading--210805).
 
-### B. Independent PMs, one shared data foundation
+The IG timeframe article is about forex. Its larger-context/smaller-entry principle is useful
+here; its market sessions and timeframe ratios are not universal rules for equities or crypto.
 
-A PM is a named deterministic strategy and version, not an AI persona. Each has
-an eligible universe, direction, time horizon, parameters, entry/exit rules,
-stop rules, simulated positions, pending actions and standalone performance.
-Research begins with a small number of distinct families, not many near-identical
-presets masquerading as independent opinions.
+## 3. Define high and low before generating a signal
 
-1. Reuse a common frozen market-data snapshot. Run all deliberately enabled
-   asset/strategy assignments, deduplicating overlapping group membership.
-2. Save results by asset, strategy/preset version and run, including data cutoff,
-   observation times, exact settings, success/failure and signal explanation.
-   Updating one PM must not erase another. Do not mix different run cutoffs into
-   an apparently current consensus; show incomplete coverage.
-3. Keep each PM's position and ledger independent. A long exit means close that
-   PM's long; it does not mean initiate a short or cancel every other PM's long.
-4. Use the Timing dropdown to select the displayed PM's chart, stops, trades and
-   equity. Dropdown changes are view changes. Trend provides an asset summary
-   with expandable PM views and the existing four entry/exit directions.
-5. Store the eventual combined portfolio as its own versioned policy, with its
-   own funded ledger. Independent hypothetical PM accounts do not each get to
-   spend the same shared dollar. No automatic macro AI calls are required.
+### 3.1 Confirmed swing points
 
-Long and short views may coexist because their horizons differ. Display both
-direction and horizon. First combination tests use compatible daily horizons;
-weekly and intraday views need explicit alignment rules before joining a vote.
+Start with a transparent five-bar swing detector: a central high exceeds the highs of the
+two bars on each side; reverse the comparison for a low. This is the conventional fractal
+shape described in [MetaTrader's Fractals documentation](https://www.metatrader5.com/en/terminal/help/indicators/bw_indicators/fractals).
+Confirmation arrives two bars later; [TradingView's Williams Fractal documentation](https://www.tradingview.com/support/solutions/43000591663-williams-fractal/)
+also describes this lag. We use the shape as a structure primitive, without adopting the
+entire Williams trading system.
 
-### C. Confirmation, veto and Multisectional context
+Implementation decisions:
 
-| Term | Proposed meaning |
+- Default left/right span: 2 completed bars, editable per timeframe.
+- Persist pivot time AND confirmation time. A daily pivot at Monday cannot influence
+  Monday's saved decision when its two confirming bars close on Wednesday.
+- Use strict comparisons initially. Equal extrema produce no strict pivot; nearby confirmed
+  points can still form an equal-high/low zone. Label flat-top/flat-bottom cases explicitly.
+- If one wide bar qualifies as both a swing high and low, its intrabar order is unknown.
+  Do not invent an alternating sequence from it.
+- Maintain an alternating structural sequence. Before an opposite pivot confirms, a more
+  extreme same-type pivot may supersede the current candidate only for subsequent decisions.
+  Retain prior saved snapshots.
+- Store candidate points separately from confirmed points. A chart can show a pending
+  candidate, but a saved signal cannot describe it as confirmed.
+- These are swing pivots, distinct from classic HLC-derived daily “pivot point” indicators.
+
+### 3.2 Higher/lower/equal comparisons
+
+Compare the latest two confirmed structural highs and the latest two confirmed structural
+lows, within the same timeframe and structure version.
+
+Proposed tolerance: epsilon = max(one instrument tick, 0.25 × ATR14).
+For each assessment, use ATR from its latest completed bar and record the value.
+
+| Label | Proposed comparison |
 | --- | --- |
-| Fresh entry | A PM confirms a new entry for the next available execution point. |
-| Active support | A PM still holds that direction; this is context, not a fresh entry. |
-| Opposition | An eligible PM explicitly supports the opposite direction on the defined comparison horizon. |
-| Abstain / flat | The PM offers no directional support. This is not automatically a veto. |
-| Unavailable | Missing, stale, failed or insufficient history. Never convert it to a negative vote or quietly shrink a required confirmation set. |
-| Exit | An instruction belonging to a specific PM's existing position; separate from a vote on a new trade. |
-| Hard veto | A predefined constraint blocks new allocation, such as stale required inputs, unavailable borrow, or an exposure limit. |
+| HH | New high > prior high + epsilon |
+| LH | New high < prior high - epsilon |
+| EH | Highs differ by no more than epsilon |
+| HL | New low > prior low + epsilon |
+| LL | New low < prior low - epsilon |
+| EL | Lows differ by no more than epsilon |
 
-Count support by strategy family, with one family contribution. Conflicting
-presets within a family produce a mixed label. Benchmarks remain visible but do
-not vote by default. Show long support and short support separately, never hide
-"three long, two short" behind an unexplained +1 score.
+ATR describes movement size including gaps, not direction. Use Wilder smoothing, seed with
+the mean of the first 14 true ranges, and retain a previous close for each true-range input.
+[Fidelity: ATR definition and calculation](https://www.fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/atr).
+The 0.25 multiplier is our adjustable noise tolerance, not a textbook truth.
 
-Freeze the supporting family set, required coverage and recent-signal window
-before each test. A possible window is five completed asset bars; this is a
-proposal. Historical votes use only signals still valid at the decision time.
-Failed or stale required inputs block a new combined decision. Optional missing
-context may reduce the grade only under a predefined rule.
+### 3.3 Market-state rules
 
-Study these as separate policies, with the same capital and costs:
-
-| Policy | Question |
-| --- | --- |
-| Standalone PM / fixed funded PM split | What do the components achieve without vote filtering? |
-| Union | Does accepting a fresh entry from any selected family improve coverage after accounting for overlap? |
-| Intersection | Does a fresh entry plus support from every named confirmation family improve outcomes despite fewer trades? |
-| Explicit veto | Does blocking a fresh entry when a named opposing view is active improve outcomes? |
-| Grade-based allocation | Does varying size add value beyond taking the same accepted trades at constant size? |
-
-Multisectional ranking contributes a separate, dated context field. It must be
-recomputed or replayed using data and universe eligibility available at the
-historical decision time; today's saved ranking cannot label yesterday's trades.
-For long proposals, relative strength might support the thesis; short rules may
-use relative weakness. The thresholds and direction semantics require testing.
-Momentum and price-action PMs may use overlapping information, so their agreement
-does not imply independent evidence or a calibrated probability of success.
-
-For the first shared-account proposal, an unresolved same-horizon long/short
-conflict means no new allocation; the independent PMs continue to be shown.
-Each accepted position retains a nominated originating PM whose exit/stop rules
-govern it, subject to portfolio risk overrides. Confirmation loss blocks later
-entries but does not silently rewrite an existing exit. A different rule that
-closes on vote loss must be named and evaluated separately. A union policy must
-freeze a deterministic owner when simultaneous PM entries target the same asset.
-
-### D. Simple opportunity grades and the meaning of one lot
-
-Use the user's intuitive convention as a research hypothesis: **C = 0.5 base
-allocation, B = 1 base allocation, A = 2 base allocations**. Add **Skip = 0**.
-These are allocation multipliers, not broker contract lots, leverage levels,
-win probabilities or percentages of account equity at risk.
-
-Proposed first grade definition, to freeze before testing:
-
-| Grade | Explainable conditions | Size multiplier |
-| --- | --- | ---: |
-| Skip | No fresh eligible trigger, a hard veto, missing required evidence, or an unresolved directional conflict | 0 |
-| C | Valid trigger from the originating family, all required inputs current, but no additional family confirmation | 0.5 |
-| B | Valid trigger plus one distinct confirming family, no veto or conflict | 1 |
-| A | B conditions plus supportive, current Multisectional context under a frozen direction-specific threshold | 2 |
-
-Missing Multisectional context cannot create A. It may leave a proposal at B if
-that input is explicitly optional. Save the reasons with the grade. More votes
-do not automatically keep increasing size. The grade map is deliberately simple;
-evaluate it without searching many score weights or relabelling losing grades.
-
-Proposed base allocation: **5% of free deployable cash before the decision batch**.
-Free cash excludes reserved orders, collateral, short-sale proceeds and any
-configured cash buffer. Use one pre-batch cash snapshot for all simultaneous
-signals; if requests exceed cash or limits, scale proportionally. Do not let
-alphabetical order determine the largest position. Initially retain fixed units
-until exit: a later grade change does not automatically pyramid or rebalance.
-
-Example, ignoring costs for illustration: $20,000 free cash gives a $1,000 base
-allocation. C requests $500, B $1,000 and A $2,000. These are cash budgets, not
-estimated losses. A 5% cash allocation is **not** permission to lose 5% of equity.
-For a linear position, show units × entry-to-stop distance plus costs as planned
-stop loss, and report stressed gap loss separately; the stop estimate is not a
-guaranteed maximum loss. Freeze per-position loss budgets and symbol, sector,
-underlying and account exposure limits before any funded grade experiment.
-
-This cash-based rule differs from production equal-capital sizing across eligible
-names. Compare constant 1-base allocations with C/B/A allocations on exactly the
-same accepted signals to isolate grading; also retain the production allocation
-reference. Report trade counts, cash use, net contribution and losses by entry
-grade. If A is not better supported in subsequent evidence, simplify the policy.
-
-### E. Instrument choice and leverage are separate research decisions
-
-Keep three quantities visible: grade multiplier, instrument exposure relative
-to invested capital, and total account exposure. An A grade is not an automatic
-instruction to borrow, buy a leveraged ETF, or increase the whole account to 2×.
-A requested "1.5×" must specify whether it means a position multiplier or an
-account gross-exposure target. For linear positions, account gross exposure is
-the sum of absolute notionals divided by account equity; report net exposure too.
-For leveraged products, also report estimated underlying exposure so buying a
-2× product with borrowed cash does not hide compounded leverage.
-
-| Instrument route | Additional model and inputs required before calling a simulation realistic |
-| --- | --- |
-| Cash equities / ETFs and spot crypto | Actual tradeable prices, fees, increments, calendars and liquidity assumptions; starting reference |
-| Margin-funded equities or ETFs | Financing balance/rates, collateral eligibility, initial and maintenance margin, broker liquidation policy, adverse gaps and changing requirements |
-| Borrowed short equity | Locate/borrow availability, changing borrow cost, recalls, dividends owed and short margin; synthetic short results are not execution feasibility |
-| Leveraged / inverse ETFs | Actual product candles and inception, objective/reset frequency, distributions, splits, tracking and spreads; do not multiply the underlying's whole-history return |
-| Futures / perpetuals | Contract multiplier, collateral, mark and liquidation prices, margin changes, expiry/roll or funding, and venue-specific execution |
-| Options | Historical quotes/spreads, expiry/strike, volatility, exercise/assignment and nonlinear exposure; defer until appropriate inputs exist |
-
-Choose one leveraged route for the first feasibility study; product and broker
-selection remain open. Do not introduce all routes at once. Strategy signals may
-come from an underlying while execution uses another instrument; record the
-mapping, calendar, entry/exit timing and whether stops reference the underlying
-or product. Match valid product history rather than inventing pre-inception fills.
-With actual product returns, distinguish embedded expenses from separately charged
-costs to avoid deducting the same expense twice.
-
-A stop-market order does not guarantee the stop price, especially through gaps.
-[FINRA's order-handling notice](https://www.finra.org/rules-guidance/notices/21-12).
-Margin borrowing also introduces interest and possible broker liquidation.
-[Investor.gov's margin-account bulletin](https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins/investor-bulletins-29).
-Many leveraged/inverse ETFs target daily returns; multi-day returns depend on
-the return path and reset mechanics.
-[FINRA's non-traditional ETF FAQ](https://www.finra.org/rules-guidance/key-topics/etf/non-traditional-etf-faq).
-These explain modelling gaps; actual terms must come from the selected product
-and venue at implementation time.
-
-First test unlevered allocation. Later compare explicitly defined 1×, 1.5× and
-2× exposure scenarios, recording whether units are fixed or exposure is reset,
-and when rebalancing occurs. Historical tests and synthetic shocks are separate
-outputs. Include adverse opens beyond stops, simultaneous correlated losses,
-cost/financing increases, borrow withdrawal, missing execution and margin changes.
-Report drawdown, minimum equity/free collateral, margin breaches, forced exits,
-financing and worst gap loss. Define failure before running. Daily OHLC cannot
-establish the exact ordering of every intraday stop and liquidation; use finer
-data or label conservative scenario bounds. "Did not blow up" is only one result
-under stated assumptions, not the criterion for approving leverage.
-
-### F. Sequence the work and make each phase useful
-
-| Phase | Deliverable | Condition for proceeding |
+| State | Proposed minimum evidence | Default behaviour |
 | --- | --- | --- |
-| R0 — inputs and conventions | Frozen data/coverage; resolve or label the SPY issue; explicit warmup, funding and stress-test definitions | Reconciled sample trades and consistent comparable inputs |
-| R1 — strategy breadth | Part II's long comparison; separately specify one purpose-built short candidate, initially a failed-rally short within a downtrend | Full standalone results against D / buy-and-hold for long and fixed short / cash for short; short thresholds, holding horizon and costs frozen before execution |
-| R2 — independent PM infrastructure | Common result contract, run-all-enabled workflow, saved PM ledgers and chart dropdown | Each PM reproduces its standalone result; failed runs and versions remain distinguishable |
-| R3 — joint decisions at constant size | Descriptive agreement first; then a small frozen set of union/intersection/veto and funded-split comparisons | Shared-capital ledger reconciles; overlap and missing-data rules tested; compare to each standalone PM |
-| R4 — C/B/A allocations | Constant-size versus graded-size accounts on the same accepted entries, without leverage | Exposure and cash competition explained; grades evaluated without hindsight |
-| R5 — one leveraged instrument route | Product-specific accounting and matched-history/stress comparisons | Financing, forced exits and stress limits modelled and disclosed; size/leverage policy separately reviewed |
-| R6 — forward paper observation | Frozen enabled PMs, decision policy, grades and instrument assumptions; dated proposals and realised paper outcomes | Sufficient new evidence under predefined review criteria before production promotion |
+| UP | HH and HL in the current structural sequence; no completed close through the protected low minus epsilon | Seek long pullbacks; show upper obstacles. |
+| DOWN | LH and LL; no completed close through the protected high plus epsilon | Seek short rallies; show lower obstacles. |
+| RANGE | Two distinct confirmed reactions near each horizontal boundary, repeated traversal between them, and latest close still inside the boundaries plus tolerance | Seek long at support and short at resistance. |
+| TRANSITION | A protected swing breaks, conflicting swing relationships, compression/expansion, or a range breaks | Suspend the old setup; display break/retest or wait conditions. |
+| UNKNOWN | Insufficient or unusable bars/anchors | Explain unavailable evidence. |
 
-Short-strategy design belongs early in R1; it need not wait for ranking, voting
-or leverage. Leverage feasibility research can run alongside earlier phases, but
-an unmodelled leveraged route cannot enter their reported funded results. Begin
-dated forward signal collection as soon as a candidate is frozen; R6 evaluates
-the fully specified policy without retroactively treating earlier observations
-as evidence for later revisions.
+The protected low is the most recent confirmed structural low supporting the UP sequence;
+the protected high is the corresponding high supporting DOWN. Display the chosen point.
+A break cancels that trend's continuation eligibility; it does not immediately confirm the
+opposite trend. Require the opposite structure to form.
 
-The next work package is R0 plus the fixed long experiment in Part II and a
-short-candidate specification. R1 supplies useful results even if consensus,
-grades or leverage subsequently add no value. Do not launch a joint optimiser
-across strategies × votes × grades × instruments. Each extra layer must explain
-its incremental contribution before the next is added.
+A single HH, one rising candle, price above SMA, or low ADX is insufficient to declare all
+the other conditions true. Rising lows beneath flat highs may be compression rather than
+a horizontal range. This state machine is our implementation convention.
 
-### G. Decisions to freeze when the relevant phase starts
+### 3.4 Support/resistance zones and horizontal ranges
 
-- R1: exact short entry, exit, stop and time horizon; preserve the fixed short
-  benchmark and allow the conclusion that cash is preferable.
-- R3: enabled voting families, freshness window, required inputs, ownership of
-  shared positions and explicit conflict/exit behaviour.
-- R4: exact Multisectional threshold, cash buffer and risk/exposure caps; keep
-  the 5% base and 0.5/1/2 grade proposal distinct from the production baseline.
-- R5: which instrument and venue to model first, what 1.5× refers to, exposure
-  reset rules, financing assumptions and predefined failure limits.
+Proposed initial range construction:
 
-Later opportunity output should explain: asset and direction; originating PM
-and horizon; confirmation and opposition; context date; grade and reasons;
-base cash, requested and permitted size; instrument; planned stop loss and gap
-stress; position and account exposure; and why a request was reduced or skipped.
-Keep implementation identifiers available for audit, out of the everyday flow.
+1. Inspect up to 60 completed setup bars, using confirmed pivots available at the cutoff.
+2. Pair two lows whose prices differ by at most epsilon; do the same for highs.
+   Each pair's centre is its mean. Its zone extends epsilon on either side.
+3. Require alternating boundary reactions, such as low-high-low-high or the reverse.
+   Adjacent bars lingering at one boundary count as one reaction, not repeated tests.
+4. Require upper-zone bottom > lower-zone top. A close outside a boundary by more than
+   epsilon invalidates the old range; a wick alone is recorded as a test/sweep.
+5. If multiple candidates qualify, select the one with the most recent final confirmation;
+   break ties by the most recent first anchor, then stable anchor IDs. Show alternatives
+   only on request. Do not select whichever later made more money.
+6. Keep nearer internal obstacles visible. Recheck room to the first obstacle before a trade.
+   A geometrically valid but narrow range can be untradeable after costs.
 
-## Part II — first long strategy comparison
+The 60-bar window, clustering and selection rules are editable engineering choices. A trader
+can draw or adjust a zone; save author, time, reason, anchors and version rather than
+silently changing the automatic result.
 
-Question: using our stored assets, does buying strength, holding a broad uptrend,
-or buying a pullback provide the most useful long approach after costs? A useful
-outcome may be retaining Donchian, adding a complementary PM, or declining to
-allocate to a candidate. This experiment isolates strategy breadth before adding
-votes, grades or leverage.
+### 3.5 Sloping channels
 
-### 1. Questions and comparisons
+A channel frames price movement between two boundaries; it is a separate drawing from a
+rolling Donchian high/low envelope. [Schwab: trendlines and channel tools](https://www.schwab.com/learn/story/filtering-market-using-technical-analysis).
 
-| Question | Comparison | Evidence to examine |
+Proposed deterministic first version, using bar index on a linear price scale:
+
+- UP: connect the latest two structural lows; project a parallel upper line through the
+  highest positive high-pivot residual between those low anchors.
+- DOWN: connect the latest two structural highs; project a parallel lower line through the
+  lowest negative low-pivot residual between those high anchors.
+- Require an opposite pivot between the anchors, correct slope sign, positive width, and
+  no completed close beyond the protective boundary plus epsilon since the second anchor.
+  Otherwise label the channel unavailable or broken.
+- Store all three anchor IDs, their confirmation times, slope, offset and scale.
+  Evaluate both boundaries at the current bar, not at an old anchor's price.
+- Treat this minimum three-anchor channel as provisional geometry. Later reactions provide
+  additional evidence; do not imply the opposite boundary is guaranteed resistance/support.
+- Allow manual anchors and horizontal support/resistance alongside it. A trend setup may
+  use a valid horizontal zone even when no reasonable parallel channel exists.
+
+### 3.6 “Low” and “high” are relative locations
+
+For a valid channel/range at time t, let lower = L(t), upper = U(t):
+
+location = (price - lower) / (upper - lower)
+
+Our first display defaults: lower quarter (0–0.25) = relatively low; upper quarter
+(0.75–1) = relatively high; interior = middle. Values outside 0–1 stay visible as outside,
+never clamped into an entry zone. Invalid width means location unavailable.
+
+A long candidate needs proximity to identified support; a short needs proximity to identified
+resistance. The outer-quarter label alone is not an entry trigger. “Low” does not mean down
+a lot from an all-time high, and “high” does not mean merely expensive in absolute dollars.
+After a bounce, classify the actual proposed entry too; a late entry may no longer offer room.
+
+## 4. Four complete setup templates
+
+These are proposed composite recipes built from the foundations above. Each gets its own
+PM identity, direction, parameters and lifecycle. A short exit is a cover; it does not create
+a long. A long exit does not create a short.
+
+| Setup | Direction and location | Trigger after reaching the zone | Invalidation | First target |
+| --- | --- | --- | --- | --- |
+| Trend pullback long | Daily UP; pullback into support/lower channel | Completed bullish rejection or reclaim of a local swing high | Below the rejected support and relevant setup low, with buffer | Nearest resistance above entry, usually prior swing high |
+| Trend rally short | Daily DOWN; rally into resistance/upper channel | Completed bearish rejection or loss of a local swing low | Above rejected resistance and relevant setup high, with buffer | Nearest support below entry, usually prior swing low |
+| Range long | Valid daily RANGE; lower boundary | Rejection back inside, then upward confirmation | Below range support and rejection low, with buffer | First internal resistance; opposite boundary is a later target if clear |
+| Range short | Valid daily RANGE; upper boundary | Rejection back inside, then downward confirmation | Above range resistance and rejection high, with buffer | First internal support; opposite boundary is a later target if clear |
+
+Bounce/structural stop/target concepts: [Schwab swing-trade examples](https://www.schwab.com/learn/story/ins-and-outs-swing-trade).
+Two-sided range concept: [IG range trading](https://bts.ig.com/uk/learn-to-trade/ig-academy/range-trading/what-is-range-trading).
+
+Proposed trigger presets, selected explicitly rather than silently combined:
+
+- **Rejection:** a completed candle overlaps the zone; long closes above its centre, above
+  its open and in its upper half. Short mirrors all three comparisons. Zero-range bars fail.
+- **Local structure reclaim:** after zone contact, a completed trigger-timeframe close moves
+  above the latest confirmed local high for long, below the latest local low for short.
+  Freeze the local trigger level at contact; later confirmation cannot backdate an entry.
+- Default contact expires after 3 setup bars, or sooner if structure/zone breaks.
+- The daily-only version evaluates daily triggers. The 4-hour version is a distinct preset
+  and waits for actual intraday data. Do not invent intraday triggers from daily OHLC.
+- Default stop buffer: epsilon from the setup timeframe. The stop follows the setup thesis;
+  replacing a daily invalidation with an arbitrary tiny 4-hour stop is a different setup.
+- Recompute estimated entry, target room and costs when the trigger arrives. Label the result
+  waiting, actionable, invalidated or unavailable, with the reason.
+
+Proposed lifecycle for the first app version: a close-confirmed daily entry becomes a pending
+next-open action, consistent with the existing PM workflow. Before a modeled fill, recheck
+invalidation and target room at the new price; cancel an obsolete plan rather than assuming
+the previous close was available. Start with a fixed structural stop and the first target.
+An opposite structure break can create an exit for that PM; trailing and partial exits are
+separate editable presets. A new 4-hour trigger needs an explicit execution-clock extension,
+not an intraday timestamp inserted into a daily-only contract. If one OHLC bar crosses both
+stop and target, record the ordering ambiguity and use an explicit conservative convention
+unless finer data resolves it. This is functional accounting, not a performance experiment.
+
+Breakout/retest and failed-break reversal are subsequent templates, not exceptions that
+silently turn the four recipes into a different strategy. Range breakdown cancels range-long
+eligibility; range breakout cancels range-short eligibility. Re-entry requires a new valid
+setup. An upper-band touch in an uptrend is not automatically a short.
+
+## 5. Weekly context, daily setup, 4-hour evidence
+
+Default roles are our product choice, not an optimal timeframe claim.
+
+| Timeframe | Question | Display |
 | --- | --- | --- |
-| Do breakout rules add value over a simple trend filter? | Donchian V2 vs moving-average trend | Net return, drawdown, turnover and consistency across years |
-| Does buying weakness within an uptrend help? | Pullback vs Donchian and moving average | Net return, cash time, holding periods and losses during falling markets |
-| Are differences mostly caused by stops? | Moving average with/without the same initial stop; pullback with/without it | Change in return, drawdown and stopped trades |
-| Is timing worth its cost? | Each long strategy vs buy and hold | Return sacrificed or gained for drawdown reduction and time out of market |
-| Could two strategies complement one another? | Later, a fixed 50/50 funded combination vs each standalone account | Portfolio drawdown and net return, including when both lose together |
+| Weekly | What is the larger structure and where are major obstacles? | State, swing anchors, support/resistance, completed-through time |
+| Daily | Is there a workable directional or range setup at a useful location? | Setup, zone, proposed entry, structural stop, first target |
+| 4-hour | Is the local reaction supporting the entry now? | Rejection/reclaim, local structure, evidence age and availability |
 
-These are hypotheses, not promises of profitability. A comparison of whole
-strategies does not isolate the entry rule: exits and time invested differ too.
-The stop controls isolate one specific difference; they do not explain everything.
+Examples:
 
-### 2. Data before strategy ranking
-
-Use **every stored equity, ETF and crypto asset**. Freeze the symbol list,
-priority membership, asset classes, available dates and data cutoff before running.
-Use the production priority definition: watchlist, bonds, major companies and
-BTC/ETH. The previous study had 678 assets and 60 priority names; record the
-actual counts rather than forcing those historical numbers.
-
-Keep every symbol in the coverage table, including insufficient-history and
-unresolved-data cases. Never omit a losing symbol or silently call missing data
-Flat. Report full-universe results; practical selection uses the frozen priority
-group. Do not search individual symbols for their best parameter settings.
-
-Use adjusted equity OHLC and Coinbase crypto candles. Before ranking, check
-duplicate dates, missing/nonpositive values, OHLC ordering, gaps and extreme
-intraday ranges. Flags require inspection, not automatic price clipping.
-
-**Known unresolved example:** SPY's stored adjusted low on 2026-02-02 is 68.64
-against an open of 685.90 and close of 691.70. A direct Alpaca request also
-returns that low. Another ordinary full fetch is therefore not an established
-repair. Verify against an independent historical source. Never guess 686.40 or
-replace the low with the close. Retain source evidence for any research correction.
-If unresolved, show the affected symbol and portfolios as provisional; do not
-declare a winner using them. Repairing an input requires recomputing all
-candidates on the same corrected snapshot, including Donchian and buy and hold.
-
-Save one reproducible input snapshot with source, cutoff, parameters, symbol
-membership and a content hash in the research outputs. The live database may
-continue changing without changing an already running experiment.
-
-### 3. First experiment: fixed rules
-
-Daily bars are each asset's own trading bars. Indicators use only completed
-bars; all close-confirmed actions execute at the next available open. Start
-each asset after **250 prior valid daily bars** for every first-stage candidate,
-including buy and hold. This also provides a common start for the MA neighbours.
-An asset with shorter history stays in coverage but has no comparable result.
-For each reporting window, the first decision bar is the first bar in that
-window with 250 prior valid bars. Begin flat, evaluate at that bar's close, and
-permit first execution at its next available open. Buy and hold purchases at
-that same earliest execution open. Warmup bars create no carried positions or
-pending orders. If no following open exists, retain the asset in coverage with
-no executable comparison. Record decision and execution dates explicitly.
-
-| ID | Entry while flat | Exit while holding | Initial stop |
+| Weekly | Daily | 4-hour | Interpretation |
 | --- | --- | --- | --- |
-| D: Donchian V2 | Close above highest high of previous 20 bars | Close below lowest low of previous 55 bars | Fixed 3×Wilder ATR20 |
-| M: moving-average trend | Close above SMA200 | Close below SMA200 | None |
-| P: uptrend pullback | Close above SMA200 **and** Wilder RSI2 below 20 | Close at/above SMA5, close at/below SMA200, or the tenth held bar's close, whichever comes first | Fixed 3×Wilder ATR20 |
-| B: buy and hold | First common execution open defined above | Remain invested through the reporting cutoff | None |
+| UP | UP, near support | Pullback ends with bullish reclaim | Supporting evidence for trend long |
+| DOWN | DOWN, near resistance | Rally ends with bearish rejection | Supporting evidence for trend short |
+| RANGE | RANGE, near lower boundary | Upward rejection | Range-long candidate; weekly upper boundary remains an obstacle |
+| RANGE | RANGE, near upper boundary | Downward rejection | Range-short candidate |
+| UP | UP, pulling back | Still DOWN | Pullback in progress; daily idea may exist while the 4-hour trigger waits |
+| UP | DOWN, near resistance | Bearish trigger | Explicit countertrend short relative to weekly; show conflict and weekly support |
+| Any | Any | Missing/stale | Unavailable evidence, never a neutral or confirming vote |
 
-The pullback thresholds are deliberately simple starting assumptions, not
-published or validated optimal parameters. RSI2 uses Wilder smoothing; no losses
-means 100, no gains means 0, and no movement in either direction means 50.
-Equality to SMA200 leaves M unchanged. The entry bar counts as held bar one for P.
-A time-limit confirmation on bar ten fills at the following open.
+The top-down principle is described by [IG's timeframe guide](https://www.ig.com/uk/trading-strategies/what-are-the-best-timeframes-in-forex-trading--210805).
+Our three-role combination and interpretation table are the proposed app design.
 
-No pyramiding, averaging down or same-account simultaneous positions. Each
-strategy owns one long position per asset. Different strategies can overlap.
-Resting stops use entry price minus 3×signal-bar ATR; they are active from entry,
-stay fixed, and gap through at the adverse open. Scheduled exits execute before
-intraday stops. A stop exit can be followed by a fresh close-confirmed entry for
-the following session, never another intraday entry invented from daily bars.
-An exit-day close does not create a duplicate entry for an already held position.
+“Resonance” means explainable alignment of context, location and timing. It is not a probability,
+nor three independent votes from related price series. A smaller downtrend can be the pullback
+that creates a larger long opportunity. Several indicators saying the same thing should not
+inflate confidence.
 
-Two predefined stop controls: **M3** adds that same 3×ATR stop to M; **P0** removes
-it from P. All other rules stay identical. These are secondary explanations,
-not extra chances to silently replace the primary candidates.
+Proposed policy: higher-timeframe conflict is visible evidence. Countertrend templates are
+labelled separately; a trader may accept them with a reason. Whether a particular preset
+requires weekly alignment or a 4-hour trigger must be explicit in its saved version.
+Missing required evidence blocks that preset; missing optional evidence leaves a partial card.
 
-### 4. Common accounting and capital
+### Data and timing requirements
 
-- Reuse the production fill and fixed-unit accounting conventions, with separate
-  strategy signal logic. Independently reconcile a small set of entry, gap-stop,
-  channel/time exit and still-open examples. Matching two functions alone does
-  not prove the financial accounting is correct.
-- Normal cost per side: 5 bps of fill notional plus 0.05×ATR per unit.
-  Stress cost: 10 bps plus 0.10×ATR. Charge each actual fill once, including the
-  buy-and-hold purchase. Use the ATR available before the fill.
-- Mark open positions at the last available close; do not invent a final exit
-  or final exit fee. CAGR includes calendar time in cash. Realised trade returns
-  and equity returns including open P&L have separate labels.
-- Primary funded accounts: $100,000, long only, equal capital, fractional units,
-  no leverage, cash interest zero. Active candidates share the production
-  allocation convention: current prior-bar equity divided by the currently
-  eligible asset count, including flat names. Units stay fixed until exit.
-  Use the common 250-bar eligibility rule above rather than production's shorter
-  warmup; eligibility must use information available at that time.
-- Buy-and-hold funding is an explicit exception inherited from production:
-  reserve initial capital divided by the frozen member count per asset, including
-  names not yet eligible. Invest each reserved budget at that asset's first
-  common execution open; unused budgets remain cash, without rebalancing or
-  future capital injections. Report this delayed-entry cash exposure and its
-  difference from active-strategy funding. It is not an identical dynamic-weight
-  allocation rule; separate timing from allocation effects in the interpretation.
-- All simultaneous entry requests use the same prior-cash snapshot and scale
-  proportionally if cash is insufficient. Preserve production's conservative
-  convention that same-day exit proceeds cannot fund that day's entries. Log
-  rejected or scaled requests and cost reservations for reconciliation.
-- Run both priority and full-universe portfolios. Also report each asset's
-  standalone return. Median asset CAGR is not portfolio CAGR. Apply the same
-  stale-price rules to every candidate; flag held stale marks and prohibit new
-  funding after more than seven calendar days without a price.
-- Preserve the fixed short benchmark (20/20, initial 2×ATR, Chandelier 3×ATR)
-  as a separate comparison account. Do not optimise it or fold its loss into
-  a long strategy's result. Funded short reporting uses 2% annual borrow,
-  stressed at 4%, with the existing synthetic-borrow limitations stated.
+The current price/crypto tables are date-keyed, and the current PM contract is daily:
+[migration 0003](../../schema/migrations/0003_data_management.sql) and
+[PM contract](../../backend/app/features/pms/README.md).
+A real intraday path is a product gap, not something an indicator setting fixes.
 
-Equal capital makes the capital convention common; it does not equalise risk
-or market exposure. Report those differences before attributing returns to skill.
+- Aggregate weekly OHLCV from compatible daily bars: first open, max high, min low,
+  last close, summed volume; determine completion using the asset calendar.
+- Obtain timestamped 4-hour bars, or aggregate smaller intraday bars. Daily bars cannot
+  reconstruct their intraday price path.
+- Specify provider/feed, instrument, adjustment basis, exchange timezone, session policy,
+  bucket boundaries, bar open/close times, completion state and retrieval time.
+- For a 6.5-hour session, a 4-hour bucket leaves a 2.5-hour session-end bucket. Label the
+  shorter bucket; do not claim every equity day contains six equal 4-hour candles.
+- For continuous markets choose explicit UTC buckets; for exchange sessions handle daylight
+  saving and holidays through a calendar. Never align solely by the computer timezone.
+- At decision time T, use only bars closed by T and pivots confirmed by T. A forming weekly
+  candle may be shown separately, never substituted for the last completed weekly observation.
+- Persist the exact source cutoffs and inputs. An intraday entry must use the daily setup
+  already known then, not that day's future close.
+- Daily-only production can ship first with “4-hour evidence unavailable.” Enabling a required
+  4-hour trigger is a separate version and requires the data path.
 
-### 5. Historical evaluation and sensitivity
+## 6. Entry, cost, stop and target must form a usable plan
 
-Run full available history and a separate **2020-onward** account starting flat,
-using earlier bars only for indicator warmup. Use matching dates for paired
-comparisons on each asset. The 2020-onward priority portfolio is the primary
-decision window; full-history and full-universe results test its breadth.
+Proposed app calculations, for linear units on a consistent price basis:
 
-Show each complete calendar year's return and drawdown, plus the partial latest
-year separately. Within a continuous run, do not reset positions at year-end.
-Separate-window runs do reset; label them accordingly. Show 2020–2022 and
-2023–2025 as fixed subperiods, without selecting attractive market episodes later.
+- Long requires stop < expected entry < target.
+- Short requires target < expected entry < stop.
+- Gross planned risk per unit = absolute(entry - stop).
+- Gross planned reward per unit = absolute(target - entry).
+- Estimated loss at stop = gross risk + estimated round-trip costs to stop.
+- Estimated reward at target = gross reward - estimated round-trip costs to target.
+- Net reward/risk = estimated reward / estimated loss, only with valid positive denominators.
+- Cost includes the relevant commissions, spread/slippage and holding-cost assumptions.
+  Do not double count spread/slippage if already included in expected fill prices.
+- If short borrow, financing or the executable instrument is unknown, show that uncertainty.
+  Do not call an underlying-price short signal an executable spot-crypto short.
 
-There is **no optimiser in the first experiment**. Freeze the above candidates
-before generating results. Nearby-parameter checks change one input at a time:
-M uses SMA150 and SMA250; P uses RSI entry thresholds 10 and 30. Keep every
-other rule unchanged. D remains the production reference. This makes ten long
-configurations including buy and hold: four primary, two stop controls and four
-neighbours. Run all at normal and doubled costs; show all trials.
+Illustrative arithmetic only: long entry 102, stop 99, target 110, total cost 0.20 per unit
+on each outcome gives risk 3.20, reward 7.80 and ratio 2.44. Short entry 110, stop 113,
+target 102 with the same assumptions gives the same arithmetic.
 
-Use paired uncertainty estimates for portfolio return differences: resample
-the same calendar-date blocks for all candidates and assets together, retaining
-cross-asset co-movement and cash days. Align funded returns to a daily calendar:
-equity-only accounts carry unchanged weekend marks; crypto accounts retain their
-weekend returns. Proposed diagnostic: 2,000 moving-block resamples, 28-calendar-day
-blocks and an 84-day sensitivity, fixed seed 20260908. Annualise the mean daily
-return difference using 365.25; do not mix this with compounded CAGR.
-Display 95% intervals for annualised mean-return differences, not a probability
-of making money or a guarantee about CAGR. These are conditional diagnostics;
-they do not remove prior selection bias or establish statistical significance
-across all attempted variants. If the interval spans zero, describe the return
-advantage as uncertain.
+Default display preference: flag ratios below 2 for trader review, editable per preset.
+Do not move the target past an intervening obstacle or move the stop inside the invalidation
+merely to satisfy that preference. A discretionary acceptance can be saved with a reason;
+it does not alter the original calculated plan.
 
-This history was already examined during V2 research. Calling a later portion
-"out of sample" does not make it untouched. Any later optimiser must select
-using preceding data only and evaluate the next period, with all tried settings
-retained. Even that is historical validation. A genuinely forward assessment
-starts after the new rules and data snapshot are frozen; results must be kept
-separate from subsequent rule revisions.
+Keep planned stop loss distinct from worst possible loss: a stop can fill beyond its trigger,
+including after a gap. [Schwab: stop execution discussion](https://www.schwab.com/learn/story/ins-and-outs-swing-trade).
 
-### 6. Decisions, not a league table of flattering numbers
+## 7. Evidence menu: combine complementary roles
 
-Lead with **net funded CAGR and maximum drawdown together**, followed by
-time invested, turnover, costs, worst year and longest recovery. Do not change
-the main metric after discovering which one favours a candidate.
+The first four setup templates need only structure, zones, a trigger and risk geometry.
+This menu provides later additions, not a reading or implementation gate.
 
-| Possible conclusion | Proposed desk criterion, fixed before execution |
-| --- | --- |
-| Replacement candidate | Higher priority-portfolio CAGR and no deeper maximum drawdown than D under both cost levels; positive return difference in more than half of complete comparison years, with at least four such years available |
-| Different tradeoff | Higher return with deeper drawdown, or lower return with shallower drawdown; present both numbers for a user decision rather than calling it superior |
-| Complement candidate | Distinct holding/loss periods suggest a separate fixed-allocation combination test; low correlation alone is insufficient |
-| Inconclusive / retain D | Unresolved data, weak coverage, sensitivity to one setting, or advantage disappearing with costs or concentration checks |
-
-These are proposed operating criteria, not universal scientific thresholds.
-Passing them earns review, not automatic production promotion. Show concentration
-by removing each candidate's five largest positive contributors in a labelled
-diagnostic and rerun **both sides of that comparison** on the same reduced
-universe. Do not redefine the primary universe from this result. Show asset-class
-and priority-subgroup results, noting that overlapping equities and ETFs are not
-independent confirmations. A claim driven by a few names must say so.
-
-### 7. Additional candidates and dependencies
-
-| Roadmap location | Candidate | Additional design needed before execution |
+| Technique | Proposed role in this app | Boundary |
 | --- | --- | --- |
-| After the initial R1 comparison | Monthly time-series momentum | Exact calendar lookback, month-end decision, common coverage and cash rule |
-| After the initial R1 comparison | Range mean reversion | Fixed range filter, entry band, target, stop and maximum holding period |
-| Separate breadth experiment | Relative-momentum rotation | Point-in-time eligible ranking universe, ranking score, top count, rebalance and capital rules |
-| R3 | Fixed 50/50 strategy combination | Separate initial capital, no transfers, duplicated asset exposure and common costs |
-| R1 short track | Failed rally within a downtrend | Exact rebound/failure rules, exits and holding horizon, borrow/funding feasibility, fixed short and cash comparisons |
+| HH/HL, LH/LL | Direction and protected swing | A lone new extreme is incomplete structure |
+| Horizontal support/resistance | Location and obstacles | Show anchors and breaks |
+| Sloping channel | Relative location during a trend | Channel geometry can be unavailable |
+| Break and retest / role reversal | Continuation setup at a former boundary | Require observable break and reaction |
+| Failed break and reclaim | Reversal evidence at a boundary | Do not assume every wick is a failure |
+| Rejection candle | Trigger after zone contact | Candle shape alone is not a complete setup |
+| SMA / EMA | Trend context and separate named PMs | Lag and price location remain visible |
+| Donchian | Existing breakout family and channel levels | Preserve existing family semantics |
+| ADX with +DI/-DI | Optional trend-strength and directional evidence | ADX alone has no direction |
+| ATR | Zone/stop normalization and movement context | It does not predict direction |
+| RSI | Momentum recovery/exhaustion evidence at a location | Oversold is not an automatic long |
+| Stochastic | Optional range momentum evidence | Avoid duplicating RSI as another independent vote |
+| MACD | Optional momentum/trend-change evidence | Related moving averages are correlated evidence |
+| Bollinger Bands and bandwidth | Relative location and compression evidence | Band touch alone does not establish reversal |
+| Keltner channel | Optional volatility envelope | Keep distinct from structural channels |
+| Volume / OBV | Optional participation evidence | Missing or incompatible volume is unavailable |
+| Anchored VWAP | Later event-anchored location evidence | Require an explicit anchor and adequate price/volume data |
+| Volume profile | Later traded-price location evidence | Daily OHLCV does not identify actual volume at each price |
+| Double top/bottom; head-and-shoulders | Later named structure templates | Define confirmation and invalidation when implementing |
+| Flags, triangles, wedges | Later continuation/compression templates | Compression is not automatically RANGE |
+| Weekly/daily/4-hour context | Agreement, conflict and entry timing | Related timeframes are not independent votes |
+| Macro / multisectional context | Existing broader environment and relative strength | Context does not overwrite a PM's holdings |
 
-Do not add these because the first batch disappoints and then report only the
-best survivor. They require their own frozen questions. Current membership and
-surviving stored names limit historical generalisation, particularly for rotation.
-No new data family or macro AI is required for the first experiment.
+Primary references for the indicator concepts:
+[Fidelity SMA](https://www.fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/sma),
+[Fidelity EMA](https://www.fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/ema),
+[Fidelity ADX and DI](https://www.fidelity.com/viewpoints/active-investor/average-directional-index-ADX),
+[Fidelity RSI](https://www.fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/RSI),
+[Fidelity Bollinger Bands](https://www.fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/bollinger-bands),
+[Fidelity indicator catalogue](https://www.fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/overview),
+[Schwab chart patterns](https://www.schwab.com/learn/story/how-to-read-stock-charts-and-trading-patterns).
+Rows marked “later” are scoped ideas, not finished algorithm specifications. Read the relevant
+primary definition only when implementing that feature.
 
-### 8. Review outputs
+Optional conventional ADX guideposts are below 20 for weak trend strength and above 25 for
+stronger trend strength; the middle is ambiguous. These do not replace structural state.
+RSI or a band touch can remain extreme during a trend. Display the interpretation and source
+values rather than a generic “buy” badge.
 
-One report in `docs/temp`, containing four main tables: coverage and data issues;
-strategy/portfolio comparison; annual and asset-class stability; costs, stop
-controls and neighbours. Three charts: funded equity/drawdown, return versus
-drawdown, and asset contributions. Include the complete per-symbol table and
-trade ledgers as machine-readable files, plus reproducible parameters and inputs.
-As later phases are undertaken, extend that report with the PM comparison,
-vote-policy results, grade contributions and instrument stress results, each
-clearly identified by phase and frozen policy version. Do not present planned
-experiments as completed evidence.
+## 8. PM independence, assessment and trader controls
 
-Label no-trade, insufficient-history and unresolved-data cases explicitly.
-Maintain this design and the report in place, without a separate fix log,
-changelog or daily narrative. Once reviewed, a short permanent result paper can
-replace the working material under the user's archive-and-delete workflow.
+Already implemented: independent saved PM results, run-all workflow, chart dropdowns and
+descriptive family support. Reuse [the PM module](../../backend/app/features/pms/README.md)
+and [assessment contract](../../backend/app/features/pms/assessment-contract.md).
 
-## Research grounding
+A PM already holding while another enters, in either direction, is valid. Exits belong to the
+originating PM. Selecting one chart does not decide which PMs run or participate in assessment.
 
-Time-series and cross-sectional momentum ask different questions; the later
-momentum phases should preserve that distinction. [Moskowitz, Ooi and Pedersen](https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum).
+Still to implement: the decision policy that combines these observations into an opportunity,
+handles agreement/opposition/veto, incorporates macro/multisectional evidence and proposes size.
+Existing descriptive support is not that allocation policy.
 
-Trying many configurations makes selecting a misleading historical winner easier;
-fixed primary comparisons and disclosure of all trials address part of that risk.
-[Bailey, Borwein, Lopez de Prado and Zhu](https://www.davidhbailey.com/dhbpapers/backtest-prob.pdf).
+Proposed opportunity record:
 
-Trading costs can materially change conclusions about frequent reversal trading;
-our normal/doubled assumptions remain approximations, not measured execution costs.
-[Frazzini, Israel and Moskowitz](https://www.aqr.com/Insights/Research/Working-Paper/Trading-Costs-of-Asset-Pricing-Anomalies).
-These sources motivate the design; they do not validate the specific rules above.
+| Group | Required content |
+| --- | --- |
+| Identity | Asset, setup ID, PM key/version, side, as-of time, engine/parameter version |
+| Context | Per-timeframe state, completed-through time, availability and source/input references |
+| Location | Swing/zone/channel anchors, automatic or manual origin, relative position |
+| Plan | Contact time, trigger and expiry, expected entry, invalidation, stop, first and later targets |
+| Costs | Instrument assumptions, estimated outcome costs, net reward/risk, missing inputs |
+| Evidence | Supporting, opposing, unavailable and optional items with reasons and timestamps |
+| Lifecycle | Watching, waiting, actionable, held, exit pending, invalidated or unavailable |
+| Review | Trader accept/reject/override, reason, timestamp; original automatic assessment retained |
+
+Map these fields into the existing contracts where possible; do not create a parallel PM engine.
+Keep the signal, opportunity assessment and instrument/size proposal separate.
+
+Future sizing can use familiar C/B/A labels and editable 0.5/1/2 base-lot multipliers.
+These are discretionary policy choices, not calibrated probabilities. Define what one lot
+means, available-cash basis, stop-risk cap and portfolio exposure limits before computing units.
+Evidence agreement alone must not silently produce 1.5x leverage.
+
+Neutral volatility is a distinct future instrument workflow. A defined-risk short iron condor
+can be considered as a named candidate, but it requires actual options legs, strikes, expiry,
+quotes, costs and payoff/invalidation rules. A RANGE or UNKNOWN label alone cannot recommend
+selling volatility. [Fidelity: short iron condor structure](https://www.fidelity.com/learning-center/investment-products/options/options-strategy-guide/short-iron-condor-spread).
+Instrument specifications belong in that later task; no options strategy is implemented here.
+
+## 9. Delivery order and acceptance
+
+Use [the checklist](agent-work-checklist.md) for current authorisation and task claims.
+
+1. Deliver the already-requested SMA as ordinary production PMs, long and short, with saved
+   results and overlays in the existing dropdowns. No renewed performance-comparison gate.
+2. Deliver visible market structure, zones, location and manual review controls.
+3. Deliver both trend-pullback directions and both range directions using daily data.
+4. Add completed weekly context, then genuine 4-hour ingestion and optional timing evidence.
+5. Add the opportunity composer, explicit assessment policy, grades and instrument sizing.
+
+A production strategy task is done when it runs through the app, saves independently, can be
+selected and understood on its chart, exposes entries/exits/stops/reasons for both directions,
+and passes relevant functional checks. A document or a research result is not a shipped feature.
+
+Functional examples to cover as each feature is implemented: HH without HL; LL without LH;
+true range versus compression; protected-level break; pivot confirmation delay; equal extrema;
+missing 4-hour data; forming weekly bar; mirrored long/short arithmetic; a nearer obstacle;
+multiple PMs holding independently; manual changes preserving saved history.
+
+No profitability testing or parameter search is required by this specification.

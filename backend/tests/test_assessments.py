@@ -2,6 +2,7 @@
 from datetime import date, timedelta
 import json
 import zlib
+import pytest
 
 from app.features.pms.assessment import assess, read
 from app.features.pms.contracts import PMDefinition, PMResult, Position, PendingAction, content_hash
@@ -11,6 +12,12 @@ from tests.test_pms import pm_db
 
 BARS=[{'date':(date(2026,9,1)+timedelta(days=i)).isoformat(),'o':100.,'h':101.,'l':99.,'c':100.,'v':1.} for i in range(12)]
 DIGEST=content_hash(BARS)
+
+
+@pytest.fixture(autouse=True)
+def synthetic_family_versions(monkeypatch):
+    # These counting fixtures use invented families, not runnable strategy definitions.
+    monkeypatch.setattr('app.features.pms.assessment.current_engine_version', lambda family: ENGINE_VERSION)
 
 
 def target(key='a',family='trend',direction='long',state='long',pending=None,benchmark=False,entry=9):

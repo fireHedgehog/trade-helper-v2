@@ -47,5 +47,35 @@ signal tables. Changing a PM definition requires a new version and run.
 [Descriptive assessment](assessment-contract.md) reads all targets for the asset
 in the selected run. Timing displays family-level support and expandable evidence.
 Benchmarks stay visible but do not contribute to support counts; missing inputs
-remain in required coverage. Funded aggregation, grades, new strategy-family
-activation and instrument leverage remain separate roadmap tasks.
+remain in required coverage. Funded aggregation, grades, further strategy families
+and instrument leverage remain separate roadmap tasks.
+
+## Production SMA family
+
+Run all enabled PMs now includes SMA200 long and SMA200 short alongside the existing
+Donchian pair. Explicit assignment overrides can disable or version each PM separately.
+These are ordinary non-benchmark PMs with voting eligibility; the existing descriptive
+assessment still follows its family grouping contract and does not allocate positions.
+
+The long enters when a completed close is above SMA200 and exits when below; the short
+mirrors those conditions. Equality does nothing. Decisions fill at the next open.
+Every entry has a fixed 3 x ATR20 stop, based on the signal-close ATR and actual modeled
+entry open. No trailing stop, profit target or automatic reversal. A stop can act on
+entry day; adverse gaps use the open, and scheduled exits precede intraday stop checks.
+A new qualifying close after an exit may schedule a later re-entry.
+
+The first possible default decision is bar index 199 (200 available bars). Missing
+warmup stays unavailable. This replaces the research-only 250-bar start convention for
+production SMA; it does not alter the Donchian warmup or historical saved runs.
+
+[sma.py](sma.py) validates the period, ATR and cost parameters and supplies close rules
+to the existing execution/accounting engine. It imports no temp/research modules.
+The initial stop is mandatory for this named production version. Costs per fill are
+5 bps plus 0.05 x known ATR; borrow and financing are excluded. Custom parameters create
+new hashed definitions through the existing assignment contract; this slice provides
+read-only parameter/rule display rather than a new settings editor.
+
+[versions.py](versions.py) checks engine identity by family for evaluation, chart choices
+and assessment. SMA's version includes the shared execution version. Saved Timing charts
+show the actual strategy SMA, stop, entry/exit markers and direction-specific explanation.
+Switching PMs never recomputes or changes another PM's results.

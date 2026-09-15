@@ -1,9 +1,17 @@
 # Trend and Timing
 
-Both pages use `features/signals`, engine version `donchian-4`. Each asset runs
+The assigned Donchian view uses `features/signals`, engine version `donchian-4`. Each asset runs
 its assigned long preset and a fixed, independent short benchmark. Each direction
 owns its trades, position, stops and returns. Both may hold the same asset at once
-in their separate research accounts. These are simulated positions, not orders.
+in their separate modeled accounts. These are simulated positions, not orders.
+
+The saved PM dropdown also exposes **SMA200 long and SMA200 short** after Run all enabled
+PMs. They use the independent PM worker, versioned definitions and frozen chart inputs.
+SMA long enters above its average and exits below; short mirrors it; equality does nothing.
+Fills occur at the next open with a fixed 3 x ATR20 initial stop and the existing cost
+accounting. The first decision needs 200 completed bars. The orange strategy SMA and stop
+line display on Daily, with entry/exit markers and a saved rule explanation.
+See the [production SMA contract](../../backend/app/features/pms/README.md).
 
 ## Current rules
 
@@ -20,8 +28,10 @@ in their separate research accounts. These are simulated positions, not orders.
 
 The default long preset is `trend-long-v2`. One common preset serves all asset
 classes, including bonds and crypto. The Strategies page can assign another long
-preset. It cannot change the fixed short benchmark. Short optimisation and the
-[multiple-strategy framework](11-strategy-design-draft.md) are parked.
+preset. It cannot change the fixed short benchmark. Independent PMs are already implemented;
+future structure, range and timeframe features follow the
+[agent checklist](../temp/agent-work-checklist.md). SMA parameter editing through this
+legacy Donchian form is not supported; saved SMA parameters are displayed separately.
 
 Equities use adjusted OHLC and crypto uses raw OHLC. The paired engine starts
 signals after at least 65 bars, or the longer required parameter warmup.

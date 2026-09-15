@@ -1,14 +1,20 @@
 # PM research: strategy breadth and remaining gaps
 
+> Historical research record, superseded as a work plan on 2026-09-15.
+> The conclusions below describe that study, not current production admission rules.
+> The user explicitly requested production SMA in both directions without another
+> performance gate. Follow the [current checklist](agent-work-checklist.md) and
+> [technical playbook](strategy-comparison-experiment-design.md).
+
 **Current long-study decision: inconclusive; retain the existing Donchian default.**
 SMA200 offers lower return with shallower drawdown in the predefined recent
 priority comparison. The fixed pullback is highly sensitive to costs. Neither
 earns automatic production promotion. Unresolved price flags prevent a validated
 replacement claim, even where a control looks attractive.
 
-The [roadmap](strategy-comparison-experiment-design.md) owns the frozen hypotheses;
-the [agent checklist](agent-work-checklist.md) owns implementation state and live
-job handoffs. This report records completed research, not a live trading policy.
+Frozen hypotheses belonged to the historical roadmap at commit efdd0ac.
+The [agent checklist](agent-work-checklist.md) now owns application delivery state.
+This report records completed research, not a live trading policy.
 
 ## Inputs, conventions and accounting
 

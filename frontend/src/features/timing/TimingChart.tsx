@@ -146,16 +146,28 @@ export function TimingChart({
         color: "#d64545",
         lineWidth: 2,
         lineStyle: LineStyle.SparseDotted,
+        // Fixed SMA stops are discrete per trade. Joining across flat periods
+        // would draw an invented sloping/trailing stop between separate trades.
+        lineVisible: !overlays.sma,
+        pointMarkersVisible: !!overlays.sma,
+        pointMarkersRadius: 1.5,
         priceLineVisible: false,
         lastValueVisible: false,
       });
-      const pick = (arr: (number | null)[]) =>
+      const pick = (arr: (number | null)[] = []) =>
         overlays.dates
           .map((d, i) => ({ time: d as Time, value: arr[i] }))
           .filter((p): p is { time: Time; value: number } => p.value != null);
       up.setData(pick(overlays.donchian_up));
       dn.setData(pick(overlays.donchian_dn));
       stop.setData(pick(overlays.stop_line));
+      if (overlays.sma) {
+        const average = chart.addSeries(LineSeries, {
+          title: `SMA${overlays.sma_period ?? ''} strategy`, color: '#e59b24',
+          lineWidth: 2, priceLineVisible: false, lastValueVisible: true,
+        });
+        average.setData(pick(overlays.sma));
+      }
       if (overlays.short_stop_line) {
         const shortStop = chart.addSeries(LineSeries, {color: '#a96dd0', lineWidth: 2,
           lineStyle: LineStyle.SparseDotted, priceLineVisible: false, lastValueVisible: false});

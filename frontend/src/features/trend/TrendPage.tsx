@@ -228,10 +228,10 @@ export function TrendPage() {
         Trend
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
-        Run the long strategy and fixed short benchmark across the database. Each direction has
-        its own positions, exits and pending actions; one asset can appear in both lists.
-        Long uses 20/55 with an initial 3×ATR stop and no Chandelier. Short remains the
-        20/20 comparison benchmark with initial 2×ATR and Chandelier 3×ATR.
+        Run all enabled PMs to save Donchian and SMA200 long and short results across the database.
+        Each PM owns its positions, stops and exits; several PMs can hold the same asset independently.
+        SMA200 uses a fixed 3×ATR initial stop and next-open entries and exits.
+        The assigned Donchian long and fixed Donchian short benchmark remain available.
       </Typography>
 
       <Stack

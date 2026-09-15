@@ -23,7 +23,21 @@ class EngineResult:
     directions: dict[str, EngineResult] = field(default_factory=dict)
 
 
-def run(bars: list[dict], params: SignalParams, *, start: int = 0) -> EngineResult:
+@dataclass
+class CloseRules:
+    """Close-confirmed decisions supplied by a family; execution stays shared."""
+
+    entries: list[int]
+    long_exits: list[bool]
+    short_exits: list[bool]
+    ready: list[bool]
+    overlays: dict
+    entry_reason: str
+    exit_reason: str
+
+
+def run(bars: list[dict], params: SignalParams, *, start: int = 0,
+        rules: CloseRules | None = None) -> EngineResult:
     n = len(bars)
     dates = [b["date"] for b in bars]
     o = [float(b["o"]) for b in bars]
@@ -33,11 +47,29 @@ def run(bars: list[dict], params: SignalParams, *, start: int = 0) -> EngineResu
     if not n:
         return EngineResult(overlays={"dates": [], "donchian_up": [], "donchian_dn": [], "stop_line": []})
     atr = ind.wilder_atr(h, low, c, params.atr_len)
-    dc_up_e, dc_dn_e = ind.donchian(h, low, params.entry_len)
-    dc_up_x, dc_dn_x = ind.donchian(h, low, params.exit_len)
-    ma_reg = ind.sma(c, params.ma_regime) if params.use_ma_regime else [None] * n
+    if rules is None:
+        dc_up_e, dc_dn_e = ind.donchian(h, low, params.entry_len)
+        dc_up_x, dc_dn_x = ind.donchian(h, low, params.exit_len)
+        ma_reg = ind.sma(c, params.ma_regime) if params.use_ma_regime else [None] * n
+        entries = []
+        for t in range(n):
+            d = 1 if dc_up_e[t] is not None and c[t] > dc_up_e[t] else (
+                -1 if dc_dn_e[t] is not None and c[t] < dc_dn_e[t] else 0)
+            if d and params.use_ma_regime and ma_reg[t] is not None:
+                if (d == 1 and c[t] <= ma_reg[t]) or (d == -1 and c[t] >= ma_reg[t]):
+                    d = 0
+            entries.append(d)
+        rules = CloseRules(
+            entries=entries,
+            long_exits=[dc_dn_x[t] is not None and c[t] < dc_dn_x[t] for t in range(n)],
+            short_exits=[dc_up_x[t] is not None and c[t] > dc_up_x[t] for t in range(n)],
+            ready=[v is not None for v in dc_up_e],
+            overlays={'donchian_up': dc_up_e, 'donchian_dn': dc_dn_e},
+            entry_reason='breakout', exit_reason='channel_reversal')
+    if any(len(values) != n for values in (rules.entries, rules.long_exits, rules.short_exits, rules.ready)):
+        raise ValueError('Close rules must match input bars')
     stops: list[float | None] = [None] * n
-    overlays = {"dates": dates, "donchian_up": dc_up_e, "donchian_dn": dc_dn_e,
+    overlays = {**rules.overlays, "dates": dates,
                 "stop_line": stops, "atr": atr}
     trades: list[dict] = []
     ledger: list[dict] = []
@@ -88,7 +120,7 @@ def run(bars: list[dict], params: SignalParams, *, start: int = 0) -> EngineResu
         if pending is not None:
             order, pending = pending, None
             if order["action"] in ("exit", "reverse"):
-                close_position(t, o[t], "channel_reversal", prior_atr)
+                close_position(t, o[t], order["reason"], prior_atr)
                 exited = True
             if order["action"] in ("enter", "reverse"):
                 open_position(order["direction"], t, o[t], order["signal_i"])
@@ -115,36 +147,32 @@ def run(bars: list[dict], params: SignalParams, *, start: int = 0) -> EngineResu
                 pos["mae"] = min(pos["mae"], adverse)
                 pos["mfe"] = max(pos["mfe"], favorable)
 
-        if t < max(start, params.warmup()) or atr[t] is None or dc_up_e[t] is None:
+        if t < max(start, params.warmup()) or atr[t] is None or not rules.ready[t]:
             continue
 
         if pos is not None:
             d = pos["direction"]
-            channel_exit = (d == 1 and dc_dn_x[t] is not None and c[t] < dc_dn_x[t]) or (
-                d == -1 and dc_up_x[t] is not None and c[t] > dc_up_x[t])
+            channel_exit = rules.long_exits[t] if d == 1 else rules.short_exits[t]
             if params.channel_enabled and channel_exit:
                 reverse = params.stop_and_reverse and allowed(-d)
                 if params.fill_at == "close":
-                    close_position(t, c[t], "channel_reversal", atr[t])
+                    close_position(t, c[t], rules.exit_reason, atr[t])
                     if reverse:
                         open_position(-d, t, c[t], t)
                 else:
                     pending = {"action": "reverse" if reverse else "exit",
                                "direction": -d if reverse else d, "signal_i": t,
-                               "reason": "channel_reversal"}
+                               "reason": rules.exit_reason}
         elif not exited or params.fill_at == "open_next":
             # A stop prevents another fill today, but today's closing breakout
             # can still confirm an order for the following session.
-            d = 1 if c[t] > dc_up_e[t] else (-1 if c[t] < dc_dn_e[t] else 0)
-            if d and params.use_ma_regime and ma_reg[t] is not None:
-                if (d == 1 and c[t] <= ma_reg[t]) or (d == -1 and c[t] >= ma_reg[t]):
-                    d = 0
+            d = rules.entries[t]
             if d and allowed(d):
                 if params.fill_at == "close":
                     open_position(d, t, c[t], t)
                 else:
                     pending = {"action": "enter", "direction": d, "signal_i": t,
-                               "reason": "breakout"}
+                               "reason": rules.entry_reason}
 
         if pos is not None and params.trailing_enabled:
             # Revise after the close; never test this revised stop on today's range.

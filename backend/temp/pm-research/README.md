@@ -1,9 +1,11 @@
-# Current independent-PM research
+# Historical independent-PM research
 
-Start with `docs/temp/agent-work-checklist.md` at the repository root. It records
-current jobs and output manifests; check them before starting another experiment.
-The roadmap and research report live alongside that checklist. Earlier archived
-experiments must not be retrieved without explicit user instruction.
+The research workflow below is retained for provenance. It is not an active task
+queue. Do not run these commands or restart experiments without a new explicit
+user request for research. Start with `docs/temp/agent-work-checklist.md` at the
+repository root for application delivery and the user's latest scope.
+The technical playbook and historical report live alongside that checklist.
+Earlier archived experiments must not be retrieved without explicit user instruction.
 
 These source files and small planning documents are retained in Git. SQLite
 inputs, source copies in run outputs, ledgers, generated charts, Playwright files
