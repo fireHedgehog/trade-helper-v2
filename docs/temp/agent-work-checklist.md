@@ -20,6 +20,9 @@ Technical definitions and editable defaults: [technical playbook](strategy-compa
 - Never commit or push. The user revoked all earlier commit/push authorisation.
   Leave changes uncommitted; the user controls Git history and publication.
 - Build visible application capability from established techniques; tune parameters later.
+- Individual Trend/Timing runs and all-Trend/all-PM runs always recalculate from full
+  available stored history. Never introduce incremental/append-only calculations or
+  skip unchanged assets. Market-data fetch mode does not control strategy history.
 - Every directional strategy must cover long entry/exit AND short entry/exit explicitly.
 - No up/down trend still needs a defined state and useful setup choices. Separate range
   width from volatility and its expansion/contraction. Include range long/short, buying

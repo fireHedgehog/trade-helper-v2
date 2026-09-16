@@ -12,6 +12,10 @@ discretionary technical trader; implementation first, parameter tuning later.**
 
 - Start at `docs/temp/agent-work-checklist.md`, then read only the relevant part
   of `docs/temp/strategy-comparison-experiment-design.md` (the technical playbook).
+- Trend/Timing and PM computations must always replay the full available stored
+  history, for individual assets and all-target runs. Never make them incremental,
+  append-only, shortened-window or skip-unchanged computations. Fetching new market
+  data is a separate operation; its incremental mode must not change strategy runs.
 - Use established technical disciplines and clear editable defaults. Combine
   structure, location, trigger, invalidation and targets with relevant evidence.
 - Preserve uptrend, downtrend, confirmed range and unclear-state distinctions.

@@ -285,9 +285,11 @@ def _universe_targets(conn: sqlite3.Connection) -> list[str]:
     return out
 
 
-def run_universe(conn: sqlite3.Connection, run_id: int, mode: str = "incremental") -> None:
+def run_universe(conn: sqlite3.Connection, run_id: int, mode: str = "full") -> None:
     """`run_id` is the fetch_runs row driving the progress bar. A companion
-    `signal_runs` row is the domain record the board reads."""
+    `signal_runs` row is the domain record the board reads.
+    Every target is recalculated from its complete stored history. `mode` is
+    accepted for caller compatibility and never truncates or skips histories."""
     # Resolve the assigned long preset once. run_pair adds the independent,
     # fixed short benchmark for every symbol.
     resolved = repo.resolve_symbol_params(conn)

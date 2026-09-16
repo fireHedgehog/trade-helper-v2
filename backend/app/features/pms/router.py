@@ -16,7 +16,7 @@ class RunRequest(BaseModel):
 @router.post('/run')
 def run(body: RunRequest):
     from app.features.data_management import worker
-    run_id,deduped=worker.submit('pm_universe',scope_arg=json.dumps(body.symbols) if body.symbols else None)
+    run_id,deduped=worker.submit('pm_universe',mode='full',scope_arg=json.dumps(body.symbols) if body.symbols else None)
     return {'run_id':run_id,'deduped':deduped}
 
 

@@ -123,6 +123,7 @@ def test_worker_persists_both_pms_and_reads_frozen_charts_without_rerun(client):
     job=wait_job(client,reply['run_id'])
     assert job['status']=='succeeded',job
     assert job['planned_targets']==job['completed_targets']==4
+    assert job['mode']=='full'
     choices=client.get('/api/pms/choices/SPY').json()
     assert choices['run_status']=='succeeded'
     assert len(choices['choices'])==4

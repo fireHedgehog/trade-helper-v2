@@ -90,6 +90,10 @@ def submit(kind: str, mode: str = "incremental", scope: str = "all",
     """
     if kind not in VALID_KINDS:
         raise ValueError(f"Unknown fetch kind '{kind}'")
+    # Strategy calculations always replay complete stored histories. Fetch
+    # modes must not label them incremental or become a shortcut around replay.
+    if kind in ('signal_universe', 'pm_universe'):
+        mode = 'full'
     if _queue is None:
         raise RuntimeError("Fetch worker is not running")
     with get_connection() as conn:

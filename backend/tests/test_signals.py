@@ -253,6 +253,57 @@ def test_universe_run_populates_the_board(client):
 
 
 # Executions use only information available when the order can fill.
+def test_individual_preview_and_universe_replay_full_history_on_repeated_runs(client, monkeypatch):
+    from app.db.connection import get_connection
+    from app.features.signals import service
+    from tests.test_pms import wait_job
+
+    with get_connection() as conn:
+        _seed_bars(conn, 'SPY', n=300)
+        first_date = conn.execute("SELECT MIN(date) FROM price_bars WHERE symbol='SPY'").fetchone()[0]
+    calls = []
+    original = service._full_result
+
+    def record(bars, params):
+        calls.append((len(bars), bars[0]['date'], bars[0]['c']))
+        return original(bars, params)
+
+    monkeypatch.setattr(service, '_full_result', record)
+    monkeypatch.setattr(service, '_universe_targets', lambda conn: ['SPY'])
+    assert client.post('/api/signals/run', json={'symbol':'SPY'}).status_code == 200
+    from app.features.signals.params import LONG_PARAMS
+    assert client.post('/api/signals/preview', json={'symbol':'SPY','params':LONG_PARAMS.model_dump()}).status_code == 200
+    with get_connection() as conn:
+        conn.execute("UPDATE price_bars SET adj_open=103,adj_high=104,adj_low=102,adj_close=103 WHERE symbol='SPY' AND date=?", (first_date,))
+    assert client.post('/api/signals/run', json={'symbol':'SPY'}).status_code == 200
+    job = client.post('/api/signals/run-universe').json()
+    status = wait_job(client, job['run_id'])
+    assert status['status'] == 'succeeded' and status['mode'] == 'full'
+    assert len(calls) == 4
+    assert all(count == 300 and day == first_date for count, day, _ in calls)
+    assert calls[0][2] != 103 and calls[2][2] == calls[3][2] == 103
+
+
+def test_shared_fetch_endpoint_forces_full_strategy_jobs_only(client, monkeypatch):
+    from app.features.data_management import worker
+    queued = []
+
+    class Queue:
+        def put_nowait(self, job):
+            queued.append(job)
+
+        def qsize(self):
+            return len(queued)
+
+    monkeypatch.setattr(worker, '_queue', Queue())
+    for kind, expected in [('signal_universe','full'), ('pm_universe','full'), ('asset_prices','incremental')]:
+        response = client.post('/api/data/runs', json={'kind':kind, 'mode':'incremental'})
+        assert response.status_code == 200
+        status = client.get(f"/api/data/runs/{response.json()['run_id']}").json()
+        assert status['mode'] == expected
+        assert queued[-1].mode == expected
+
+
 def _execution_bars(*sessions):
     bars = _bars([100.0] * 35)
     for op, hi, lo, cl in sessions:

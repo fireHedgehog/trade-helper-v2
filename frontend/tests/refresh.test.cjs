@@ -34,7 +34,8 @@ test("one click uses every existing fetch in dependency order, baseline and rank
     "asset_catalog", "memberships", "asset_prices", "crypto_bars", "commodity_prices",
     "macro", "option_snapshots", "baseline", "ranking", "signal_universe",
   ]);
-  assert.ok(calls.filter(c => typeof c === "object").every(c => c.mode === "incremental" && c.scope === "all"));
+  assert.ok(calls.filter(c => typeof c === "object").every(c =>
+    c.mode === (c.kind === "signal_universe" ? "full" : "incremental") && c.scope === "all"));
   assert.equal(flow.getSnapshot().phase, "done");
   assert.equal(refreshProgress(flow.getSnapshot()), 100);
 });

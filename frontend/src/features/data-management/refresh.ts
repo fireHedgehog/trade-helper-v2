@@ -58,7 +58,8 @@ export function createRefreshWorkflow(api: Dependencies, saved?: RefreshState) {
         const step = REFRESH_STEPS[state.step];
         if (step.kind) {
           if (state.runId === null) {
-            const started = await api.startRun({ kind: step.kind, mode: state.mode, scope: "all" });
+            const mode = step.kind === "signal_universe" || step.kind === "pm_universe" ? "full" : state.mode;
+            const started = await api.startRun({ kind: step.kind, mode, scope: "all" });
             if (started.deduped) {
               throw new Error("A separate run of this step is already active. Let it finish, then retry this step.");
             }

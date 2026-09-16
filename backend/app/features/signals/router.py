@@ -115,7 +115,7 @@ def run_universe():
     infrastructure as the Data-management fetches)."""
     from app.features.data_management import worker
 
-    run_id, deduped = worker.submit("signal_universe")
+    run_id, deduped = worker.submit("signal_universe", mode="full")
     return {"run_id": run_id, "deduped": deduped}
 
 

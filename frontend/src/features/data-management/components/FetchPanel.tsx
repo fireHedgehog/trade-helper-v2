@@ -94,7 +94,7 @@ export function FetchPanel({
     try {
       const { run_id, deduped } = await dataApi.startRun({
         kind,
-        mode,
+        mode: kind === "signal_universe" || kind === "pm_universe" ? "full" : mode,
         scope,
         scope_arg: scopeArg,
       });
