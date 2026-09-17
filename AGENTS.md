@@ -1,5 +1,28 @@
 # Project instructions
 
+## Product first; reuse the original application
+
+- Product functionality is the first priority. Profitability, losses, drawdown,
+  bankruptcy in simulations, or whether a strategy performs well on the short
+  side are not admission gates for implementing requested application features.
+  Do not substitute research or performance debates for working app functions.
+- Unless the user explicitly requests a new UI, first inspect and reuse the
+  original UI, its design and its complete feature set. Do not silently replace,
+  simplify or omit existing controls, columns, views, calculations or behaviours.
+- Every new strategy must inherit the shared application functions and UI.
+  Adapt strategy data to the existing contracts; do not create a separate table,
+  page, layout or reduced feature set for a strategy.
+- If an existing component or function cannot be reused, make it reusable FIRST.
+  Do not register another strategy until it can use the shared product features.
+  Strategy-specific rules and parameter metadata belong in registration, not
+  copied frontend components or hardcoded branches in the shared pages.
+- Before declaring a strategy integration complete, check parity with the
+  original product: run selected/run all, both directions, settings, saved
+  results, signals, watchlist/table/chart views, context columns, holdings,
+  links, performance and applicable sizing. Report omissions explicitly.
+- Preserve layout proportions, scrolling and responsive behaviour. Do not
+  resize the user's browser or add layout rules as part of strategy work.
+
 ## Git control belongs to the user
 
 - Never run git commit or git push. The user explicitly prohibited both.
@@ -26,6 +49,14 @@ discretionary technical trader; implementation first, parameter tuning later.**
 - Every directional family includes long AND short behaviour. Neutral/range and
   options volatility exposure must be explicit. Never substitute the fixed short
   benchmark for implementing a new family's short side.
+- Trend and Timing use one strategy dropdown (Donchian, SMA) and independent
+  Long/Short checkboxes. Both checked shows both directions. Never expose each
+  direction as a separate strategy option; saved direction accounts stay independent.
+- All registered strategies must use the same Trend UI and functions: watchlist,
+  mini-charts, momentum/volatility context, signals, holdings, allocation guidance,
+  direction filters and full-history runs. Register metadata/engine logic and adapt
+  results to the shared contract. Never build a separate strategy-specific board
+  or copy the UI; new registrations must appear without frontend family branches.
 - Do not run quantitative research, comparative backtests, profitability gates,
   parameter sweeps or statistical/forward validation unless the user explicitly
   requests that work again. Do not resume the superseded T01-T50 research plan.

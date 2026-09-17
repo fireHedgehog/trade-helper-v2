@@ -170,6 +170,7 @@ export function TimingChart({
       }
       if (overlays.short_stop_line) {
         const shortStop = chart.addSeries(LineSeries, {color: '#a96dd0', lineWidth: 2,
+          lineVisible: !overlays.sma, pointMarkersVisible: !!overlays.sma, pointMarkersRadius: 1.5,
           lineStyle: LineStyle.SparseDotted, priceLineVisible: false, lastValueVisible: false});
         shortStop.setData(pick(overlays.short_stop_line));
       }

@@ -1,7 +1,7 @@
 """Expected engine identities by family, shared by evaluation and read surfaces."""
-from app.features.signals.params import ENGINE_VERSION as DONCHIAN_VERSION
-from .sma import ENGINE_VERSION as SMA_VERSION
+from .registry import STRATEGIES
 
 
 def current_engine_version(family: str) -> str | None:
-    return {'donchian': DONCHIAN_VERSION, 'sma': SMA_VERSION}.get(family)
+    strategy = STRATEGIES.get(family)
+    return strategy.engine_version if strategy else None

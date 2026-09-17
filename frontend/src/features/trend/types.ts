@@ -23,6 +23,12 @@ export interface MiniEvent {
 }
 
 export interface BoardRow {
+  family?: string;
+  pm_run_id?: number;
+  pm_key?: string;
+  pm_version?: string;
+  status?: string;
+  error?: string | null;
   direction?: 'long' | 'short';
   atr_20?: number | null;
   directions?: Partial<Record<'long' | 'short', Omit<BoardRow, 'directions'>>>;
@@ -51,7 +57,7 @@ export interface WatchSection {
 }
 
 export interface BoardStrategy {
-  id: number;
+  id: number | string;
   key: string;
   name: string;
   is_default: boolean;
@@ -60,6 +66,12 @@ export interface BoardStrategy {
 }
 
 export interface BoardResponse {
+  family?: string;
+  strategy_name?: string;
+  source?: 'assigned' | 'saved';
+  pm_run_id?: number;
+  run_status?: string;
+  unavailable?: BoardRow[];
   status: "ok" | "not_computed";
   computed_at?: string;
   engine_version?: string;

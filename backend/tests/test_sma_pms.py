@@ -139,6 +139,19 @@ def test_worker_saves_all_families_and_read_only_sma_charts(client):
             assert all(t['direction']==choice['direction'] for t in selected['trades'])
             saved.append((params, selected))
     out = client.get('/api/pms/assessment/SMAFIX').json()
+    for family in ('sma','donchian'):
+        paired = client.get('/api/pms/family-timing/SMAFIX', params={'run_id':choices['run_id'],'family':family}).json()
+        assert paired['status']=='ok' and set(paired['directions'])=={'long','short'}
+        assert paired['unavailable_directions']=={} and 'pm_direction' not in paired
+        sides = paired['directions']
+        expected = [(l+s)/2 for l,s in zip(sides['long']['equity']['strat_equity'], sides['short']['equity']['strat_equity'])]
+        assert paired['equity']['strat_equity'] == pytest.approx(expected)
+        assert engine.compound([d['strat_ret'] for d in paired['daily']]) == pytest.approx(expected)
+        assert paired['metrics']['strategy']['total_return'] == pytest.approx(expected[-1]-1)
+        assert len(paired['bars'])==len(xs)
+        if family=='sma':
+            assert paired['trades']==sorted([t for _,v in saved for t in v['trades']],key=lambda t:(t['entry_date'],t['direction']))
+            assert all(paired['directions'][v['pm_direction']]==v['directions'][v['pm_direction']] for _,v in saved)
     assert out['coverage']['expected_families']==2 and out['coverage']['available_families']==2
     assert all('PM engine version is outdated' not in p['reasons'] for p in out['pms'])
     with get_connection() as conn:
@@ -153,3 +166,13 @@ def test_worker_saves_all_families_and_read_only_sma_charts(client):
         assert reread['stale'] and reread['bars']==selected['bars'] and reread['trades']==selected['trades']
     with get_connection() as conn:
         assert conn.execute('SELECT COUNT(*) FROM pm_results').fetchone()[0]==count
+    # A disabled direction remains unavailable, never fabricated as a flat account.
+    reply = client.post('/api/pms/run', json={'symbols':['SMAFIX']}).json()
+    assert wait_job(client, reply['run_id'])['status']=='succeeded'
+    latest = client.get('/api/pms/choices/SMAFIX').json()
+    partial = client.get('/api/pms/family-timing/SMAFIX', params={'run_id':latest['run_id'],'family':'sma'}).json()
+    assert partial['status']=='ok' and set(partial['directions'])=={'long'}
+    assert partial['unavailable_directions']=={'short':'Not included in this saved run'}
+    assert 'metrics' not in partial and 'equity' not in partial
+    original = client.get('/api/pms/family-timing/SMAFIX', params={'run_id':choices['run_id'],'family':'sma'}).json()
+    assert set(original['directions'])=={'long','short'} and original['stale']

@@ -132,6 +132,7 @@ export interface Metrics {
 }
 
 export interface TimingResponse {
+  unavailable_directions?: Partial<Record<Direction, string>>;
   pm_key?: string;
   pm_name?: string;
   pm_family?: string;

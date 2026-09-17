@@ -63,7 +63,7 @@ export function WatchlistCharts({ sections, tf, windowKey, mas }: Props) {
                     spacing={1}
                     sx={{ alignItems: "center", mb: 0.25, minWidth: 0 }}
                   >
-                    <SymLink symbol={r.symbol} />
+                    <SymLink symbol={r.symbol} row={r} />
                     <StateCell row={r} />
                     <Box sx={{ flex: 1 }} />
                     {r.vol_60d != null && (

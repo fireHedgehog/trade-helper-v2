@@ -10,8 +10,8 @@ import zlib
 from app.features.data_management import runs as jobs
 from app.features.signals import data as prices, engine, repository as signals
 from app.features.signals.params import SignalParams
-from . import repository as repo, sma
-from .adapters import adapt, definitions
+from . import repository as repo, registry
+from .adapters import adapt
 from .contracts import PMResult, Position, content_hash
 from .versions import current_engine_version
 
@@ -22,18 +22,20 @@ def load_bars(conn, symbol):
     return [dict(r) for r in conn.execute(f'SELECT date,{fields},volume v FROM {table} WHERE symbol=? ORDER BY date',(symbol,))]
 
 
-def freeze(conn, symbols=None):
+def freeze(conn, symbols=None, family=None):
     """One SQLite read transaction freezes assignments and compressed asset inputs."""
     frozen,plan={},[]
+    if family is not None: registry.get(family)
     with repo.atomic(conn):
         if symbols is None:
             symbols=[r[0] for r in conn.execute('SELECT symbol FROM price_bars UNION SELECT symbol FROM crypto_bars UNION SELECT symbol FROM pm_assignments')]
         for symbol in sorted({prices.normalize_symbol(s) for s in symbols}):
             params=SignalParams(**signals.resolve_one(conn,symbol)['params'])
-            selected={d.key:d for d in (*definitions(params), *sma.definitions())}
+            selected={d.key:d for strategy in registry.STRATEGIES.values() for d in strategy.definitions(params)}
             for definition,enabled in repo.assignments(conn,symbol):
                 if enabled: selected[definition.key]=definition
                 else: selected.pop(definition.key,None)
+            if family is not None: selected={k:d for k,d in selected.items() if d.family==family}
             if not selected: continue
             bars=load_bars(conn,symbol)
             digest=content_hash(bars)
@@ -52,22 +54,16 @@ def evaluate(symbol,bars,definition):
     expected_version=current_engine_version(definition.family)
     if expected_version is None: raise ValueError(f'Unsupported PM family: {definition.family}')
     if definition.engine_version!=expected_version: raise ValueError('PM engine version needs a new definition')
-    if definition.family=='sma':
-        params=sma.SMAParams(**definition.parameters)
-        start=max(definition.start_bar,params.start_bar())
-        return adapt(symbol,bars,definition,sma.run(bars,params,definition.direction,start=start),start)
-    params=SignalParams(**definition.parameters)
-    if params.allow_long!=(definition.direction=='long') or params.allow_short!=(definition.direction=='short'):
-        raise ValueError('PM direction does not match its engine parameters')
-    start=max(definition.start_bar,params.warmup())
-    result=engine.run(bars,params,start=start)
+    result,start=registry.get(definition.family).execute(bars,definition)
     return adapt(symbol,bars,definition,result,start)
 
 
 def run(conn: sqlite3.Connection, fetch_run_id: int, scope_arg=None):
     selected=json.loads(scope_arg) if scope_arg else None
+    family=selected.get('family') if isinstance(selected,dict) else None
+    symbols=selected.get('symbols') if isinstance(selected,dict) else selected
     jobs.raise_if_cancelled(fetch_run_id)
-    frozen,plan=freeze(conn,selected)
+    frozen,plan=freeze(conn,symbols,family)
     if not plan: raise ValueError('No enabled PM targets with selected assets')
     jobs.set_planned(conn,fetch_run_id,len(plan))
     with repo.atomic(conn):
@@ -106,10 +102,12 @@ def run(conn: sqlite3.Connection, fetch_run_id: int, scope_arg=None):
     return pm_run
 
 
-def choices(conn,symbol,run_id=None):
+def choices(conn,symbol,run_id=None,family=None):
     symbol=prices.normalize_symbol(symbol)
     if run_id is None:
-        row=conn.execute('SELECT MAX(run_id) FROM pm_targets WHERE symbol=?',(symbol,)).fetchone()
+        row=conn.execute('''SELECT MAX(t.run_id) FROM pm_targets t JOIN pm_definitions d
+            ON d.pm_key=t.pm_key AND d.version=t.version WHERE t.symbol=?
+            AND (? IS NULL OR json_extract(d.definition_json,'$.family')=?)''',(symbol,family,family)).fetchone()
         run_id=row[0]
     if run_id is None: return {'status':'not_computed','symbol':symbol,'choices':[]}
     run_info=repo.get_run(conn,run_id)
@@ -119,8 +117,9 @@ def choices(conn,symbol,run_id=None):
     for row in conn.execute('''SELECT t.*,d.definition_json FROM pm_targets t JOIN pm_definitions d
         ON d.pm_key=t.pm_key AND d.version=t.version WHERE t.run_id=? AND t.symbol=? ORDER BY t.pm_key''',(run_id,symbol)):
         definition=json.loads(row['definition_json'])
+        if family is not None and definition['family']!=family: continue
         options.append({'key':row['pm_key'],'version':row['version'],'name':definition['name'],
-                        'direction':definition['direction'],'status':row['status'],'error':row['error'],
+                        'family':definition['family'],'direction':definition['direction'],'status':row['status'],'error':row['error'],
                         'stale':row['input_hash']!=current_hash,
                         'engine_stale':definition['engine_version']!=current_engine_version(definition['family'])})
     return {'status':'ok','symbol':symbol,'run_id':run_id,'run_status':run_info['status'],
@@ -160,6 +159,55 @@ def timing(conn,run_id,symbol,key,version):
                 'metrics':result.metrics,'overlays':result.overlays,'equity':equity,'params':result.pm.parameters}}}
 
 
+def family_timing(conn,run_id,symbol,family):
+    """Read both independent accounts from one saved run; never execute a strategy."""
+    from app.features.signals.metrics import summarise
+    options = choices(conn,symbol,run_id)
+    members = [p for p in options['choices'] if p['family']==family]
+    if not members: raise ValueError('This strategy has no results in the requested run')
+    views = {}
+    unavailable = {}
+    for side in ('long','short'):
+        member = next((p for p in members if p['direction']==side),None)
+        if member is None:
+            unavailable[side] = 'Not included in this saved run'
+        elif member['status']!='ok':
+            unavailable[side] = member['error'] or member['status']
+        else:
+            views[side] = timing(conn,run_id,symbol,member['key'],member['version'])
+    base = {'symbol':options['symbol'],'pm_family':family,
+            'pm_name':registry.get(family).name,
+            'pm_run_id':run_id,'pm_run_status':options['run_status'],
+            'computed_at':options['computed_at'],'unavailable_directions':unavailable}
+    if not views:
+        return {**base,'status':'not_computed','reason':'No usable direction results in this saved run'}
+    first = next(iter(views.values()))
+    result = {**first,**base,'directions':{side:v['directions'][side] for side,v in views.items()},
+              'stale':any(v['stale'] for v in views.values()),
+              'needs_recompute':any(v['needs_recompute'] for v in views.values()),
+              'trades':sorted([t for v in views.values() for t in v['trades']],key=lambda t:(t['entry_date'],t['direction'])),
+              'markers':sorted([m for v in views.values() for m in v['markers']],key=lambda m:(m['time'],m['side']))}
+    for key in ('pm_key','pm_version','pm_direction','state','pending_action','metrics','equity','daily'):
+        result.pop(key,None)
+    if unavailable: return result  # Never report partial coverage as combined performance.
+    long,short = views['long'],views['short']
+    if long['equity']['dates'] != short['equity']['dates']:
+        raise ValueError('Saved direction histories do not align')
+    combined = [(l+s)/2 for l,s in zip(long['equity']['strat_equity'],short['equity']['strat_equity'])]
+    previous = 1.0
+    daily = []
+    for l,s,value in zip(long['daily'],short['daily'],combined):
+        la,sa = l['state']!=0,s['state']!=0
+        daily.append({'date':l['date'],'state':2 if la and sa else 1 if la else -1 if sa else 0,
+                      'long_active':la,'short_active':sa,'long_ret':l['strat_ret'],'short_ret':s['strat_ret'],
+                      'strat_ret':value/previous-1 if previous else 0})
+        previous = value
+    bars = [{'date':b['time'],'o':b['open'],'h':b['high'],'l':b['low'],'c':b['close'],'v':b['volume']} for b in first['bars']]
+    result.update(daily=daily,metrics=summarise(result['trades'],daily,bars),
+                  equity={**long['equity'],'strat_equity':combined,'drawdown':engine.drawdown_curve(combined)})
+    return result
+
+
 def board(conn,run_id=None):
     if run_id is None: run_id=conn.execute('SELECT MAX(id) FROM pm_runs').fetchone()[0]
     if run_id is None: return {'status':'not_computed','rows':[],'pms':[]}
@@ -169,9 +217,9 @@ def board(conn,run_id=None):
     for target in conn.execute('''SELECT t.*,d.definition_json FROM pm_targets t JOIN pm_definitions d
         ON d.pm_key=t.pm_key AND d.version=t.version WHERE t.run_id=? ORDER BY t.symbol,t.pm_key''',(run_id,)):
         definition=json.loads(target['definition_json'])
-        pms[target['pm_key']]={'key':target['pm_key'],'name':definition['name'],'direction':definition['direction']}
+        pms[target['pm_key']]={'key':target['pm_key'],'name':definition['name'],'family':definition['family'],'direction':definition['direction']}
         rows.append({**json.loads(target['summary_json'] or '{}'),'symbol':target['symbol'],
                      'pm_key':target['pm_key'],'pm_version':target['version'],'pm_name':definition['name'],
-                     'direction':definition['direction'],'status':target['status'],'error':target['error']})
+                     'family':definition['family'],'direction':definition['direction'],'status':target['status'],'error':target['error']})
     return {'status':'ok','run_id':run_id,'run_status':info['status'],'computed_at':info['finished_at'],
             'rows':rows,'pms':list(pms.values())}

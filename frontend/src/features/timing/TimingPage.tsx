@@ -24,7 +24,7 @@ import Typography from "@mui/material/Typography";
 
 import { ApiError } from "@/shared/api/client";
 import { fmtTs } from "@/shared/format";
-import { pmApi, pmToken, type PMChoices } from "@/features/pms/api";
+import { pmApi, type PMChoices, type RegisteredStrategy } from "@/features/pms/api";
 import { AssessmentPanel } from "@/features/pms/AssessmentPanel";
 
 import { EquityChart } from "./EquityChart";
@@ -100,11 +100,25 @@ export function TimingPage() {
   const linkedPM = search.get("pm");
   const linkedVersion = search.get("version");
   const linkedRun = Number(search.get("run")) || undefined;
-  const [selection, setSelection] = useState(linkedPM && linkedVersion ? `${linkedPM}@${linkedVersion}` : "legacy");
+  const linkedFamily = search.get("strategy");
+  const linkedDirections = search.get("directions");
+  const [strategies, setStrategies] = useState<RegisteredStrategy[]>([]);
+  useEffect(() => { void pmApi.strategies().then(setStrategies).catch(e => setError(String(e))); }, []);
+  const [selection, setSelection] = useState(linkedFamily ?? "donchian");
   const [pmChoices, setPmChoices] = useState<PMChoices | null>(null);
   useEffect(() => {
-    setSelection(linkedPM && linkedVersion ? `${linkedPM}@${linkedVersion}` : "legacy");
-  }, [linkedPM, linkedVersion]);
+    const linked = pmChoices?.choices.find(p => p.key === linkedPM && p.version === linkedVersion);
+    setSelection(linkedFamily ?? linked?.family ?? "donchian");
+    if (linked) {
+      setDirLong(linked.direction === "long");
+      setDirShort(linked.direction === "short");
+    } else if (linkedDirections != null) {
+      setDirLong(linkedDirections.split(',').includes('long'));
+      setDirShort(linkedDirections.split(',').includes('short'));
+    }
+  }, [linkedFamily, linkedPM, linkedVersion, linkedDirections, pmChoices]);
+  const selectedName = strategies.find(s => s.key === selection)?.name ?? selection;
+  const savedSelection = selection !== "donchian" || !!linkedPM || !!linkedRun;
 
   const initialSymbol = (routeSymbol || localStorage.getItem(LS_SYMBOL) || "QQQ").toUpperCase();
 
@@ -129,13 +143,12 @@ export function TimingPage() {
   const [dirLong, setDirLong] = useState(savedView.includes("long"));
   const [dirShort, setDirShort] = useState(savedView.includes("short"));
   const bothOff = !dirLong && !dirShort;
-  const effLong = selection === "legacy" ? dirLong || bothOff : data?.pm_direction === "long";
-  const effShort = selection === "legacy" ? dirShort || bothOff : data?.pm_direction === "short";
+  const effLong = dirLong;
+  const effShort = dirShort;
   const showBoth = effLong && effShort;
   useEffect(() => {
-    if (selection !== "legacy") return;
     localStorage.setItem(LS_VIEW, [effLong && "long", effShort && "short"].filter(Boolean).join(","));
-  }, [effLong, effShort, selection]);
+  }, [effLong, effShort]);
 
   // --- symbol picker (remote search-as-you-type) ---
   // `symValue` is the picked option, held in state — NOT derived from the
@@ -182,32 +195,38 @@ export function TimingPage() {
   useEffect(() => {
     let alive = true;
     setPmChoices(null);
-    void pmApi.choices(symbol, linkedRun).then(value => { if (alive) setPmChoices(value); })
+    void pmApi.choices(symbol, linkedRun, linkedPM ? undefined : selection).then(value => { if (alive) setPmChoices(value); })
       .catch(e => { if (alive) setError(String(e)); });
     return () => { alive = false; };
-  }, [symbol, linkedRun]);
+  }, [symbol, linkedRun, linkedPM, selection]);
 
   useEffect(() => {
     let alive = true;
     localStorage.setItem(LS_SYMBOL, symbol);
     setError(null);
     setData(null);
-    const choice = pmChoices?.choices.find(p => pmToken(p) === selection);
-    if (selection !== "legacy" && (!choice || !pmChoices?.run_id)) {
-      if (pmChoices) setError("This PM is unavailable in the selected saved run. Choose a listed PM or run enabled PMs on Trend.");
+    if (linkedPM && pmChoices && !pmChoices.choices.some(p => p.key === linkedPM && p.version === linkedVersion)) {
+      setError("The requested saved result is unavailable. Choose a strategy to view its latest results.");
       return () => { alive = false; };
     }
-    const request = selection === "legacy" ? timingApi.timing(symbol) : pmApi.timing(symbol, pmChoices!.run_id!, choice!);
+    const choice = pmChoices?.choices.find(p => p.family === selection);
+    if (savedSelection && (!choice || !pmChoices?.run_id)) {
+      if (pmChoices) setError("This strategy is unavailable in the selected saved run. Run enabled PMs on Trend.");
+      return () => { alive = false; };
+    }
+    const request = savedSelection ? pmApi.familyTiming(symbol, pmChoices!.run_id!, selection)
+      : timingApi.timing(symbol).then(assigned => choice && pmChoices?.run_id
+          && (pmChoices.computed_at ?? '') > (assigned.computed_at ?? '')
+        ? pmApi.familyTiming(symbol, pmChoices.run_id, selection) : assigned);
     void request.then(value => { if (alive) setData(value); })
       .catch(e => { if (alive) setError(e instanceof ApiError ? e.message : String(e)); });
     return () => { alive = false; };
-  }, [symbol, selection, pmChoices]);
+  }, [symbol, selection, savedSelection, pmChoices, linkedPM, linkedVersion]);
 
   const onPickSymbol = (s: string) => {
     const up = s.toUpperCase();
     setSymbol(up);
-    setSelection("legacy");
-    navigate(`/timing/${encodeURIComponent(up)}`, { replace: true });
+    navigate(`/timing/${encodeURIComponent(up)}?strategy=${selection}`, { replace: true });
   };
 
   const doRun = async () => {
@@ -238,6 +257,10 @@ export function TimingPage() {
     const visibleTrades = trades.filter((t) => keep(t.direction));
     const visibleMarkers = markers.filter((m) => keep(m.side));
     const side = data?.directions?.[effLong ? 'long' : 'short'];
+    if (bothOff || (!showBoth && data?.unavailable_directions?.[effLong ? 'long' : 'short'])) {
+      return { trades: visibleTrades, markers: visibleMarkers, metrics: undefined,
+        equity: undefined, state: undefined, filtered: true };
+    }
     if (!showBoth && side?.metrics && side.equity) {
       return { trades: visibleTrades, markers: visibleMarkers, metrics: side.metrics,
         equity: side.equity, state: side.state, filtered: true };
@@ -274,10 +297,15 @@ export function TimingPage() {
     const state = side?.state ?? filterState(data.state, visibleTrades);
 
     return { trades: visibleTrades, markers: visibleMarkers, metrics, equity, state, filtered: true };
-  }, [data, effLong, effShort, showBoth]);
+  }, [data, effLong, effShort, showBoth, bothOff]);
 
   const m = view.metrics;
   const visibleSides = (['long', 'short'] as const).filter(side => side === 'long' ? effLong : effShort);
+  const selectedOverlays = data?.directions
+    ? showBoth && data.directions.long?.overlays
+      ? {...data.directions.long.overlays, short_stop_line: data.directions.short?.overlays?.stop_line}
+      : data.directions[effLong ? 'long' : 'short']?.overlays ?? (showBoth ? data.directions.short?.overlays : undefined)
+    : data?.overlays;
   const pendingActions = data?.directions
     ? visibleSides.map(side => data.directions?.[side]?.pending_action).filter(action => action != null)
     : [data?.pending_action].filter(action => action != null).filter(action => visibleSides.includes(action.direction));
@@ -295,7 +323,7 @@ export function TimingPage() {
         Timing
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
-        {selection !== "legacy" ? <>Inspect a saved independent PM for {symbol}. Its entries, exits and position belong to this PM; selecting another view does not rerun it.</> : <>Two independent strategy accounts for {symbol}: {strategyLabel || 'the assigned long strategy'}
+        {savedSelection ? <>Inspect {selectedName} for {symbol}. Long and short positions are saved independently; changing the view does not rerun them.</> : <>Two independent strategy accounts for {symbol}: {strategyLabel || 'the assigned long strategy'}
         {" "}and the fixed short benchmark. Each owns its position and exits; they can hold opposite
         positions at the same time. Run previews both using the parameters below.</>}
       </Typography>
@@ -343,28 +371,24 @@ export function TimingPage() {
         <TextField
           select
           size="small"
-          label="Model / saved PM"
+          label="Strategy"
           disabled={running}
           sx={{ width: 300 }}
           value={selection}
           onChange={(e) => {
             const value = e.target.value;
             setSelection(value);
-            const pm = pmChoices?.choices.find(p => pmToken(p) === value);
-            setSearch(pm && pmChoices?.run_id ? { pm: pm.key, version: pm.version, run: String(pmChoices.run_id) } : {}, { replace: true });
+            setSearch({ strategy: value }, { replace: true });
           }}
         >
-          <MenuItem value="legacy">Assigned Donchian / preview</MenuItem>
-          {pmChoices?.choices.map(pm => <MenuItem key={pmToken(pm)} value={pmToken(pm)}>
-            {pm.name}{pm.status !== "ok" ? ` · ${pm.status}` : ""}{pm.stale ? " · prices changed" : ""}
-          </MenuItem>)}
-          {selection !== "legacy" && !pmChoices?.choices.some(pm => pmToken(pm) === selection) &&
-            <MenuItem value={selection}>Requested saved PM</MenuItem>}
+          {(strategies.length ? strategies : [{key:selection,name:selectedName}]).map(s => <MenuItem key={s.key} value={s.key}>{s.name}</MenuItem>)}
         </TextField>
-        <Button variant="contained" onClick={doRun} disabled={running || selection !== "legacy"}>
+        <FormControlLabel control={<Checkbox size="small" checked={effLong} onChange={e => setDirLong(e.target.checked)} />} label="Long" />
+        <FormControlLabel control={<Checkbox size="small" checked={effShort} onChange={e => setDirShort(e.target.checked)} />} label="Short" />
+        <Button variant="contained" onClick={doRun} disabled={running || savedSelection}>
           {running ? "Running…" : `Run ${symbol}`}
         </Button>
-        <Button size="small" disabled={selection !== "legacy"} onClick={() => setShowParams((s) => !s)}>
+        <Button size="small" disabled={savedSelection} onClick={() => setShowParams((s) => !s)}>
           {showParams ? "Hide parameters & guide" : "Parameters & guide"}
         </Button>
         {data?.computed_at && (
@@ -377,21 +401,20 @@ export function TimingPage() {
 
       {pmChoices?.run_id && <AssessmentPanel symbol={symbol} runId={pmChoices.run_id} />}
 
-      {selection !== "legacy" && <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
-        Saved PM: {data?.pm_name ?? "loading"}. Use Trend's Run all enabled PMs to refresh saved results; choose Assigned Donchian / preview for unsaved parameter experiments.
+      {savedSelection && <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+        Saved strategy: {data?.pm_name ?? "loading"}. Use Trend's Run all enabled PMs to refresh saved results.
       </Typography>}
-      {selection !== "legacy" && data?.params?.model === "sma" && <Paper sx={{ p: 2, mb: 2 }}>
+      {savedSelection && data?.params?.model === "sma" && <Paper sx={{ p: 2, mb: 2 }}>
         <Typography variant="subtitle2">{data.pm_name}: entry, exit and stop</Typography>
         <Typography variant="body2" color="text.secondary">
-          A completed daily close {data.pm_direction === 'long' ? 'above' : 'below'} SMA{data.params.period} schedules
-          a {data.pm_direction} entry at the next open. A close {data.pm_direction === 'long' ? 'below' : 'above'} the
-          average schedules an exit; equality leaves the position unchanged.
+          A completed daily close above SMA{data.params.period} schedules a long entry; a close below schedules a short entry.
+          Each direction exits on a close across the average. Fills occur at the next open; equality leaves positions unchanged.
           The initial stop stays fixed {data.params.atr_stop_mult} × ATR({data.params.atr_len})
-          {data.pm_direction === 'long' ? ' below' : ' above'} the entry, using ATR known at the signal close.
+          {' '}below a long entry or above a short entry, using ATR known at the signal close.
           Gaps through a stop fill at the open. There is no trailing stop or fixed profit target.
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Orange line: strategy SMA. Dotted red line: stop. Each fill includes {data.params.cost_bps} bps
+          Orange line: strategy SMA. Dotted lines: stops (purple for short when both are shown). Each fill includes {data.params.cost_bps} bps
           and {data.params.slippage_atr} × ATR in modeled costs; short borrow and financing are excluded.
           This PM owns its positions and exits independently.
         </Typography>
@@ -403,7 +426,11 @@ export function TimingPage() {
       {data?.pm_run_status && data.pm_run_status !== "succeeded" && <Alert severity="warning" sx={{ mb: 2 }}>
         This PM belongs to a {data.pm_run_status} run. Other PMs may be unavailable.
       </Alert>}
-      <Collapse in={showParams && selection === "legacy"}>
+      {visibleSides.map(side => data?.unavailable_directions?.[side] && <Alert key={side} severity="warning" sx={{ mb: 2 }}>
+        {side === 'long' ? 'Long' : 'Short'} unavailable: {data.unavailable_directions[side]}. Combined performance requires both directions.
+      </Alert>)}
+      {bothOff && <Alert severity="info" sx={{ mb: 2 }}>Select Long, Short or both to display results.</Alert>}
+      <Collapse in={showParams && !savedSelection}>
         <Paper sx={{ p: 2, mb: 2 }}>
           {params && (
             <>
@@ -546,7 +573,7 @@ export function TimingPage() {
 
       {notComputed && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          {selection === "legacy" ? <>No run stored for {symbol} yet — press <b>Run {symbol}</b>.</> : data?.reason ?? "This PM has no usable result. Run enabled PMs on Trend."}
+          {!savedSelection ? <>No run stored for {symbol} yet — press <b>Run {symbol}</b>.</> : data?.reason ?? "This strategy has no usable result. Run enabled PMs on Trend."}
         </Alert>
       )}
 
@@ -569,21 +596,21 @@ export function TimingPage() {
         </Alert>
       )}
 
-      {data?.status === "ok" && (
+      {data?.status === "ok" && !bothOff && (
         <>
           <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
               Current simulated positions {data.preview ? "· preview" : "· saved Trend result"}
             </Typography>
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
-              {(data.pm_direction ? [data.pm_direction] : ['long', 'short'] as const).map(side => {
+              {visibleSides.map(side => {
                 const state = data.directions?.[side]?.state;
                 const lastExit = (data.trades ?? []).filter(t => t.direction === side && t.exit_date)
                   .sort((a, b) => b.exit_date!.localeCompare(a.exit_date!))[0];
                 return (
                   <Box key={side} sx={{ minWidth: 0 }}>
                     <Typography variant="body2" sx={{ mb: 0.5, fontWeight: 600, color: side === 'long' ? green : red }}>
-                      {data.pm_name ?? (side === 'long' ? 'Long strategy' : 'Short benchmark')}
+                      {data.pm_name ?? 'Donchian'} {side === 'long' ? 'Long' : 'Short'}
                     </Typography>
                     {state ? <StateChip state={state} /> : <Chip variant="outlined" label="Not computed" />}
                     {state?.state === side && lastExit && (
@@ -606,14 +633,6 @@ export function TimingPage() {
               <Typography variant="body2" color="text.secondary" sx={{ mr: 0.5 }}>
                 Chart & history
               </Typography>
-              {selection === "legacy" ? <><FormControlLabel
-                control={<Checkbox size="small" disabled={selection !== "legacy"} checked={effLong} onChange={(e) => setDirLong(e.target.checked)} />}
-                label="Long strategy"
-              />
-              <FormControlLabel
-                control={<Checkbox size="small" disabled={selection !== "legacy"} checked={effShort} onChange={(e) => setDirShort(e.target.checked)} />}
-                label="Short benchmark"
-              /></> : <Chip size="small" label={data.pm_name} color={data.pm_direction === 'long' ? 'success' : 'error'} />}
             </Box>
             <ToggleButtonGroup size="small" exclusive value={timeframe} onChange={(_, v) => v && setTimeframe(v)}>
               {(["D", "W", "M"] as Timeframe[]).map((t) => (
@@ -650,13 +669,13 @@ export function TimingPage() {
 
           <Paper sx={{ p: 1, mb: 2 }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", px: 1, mb: 0.5 }}>
-              {data.pm_name ? `${data.pm_direction === 'long' ? 'Green' : 'Red'}: ${data.pm_name}. ` : 'Green: Long strategy · Red: Short benchmark. '}
+              Green: Long · Red: Short.{' '}
               Arrows mark entries; circles mark exits.
               Each exit closes only its own trade.
             </Typography>
             <TimingChart
               bars={data.bars ?? []}
-              overlays={showBoth && data.directions?.long?.overlays ? {...data.directions.long.overlays, short_stop_line: data.directions.short?.overlays?.stop_line} : data.directions?.[effLong ? 'long' : 'short']?.overlays ?? data.overlays}
+              overlays={selectedOverlays}
               markers={view.markers}
               keyLevels={keyLevels}
               timeframe={timeframe}
@@ -678,10 +697,10 @@ export function TimingPage() {
               </Typography>
               {view.filtered && (
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-                  {data.pm_name ?? (effLong ? "Long strategy" : "Short benchmark")}: standalone account performance.
-                  {!data.pm_name && 'Selecting both shows two independent accounts starting with equal capital.'}
+                  {data.pm_name ?? 'Donchian'} {effLong ? 'Long' : 'Short'}: standalone account performance.
                 </Typography>
               )}
+              {showBoth && <Typography variant="caption" color="text.secondary">Both directions: two independent accounts starting with equal capital.</Typography>}
               <Stack direction={{ xs: "column", md: "row" }} spacing={4}>
                 <StatGrid
                   title="Trade stats"
@@ -819,7 +838,7 @@ function TradeTable({ trades, pmName }: { trades: Trade[]; pmName?: string }) {
           return (
             <TableRow key={i}>
               <TableCell sx={{ color: t.direction === "long" ? green : red, fontWeight: 600 }}>
-                {pmName ?? (t.direction === 'long' ? 'Long strategy' : 'Short benchmark')}
+                {pmName ?? 'Donchian'} {t.direction === 'long' ? 'Long' : 'Short'}
               </TableCell>
               <TableCell><Chip size="small" variant={open ? "filled" : "outlined"} label={open ? "Open" : "Closed"} /></TableCell>
               <TableCell>{t.entry_date}</TableCell>

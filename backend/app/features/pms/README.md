@@ -1,6 +1,7 @@
 # Independent PM contract, version 1
 
-A PM is an independently named strategy, not a display filter. Each result is
+A PM is an independently stored direction account. The product groups these
+accounts under one registered strategy with Long/Short view checkboxes. Each result is
 identified by run + asset + PM key + preset version. Several same-direction or
 opposing PMs may hold an asset independently. An exit belongs only to its PM.
 
@@ -39,10 +40,37 @@ saves and reloads; changed parameters produce a new version; changed inputs cann
 be inserted under the old run; switching chart selection must never mutate data.
 
 Trend's Run all enabled PMs submits the existing background worker. Timing and
-Trend extend their existing model dropdowns with saved PMs; selection does not
+Trend use one registered-strategy dropdown; selection does not
 compute or change assignments. Frozen input bars preserve historical charts even
 if live prices change. Migrations 0019-0021 add storage without replacing legacy
 signal tables. Changing a PM definition requires a new version and run.
+
+## Shared product contract
+
+Register a strategy in [registry.py](registry.py): metadata, default direction
+definitions and an execution adapter returning the existing engine result. The
+worker, current-version checks and strategy dropdowns discover this registration.
+Do not add another frontend board or branch on the strategy name in Trend.
+
+[trend.py](trend.py) adapts immutable PM results to the original `BoardResponse`:
+watchlist sections, long/short/flat buckets, pending actions, unavailable accounts,
+momentum and volatility context, preset information and optional mini-chart data.
+Every strategy uses the original Trend tables, charts, direction controls and
+allocation guidance. Frozen prices and that strategy's saved trades supply the
+mini-charts; these reads never execute an engine or change saved results.
+Missing accounts remain unavailable. A later run of another family must not hide
+this family's saved results. The legacy Donchian store is a compatibility data
+adapter feeding the same UI, not a separate page implementation.
+
+Run selected passes `{ "family": "..." }` through the existing worker; run all
+omits the family. Both directions and the full available stored price history are
+always computed, regardless of display checkboxes. Existing list-of-symbols run
+requests remain supported. A selected-family run never rewrites sibling results.
+
+Product parity is not yet complete outside Trend: Timing's execution/parameter
+controls and funded Sizing still require shared strategy integration. Do not
+register another strategy or claim complete app integration before those shared
+features are reusable. Profitability research is not a prerequisite.
 
 [Descriptive assessment](assessment-contract.md) reads all targets for the asset
 in the selected run. Timing displays family-level support and expandable evidence.

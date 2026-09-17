@@ -7,15 +7,20 @@ Technical definitions and editable defaults: [technical playbook](strategy-compa
 
 | Field | Current state |
 | --- | --- |
-| Latest user scope | User resumed implementation: “ok continue then”, starting with the proposed SMA production delivery. |
-| Current deliverable | APP01 complete: production SMA long and short run and display in the local app. |
-| Implementation state | APP01 complete; continue application delivery, no new research. |
-| Next implementation task | APP02: direction, range structure, volatility condition and location. Then directional, two-way range and explicit volatility setup definitions; opportunity grades and leveraged instruments follow. Do not redo SMA. |
+| Latest user scope | Product first. Reuse the original UI and functions; make them reusable before registering another strategy. No new UI without explicit request. |
+| Current deliverable | Shared Trend UI restored and verified for Donchian/SMA. Next: shared Timing Run/parameters and Sizing. |
+| Implementation state | SMA engines and independent persistence work. Product parity is incomplete: Timing Run/parameter controls and Sizing still need shared strategy integration. Do not report engine delivery as complete application integration. |
+| Next implementation task | Finish shared product parity before registering another strategy. Then resume APP02 structure/location, followed by setup definitions, aggregation, grades and instruments. No new research. |
 | Research state | Historical work retained. No experiment, sweep or performance-admission task is active. |
 | Existing checkpoint | PM implementation: f1bffc4. Historical research checkpoint: efdd0ac. |
 | Handoff | Read this section and the claimed task only, then its relevant playbook section and local contracts. |
 
 ## 2. Rules for every task
+
+- Reuse the original UI and complete app feature set unless the user explicitly
+  requests a new design. Make non-reusable components reusable before registering
+  another strategy. Product delivery comes first; profitability, simulation losses
+  or short-side performance are not implementation admission gates.
 
 - Never commit or push. The user revoked all earlier commit/push authorisation.
   Leave changes uncommitted; the user controls Git history and publication.
@@ -41,6 +46,15 @@ Technical definitions and editable defaults: [technical playbook](strategy-compa
   Respect a later stop or narrower task.
 
 ## 3. Completed capability: reuse it
+
+2026-09-16 — Restored one registered-strategy dropdown and Long/Short checkboxes.
+Removed the separate saved-PM table; Donchian/SMA now use the original Trend
+watchlist, table/chart modes, momentum/volatility columns, signal accordion,
+holdings, allocation guidance and links. Registration supplies the common board
+contract and selected/all full-history runs. A synthetic third registration passed
+the same backend contract without frontend changes. PM/shared-contract tests,
+frontend tests/build/typecheck and browser parity checks passed; view changes made
+no writes. Timing Run/parameters and Sizing parity are still open. No commits/pushes.
 
 These are recorded implementation checkpoints, not fresh full-suite results from this documentation task.
 
@@ -68,7 +82,7 @@ acceptance conditions and both directions. Do not count documents as product com
 
 | ID | Status | Deliverable | Prerequisites | Done means |
 | --- | --- | --- | --- | --- |
-| APP01 | [x] done | Production SMA long and short | Existing PM contract | Versioned SMA200 long/short PMs run and save independently, use next-open entries/exits, a fixed 3 ATR20 stop and existing cost accounting, and appear in Trend/Timing with overlays and reasons. Donchian remains available. Completion evidence below. |
+| APP01 | [~] engine delivered; product parity open | Production SMA long and short | Existing PM contract | Engines, independent persistence and shared Trend are delivered/verified. Shared Timing Run/parameters and Sizing remain unfinished. Do not mark full product integration done until those original functions apply to SMA and future registrations. |
 | APP02 | [ ] proposed | Structure, volatility condition and location on charts | Existing bars/charts; playbook §§3, 8 | Confirmed HH/HL/LH/LL and protected levels; UP/DOWN/RANGE/TRANSITION/UNKNOWN; anchored zones/channels and high/middle/low labels; narrow/wide range and volatility expansion/contraction described separately; reasons and unavailable cases visible. |
 | APP03 | [ ] proposed | Trend pullback long AND trend rally short | APP02 | Both daily recipes from §4 run/save as independent PMs; entry, stop, first obstacle/target, cost and invalidation visible. |
 | APP04 | [ ] proposed | Range long AND range short | APP02 | Both range-edge recipes run/save; broken ranges suspend entries; middle-of-range and unclear structure do not become automatic signals. |

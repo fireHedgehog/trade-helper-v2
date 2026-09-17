@@ -37,11 +37,12 @@ import WarningAmberRounded from "@mui/icons-material/WarningAmberRounded";
 
 import { FetchPanel } from "@/features/data-management/components/FetchPanel";
 import { fmtTs } from "@/shared/format";
-import { pmApi, type PMBoard } from "@/features/pms/api";
-import { SavedPMBoard } from "@/features/pms/SavedPMBoard";
+import { pmApi, type RegisteredStrategy } from "@/features/pms/api";
 
 import { trendApi } from "./api";
 import { watchlistForDirection, type WatchDirection } from "./watchlist";
+import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import { WatchlistCharts } from "./components/WatchlistCharts";
 import { MA_RAMP, type MiniTf, type MiniWindow } from "./components/MiniChart";
 import type { BoardResponse, BoardRow, BoardStrategy, MomentumInfo, WatchSection } from "./types";
@@ -180,19 +181,18 @@ function MomCell({ row }: { row: BoardRow }) {
 const MA_CHOICES = [5, 10, 50, 100];
 
 export function TrendPage() {
-  const [pmView, setPmView] = useState("legacy");
-  const [pmBoard, setPmBoard] = useState<PMBoard | null>(null);
-  const [pmError, setPmError] = useState<string | null>(null);
-  const loadPMs = useCallback(() => {
-    setPmError(null);
-    void pmApi.board().then(setPmBoard).catch(e => setPmError(String(e)));
-  }, []);
-  const pmDone = useCallback(() => { loadPMs(); setPmView("all"); }, [loadPMs]);
-  useEffect(loadPMs, [loadPMs]);
+  const [pmView, setPmView] = useState(localStorage.getItem('trend.strategy') ?? 'donchian');
+  const [strategies, setStrategies] = useState<RegisteredStrategy[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  const refresh = useCallback(() => setRevision(v => v + 1), []);
+  useEffect(() => { void pmApi.strategies().then(setStrategies).catch(e => setError(String(e))); }, []);
   const [board, setBoard] = useState<BoardResponse | null>(null);
   const [showFlat, setShowFlat] = useState(false);
   const [showAlloc, setShowAlloc] = useState(false);
-  const [watchDirection, setWatchDirection] = useState<WatchDirection>("long");
+  const [dirLong, setDirLong] = useState(true);
+  const [dirShort, setDirShort] = useState(true);
+  const directions: WatchDirection[] = [...(dirLong ? ['long' as const] : []), ...(dirShort ? ['short' as const] : [])];
 
   // Watchlist view: default is always the compact table; "charts" is opt-in and
   // triggers a heavier board fetch (?charts=1) the first time it's opened.
@@ -202,25 +202,27 @@ export function TrendPage() {
   const [miniWindow, setMiniWindow] = useState<MiniWindow>("3M");
   const [miniMas, setMiniMas] = useState<number[]>([]); // MA lines off by default — pick your own
 
-  const loadBoard = useCallback((charts = false) => {
-    void trendApi.board(charts).then((b) => {
-      setBoard(b);
-      if (charts) setChartsLoaded(true);
-    });
-  }, []);
   useEffect(() => {
-    loadBoard(false);
-  }, [loadBoard]);
-  useEffect(() => {
-    if (wlView === "charts" && !chartsLoaded) loadBoard(true);
-  }, [wlView, chartsLoaded, loadBoard]);
+    let alive = true;
+    localStorage.setItem('trend.strategy', pmView);
+    setBoard(null);
+    setChartsLoaded(false);
+    setError(null);
+    void trendApi.board(pmView, wlView === 'charts').then(b => {
+      if (alive) { setBoard(b); setChartsLoaded(wlView === 'charts'); }
+    }).catch(e => { if (alive) setError(String(e)); });
+    return () => { alive = false; };
+  }, [pmView, wlView, revision]);
 
   const toggleMa = (n: number) =>
     setMiniMas((xs) => (xs.includes(n) ? xs.filter((x) => x !== n) : [...xs, n].sort((a, b) => a - b)));
 
   const notComputed = board?.status === "not_computed";
-  const watchSections = watchlistForDirection(board?.watchlist ?? [], watchDirection);
-  const shownComputedAt = pmView === "legacy" ? board?.computed_at : pmBoard?.computed_at;
+  const watchSections = directions.flatMap(direction => watchlistForDirection(board?.watchlist ?? [], direction)
+    .map(section => ({...section, title: `${section.title} · ${direction === 'long' ? 'Long' : 'Short'}`})));
+  const pending = (board?.pending ?? []).filter(row => directions.includes(row.pending_action!.direction));
+  const unavailable = (board?.unavailable ?? []).filter(row => directions.includes(row.direction!));
+  const strategyName = strategies.find(s => s.key === pmView)?.name ?? pmView;
 
   return (
     <div>
@@ -228,10 +230,8 @@ export function TrendPage() {
         Trend
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
-        Run all enabled PMs to save Donchian and SMA200 long and short results across the database.
-        Each PM owns its positions, stops and exits; several PMs can hold the same asset independently.
-        SMA200 uses a fixed 3×ATR initial stop and next-open entries and exits.
-        The assigned Donchian long and fixed Donchian short benchmark remain available.
+        Select a strategy to view its signals, positions and charts. Long and short accounts remain independent.
+        Runs recalculate the full stored history; the checkboxes only filter the display.
       </Typography>
 
       <Stack
@@ -240,41 +240,44 @@ export function TrendPage() {
         useFlexGap
         sx={{ mb: 2, alignItems: "center", flexWrap: "wrap" }}
       >
-        <TextField select size="small" label="Model / PM view" sx={{ width: 280 }} value={pmView} onChange={e => setPmView(e.target.value)}>
-          <MenuItem value="legacy">Assigned Donchian (existing board)</MenuItem>
-          <MenuItem value="all">All saved PMs</MenuItem>
-          {pmBoard?.pms.map(pm => <MenuItem key={pm.key} value={pm.key}>{pm.name}</MenuItem>)}
+        <TextField select size="small" label="Strategy" sx={{ width: 280 }} value={pmView} onChange={e => setPmView(e.target.value)}>
+          {(strategies.length ? strategies : [{key:pmView,name:strategyName}]).map(s => <MenuItem key={s.key} value={s.key}>{s.name}</MenuItem>)}
         </TextField>
-        <FetchPanel kind="pm_universe" buttonLabel="Run all enabled PMs" onDone={pmDone} />
-        {pmView === "legacy" &&
+        <FormControlLabel control={<Checkbox size="small" checked={dirLong} onChange={e => setDirLong(e.target.checked)} />} label="Long" />
+        <FormControlLabel control={<Checkbox size="small" checked={dirShort} onChange={e => setDirShort(e.target.checked)} />} label="Short" />
+        <FetchPanel kind="pm_universe" buttonLabel="Run all enabled PMs" onDone={refresh} />
         <FetchPanel
-          kind="signal_universe"
-          buttonLabel="Run trend backtest"
-          onDone={() => loadBoard(wlView === "charts")}
-        />}
-        {shownComputedAt && (
+          kind="pm_universe"
+          scopeArg={JSON.stringify({family:pmView})}
+          buttonLabel={`Run ${strategyName}`}
+          onDone={refresh}
+        />
+        {board?.computed_at && (
           <Typography variant="caption" color="text.secondary">
-            last run {fmtTs(shownComputedAt)}
+            last run {fmtTs(board.computed_at)}
           </Typography>
         )}
       </Stack>
 
-      {pmError && <Alert severity="error" sx={{ mb: 2 }}>{pmError}</Alert>}
-      {pmView === "legacy" ? <>
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {!board && !error && <Typography>Loading {strategyName}…</Typography>}
+      {directions.length === 0 ? <Alert severity="info">Select Long, Short or both to display results.</Alert> : <>
 
       {notComputed && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Not computed yet — press <b>Run trend backtest</b>. It walks ~700 symbols and takes a few
-          seconds.
+          Not computed yet — press <b>Run {strategyName}</b>.
         </Alert>
       )}
 
       {board?.needs_recompute && (
         <Alert severity="warning" sx={{ mb: 2 }}>
-          Run trend backtest to calculate signals and performance with the current trading rules.
+          Run {strategyName} to calculate signals and performance with the current trading rules.
         </Alert>
       )}
 
+      {board?.run_status && board.run_status !== 'succeeded' && <Alert severity="warning" sx={{ mb:2 }}>
+        This saved run is {board.run_status}. Unavailable results are shown below.
+      </Alert>}
       {board?.status === "ok" && (
         <Accordion defaultExpanded={false} disableGutters sx={{ mb: 2 }}>
           <AccordionSummary
@@ -283,7 +286,7 @@ export function TrendPage() {
             aria-controls="trend-signals-content"
           >
             <Typography variant="subtitle2">
-              Today's signals ({board.pending?.length ?? 0})
+              Today's signals ({pending.length})
             </Typography>
           </AccordionSummary>
           <AccordionDetails sx={{ minWidth: 0 }}>
@@ -293,10 +296,10 @@ export function TrendPage() {
             </Typography>
             <Box sx={{ overflowX: "auto" }}>
               <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(260px, 1fr))", gap: 2 }}>
-                <SignalTable title="Long signals" rows={board.pending ?? []} direction="long" action="enter" />
-                <SignalTable title="Long exit signals" rows={board.pending ?? []} direction="long" action="exit" />
-                <SignalTable title="Short signals" rows={board.pending ?? []} direction="short" action="enter" />
-                <SignalTable title="Short exit signals" rows={board.pending ?? []} direction="short" action="exit" />
+                <SignalTable title="Long signals" rows={pending} direction="long" action="enter" />
+                <SignalTable title="Long exit signals" rows={pending} direction="long" action="exit" />
+                <SignalTable title="Short signals" rows={pending} direction="short" action="enter" />
+                <SignalTable title="Short exit signals" rows={pending} direction="short" action="exit" />
               </Box>
             </Box>
           </AccordionDetails>
@@ -311,16 +314,6 @@ export function TrendPage() {
           sx={{ alignItems: "center", mb: 1, flexWrap: "wrap" }}
         >
           <Typography variant="subtitle2">Watchlist</Typography>
-          <ToggleButtonGroup
-            size="small"
-            exclusive
-            value={watchDirection}
-            aria-label="Watchlist strategy direction"
-            onChange={(_, v: WatchDirection | null) => v && setWatchDirection(v)}
-          >
-            <ToggleButton value="long">Long strategy</ToggleButton>
-            <ToggleButton value="short">Short benchmark</ToggleButton>
-          </ToggleButtonGroup>
           <ToggleButtonGroup
             size="small"
             exclusive
@@ -386,7 +379,7 @@ export function TrendPage() {
           )}
         </Stack>
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-          Positions and trades for the {watchDirection === "long" ? "long strategy" : "short benchmark"}.
+          Positions and trades for {directions.join(' and ')}.
           Flat means this direction has no open position. Confirmed next-open actions appear above.
         </Typography>
         <Collapse in={showAlloc}>
@@ -410,7 +403,7 @@ export function TrendPage() {
 
       {board?.status === "ok" && (
         <>
-          <Paper sx={{ p: 2, mb: 2 }}>
+          {dirLong && <Paper sx={{ p: 2, mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
               Holding long ({board.counts?.long ?? board.long.length}){" "}
               <Typography component="span" variant="caption" color="text.secondary">
@@ -418,21 +411,21 @@ export function TrendPage() {
               </Typography>
             </Typography>
             <BoardTable rows={board.long} rankFrom={1} />
-          </Paper>
+          </Paper>}
 
-          <Paper sx={{ p: 2, mb: 2 }}>
+          {dirShort && <Paper sx={{ p: 2, mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
-              Holding short · fixed benchmark ({board.counts?.short ?? board.short.length}){" "}
+              Holding short ({board.counts?.short ?? board.short.length}){" "}
               <Typography component="span" variant="caption" color="text.secondary">
                 — newest entry first
               </Typography>
             </Typography>
             <BoardTable rows={board.short} rankFrom={1} />
-          </Paper>
+          </Paper>}
 
           <Paper sx={{ p: 2 }}>
             <Button size="small" onClick={() => setShowFlat((s) => !s)}>
-              {showFlat ? "Hide" : "Show"} flat in both strategies ({board.counts?.flat ?? board.flat.length})
+              {showFlat ? "Hide" : "Show"} flat in both directions ({board.counts?.flat ?? board.flat.length})
             </Button>
             <Collapse in={showFlat}>
               <Box sx={{ mt: 1 }}>
@@ -447,7 +440,11 @@ export function TrendPage() {
           </Paper>
         </>
       )}
-      </> : <SavedPMBoard board={pmBoard} selected={pmView} />}
+      {unavailable.length > 0 && <Paper sx={{ p:2, mt:2 }}>
+        <Typography variant="subtitle2">Unavailable results ({unavailable.length})</Typography>
+        <BoardTable rows={unavailable} rankFrom={null} showFlatCols />
+      </Paper>}
+      </>}
     </div>
   );
 }
@@ -485,7 +482,7 @@ function SignalTable({ title, rows, direction, action }: {
         <TableBody>
           {signals.map((row) => (
             <TableRow key={`${row.symbol}-${row.direction ?? row.pending_action?.direction}`}>
-              <TableCell><SymLink symbol={row.symbol} /></TableCell>
+              <TableCell><SymLink symbol={row.symbol} row={row} /></TableCell>
               <TableCell sx={{ whiteSpace: "nowrap" }}>{row.pending_action?.signal_date}</TableCell>
             </TableRow>
           ))}
@@ -502,7 +499,7 @@ function SignalTable({ title, rows, direction, action }: {
 
 export function StateCell({ row }: { row: BoardRow }) {
   if (!row.state)
-    return <Chip size="small" variant="outlined" label="not computed" />;
+    return <Tooltip title={row.error ?? ''}><Chip size="small" variant="outlined" label={`${row.direction ? row.direction + ': ' : ''}${row.status ?? 'not computed'}`} /></Tooltip>;
   if (row.state === "flat")
     return <Chip size="small" variant="outlined" label="flat" />;
   return (
@@ -540,7 +537,7 @@ function BoardTable({
           {rows.map((r) => (
             <TableRow key={r.symbol}>
               <TableCell>
-                <SymLink symbol={r.symbol} />
+                <SymLink symbol={r.symbol} row={r} />
               </TableCell>
               <TableCell>{r.state_since ?? NA}</TableCell>
               <VolCell v={r.vol_60d} />
@@ -574,10 +571,10 @@ function BoardTable({
             const flat = !r.state || r.state === "flat";
             const up = (r.unrealized_pct ?? 0) >= 0;
             return (
-              <TableRow key={r.symbol}>
+              <TableRow key={`${r.symbol}-${r.direction ?? ''}`}>
                 {rankFrom != null && <TableCell align="right">{rankFrom + i}</TableCell>}
                 <TableCell>
-                  <SymLink symbol={r.symbol} />
+                  <SymLink symbol={r.symbol} row={r} />
                 </TableCell>
                 {showFlatCols && (
                   <TableCell>
@@ -635,8 +632,7 @@ function AllocationNote({ strategies }: { strategies: BoardStrategy[] }) {
           equities/other ETFs, 40% bonds and 10% crypto. Reductions stay cash; caps do not force exits.
         </li>
         <li>
-          <b>Direction</b>: long-only by default. Short stays available as a fixed comparison;
-          no profitable-short claim is attached to bonds or crypto. Combined portfolios start
+          <b>Direction</b>: long and short signals belong to the selected strategy. Combined portfolios start
           with half the capital per direction and reserve short proceeds.
         </li>
         <li>
@@ -659,9 +655,14 @@ function AllocationNote({ strategies }: { strategies: BoardStrategy[] }) {
   );
 }
 
-export function SymLink({ symbol }: { symbol: string }) {
+export function SymLink({ symbol, row }: { symbol: string; row?: BoardRow }) {
+  const search = new URLSearchParams();
+  if (row?.family) search.set('strategy', row.family);
+  if (row?.pm_run_id) search.set('run', String(row.pm_run_id));
+  if (row?.direction) search.set('directions', row.direction);
+  if (row?.pm_key && row.pm_version) { search.set('pm', row.pm_key); search.set('version', row.pm_version); }
   return (
-    <Link component={RouterLink} to={`/timing/${encodeURIComponent(symbol)}`} sx={{ fontWeight: 600 }}>
+    <Link component={RouterLink} to={`/timing/${encodeURIComponent(symbol)}${search.size ? `?${search}` : ''}`} sx={{ fontWeight: 600 }}>
       {symbol}
     </Link>
   );
@@ -686,7 +687,7 @@ function WatchRow({ r }: { r: BoardRow }) {
   return (
     <TableRow>
       <TableCell>
-        <SymLink symbol={r.symbol} />
+        <SymLink symbol={r.symbol} row={r} />
       </TableCell>
       <TableCell>
         <StateCell row={r} />
