@@ -40,6 +40,28 @@ outside both so a data migration is just a new `schema/migrations/NNNN_*.sql`.
 
 ## Run it
 
+### Windows PowerShell quick start (dependencies already installed)
+
+Run these in two separate PowerShell terminals from the repository root:
+
+```powershell
+# Terminal 1: backend
+cd backend
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+```powershell
+# Terminal 2: frontend
+cd frontend
+npm.cmd run dev -- --host 127.0.0.1
+```
+
+Open http://127.0.0.1:5173/. The frontend proxies `/api` to the backend at
+http://127.0.0.1:8000/. Use `npm.cmd` in PowerShell because `npm.ps1` may be
+blocked by the local execution policy. Keep both terminals open while using the app.
+
+### First-time setup / Unix shells
+
 Two terminals.
 
 ```bash
